@@ -28,7 +28,6 @@ kotlin {
             implementation(libs.kotlinx.coroutines.core)
         }
         androidMain.dependencies {
-            implementation(libs.androidx.activity.compose)
             implementation(libs.androidx.lifecycle.process)
             implementation(libs.google.ads.mobile.sdk)
             implementation(libs.google.user.messaging.platform)
