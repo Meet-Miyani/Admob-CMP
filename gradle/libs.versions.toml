@@ -21,8 +21,8 @@ kotlin = "2.3.20"
 kotlinx-coroutines = "1.11.0"
 material3 = "1.11.0-alpha07"
 
-# --- admob-cmp (Google Mobile Ads / UMP) ---
-gmaIos = "13.5.0"       # GMA iOS XCFramework (downloaded by admob-cmp at build time)
+# --- admob-cmp-core (Google Mobile Ads / UMP) ---
+gmaIos = "13.5.0"       # GMA iOS XCFramework (downloaded by admob-cmp-core at build time)
 gmaUmpIos = "3.1.0"     # UMP iOS XCFramework
 gmaNextGen = "1.2.1"    # Android GMA Next-Gen SDK
 gmaUmp = "4.0.0"        # Android UMP (also pulled transitively by gmaNextGen)

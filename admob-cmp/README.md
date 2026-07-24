@@ -103,7 +103,7 @@ Integrating with an AI coding agent? Point it at [AGENTS.md](AGENTS.md).
 ./gradlew :admob-cmp:testAndroidHostTest     # common tests (JVM runner)
 ./gradlew :admob-cmp:checkKotlinAbi          # public API surface check
 ./gradlew :admob-cmp:updateKotlinAbi         # regenerate api/ dump after API changes
-./gradlew :admob-cmp:doctorIos               # diagnose iOS consumer integration
+./gradlew :admob-cmp-core:doctorIos          # diagnose iOS consumer integration
 ```
 
 ## License

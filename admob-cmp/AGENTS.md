@@ -205,7 +205,7 @@ then call `adManager.consent.showPrivacyOptions()`. Do NOT gate on
 
 3. If no Swift file imports GoogleMobileAds, add `-framework JavaScriptCore` to
    `OTHER_LDFLAGS` (static Kotlin framework does not autolink it).
-4. Verify: `./gradlew :admob-cmp:doctorIos` (report-only; prints ✅/❌ per check).
+4. Verify: `./gradlew :admob-cmp-core:doctorIos` (report-only; prints ✅/❌ per check).
 
 ### iOS: App Tracking Transparency (required)
 

@@ -97,7 +97,7 @@ for this library.
 Verify the whole setup with:
 
 ```bash
-./gradlew :admob-cmp:doctorIos          # report-only diagnostic
+./gradlew :admob-cmp-core:doctorIos     # report-only diagnostic
 ```
 
 ### Troubleshooting: iOS linker errors
