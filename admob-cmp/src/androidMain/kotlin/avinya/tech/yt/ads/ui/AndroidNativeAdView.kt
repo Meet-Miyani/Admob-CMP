@@ -17,8 +17,8 @@ import avinya.tech.yt.ads.AdLogger
 import avinya.tech.yt.ads.AdManagerStatus
 import avinya.tech.yt.ads.AdPlacement
 import avinya.tech.yt.ads.LocalAdManager
-import avinya.tech.yt.ads.nativead.AndroidNativeAdPool
 import avinya.tech.yt.ads.nativead.NativeAdToken
+import avinya.tech.yt.ads.nativead.peekAndroidNativeAd
 import avinya.tech.yt.ads.nativead.layout.AdLayout
 import avinya.tech.yt.ads.nativead.rendering.AndroidNativeAdLayoutRenderer
 import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAd
@@ -111,7 +111,7 @@ public actual fun NativeAdView(
             AdLogger.i("Android NativeAdView preload finished. placement=${placement.id} state=$state")
             val acquired = pool.acquire()
             token = acquired
-            nativeAd = (pool as? AndroidNativeAdPool)?.let { androidPool -> acquired?.let(androidPool::peek) }
+            nativeAd = acquired?.let(pool::peekAndroidNativeAd)
             AdLogger.i("Android NativeAdView acquired. placement=${placement.id} token=${acquired?.tokenId} nativeAdFound=${nativeAd != null}")
         }
     }

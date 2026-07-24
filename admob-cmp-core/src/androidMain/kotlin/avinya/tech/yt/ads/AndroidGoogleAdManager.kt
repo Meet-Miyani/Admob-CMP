@@ -3,9 +3,6 @@ package avinya.tech.yt.ads
 import android.app.Activity
 import android.app.Application
 import android.content.Context
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalContext
 import avinya.tech.yt.ads.internal.AdRequestAdmission
 import avinya.tech.yt.ads.internal.FullScreenPresentationArbiter
 import avinya.tech.yt.ads.internal.deriveAdmission
@@ -42,12 +39,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 private data class AdSlotKey(val placementId: String, val format: AdFormat)
-
-@Composable
-public actual fun rememberAdManager(): AdManager {
-    val context = LocalContext.current
-    return remember { AdMob.manager(context) }
-}
 
 internal class AndroidGoogleAdManager(
     val appContext: Context,

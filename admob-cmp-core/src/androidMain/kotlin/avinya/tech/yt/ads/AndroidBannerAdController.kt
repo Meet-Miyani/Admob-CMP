@@ -2,8 +2,6 @@ package avinya.tech.yt.ads
 
 import avinya.tech.yt.ads.internal.BannerCore
 import avinya.tech.yt.ads.internal.BannerPlatform
-import avinya.tech.yt.ads.ui.screenWidthDp
-import avinya.tech.yt.ads.ui.toAndroidAdSize
 import com.google.android.libraries.ads.mobile.sdk.banner.AdSize
 import com.google.android.libraries.ads.mobile.sdk.banner.BannerAd
 import com.google.android.libraries.ads.mobile.sdk.banner.BannerAdEventCallback
@@ -128,6 +126,25 @@ internal class AndroidBannerAdController internal constructor(
             })
         }
     }
+}
+
+public fun BannerAdController.currentAndroidBannerAd(): BannerAd? =
+    (this as? AndroidBannerAdController)?.currentAd()
+
+public fun BannerAdController.attachAndroidBanner(): Unit {
+    (this as? AndroidBannerAdController)?.attach()
+}
+
+public fun BannerAdController.detachAndroidBanner(): Unit {
+    (this as? AndroidBannerAdController)?.detach()
+}
+
+public fun BannerAdController.registerAndroidBannerGeometry(
+    geometry: BannerGeometry,
+    sizePolicy: AdSizePolicy,
+    requestOptions: AdRequestOptions
+): Unit {
+    (this as? AndroidBannerAdController)?.registerGeometry(geometry, sizePolicy, requestOptions)
 }
 
 private fun AdRequestOptions.withCollapsible(sizePolicy: AdSizePolicy): AdRequestOptions {

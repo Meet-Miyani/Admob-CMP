@@ -32,10 +32,13 @@ import avinya.tech.yt.ads.AdManagerStatus
 import avinya.tech.yt.ads.AdPlacement
 import avinya.tech.yt.ads.AdSizePolicy
 import avinya.tech.yt.ads.BannerGeometry
-import avinya.tech.yt.ads.AndroidBannerAdController
 import avinya.tech.yt.ads.BannerRefreshPolicy
 import avinya.tech.yt.ads.LocalAdManager
-import com.google.android.libraries.ads.mobile.sdk.banner.AdSize
+import avinya.tech.yt.ads.attachAndroidBanner
+import avinya.tech.yt.ads.currentAndroidBannerAd
+import avinya.tech.yt.ads.detachAndroidBanner
+import avinya.tech.yt.ads.registerAndroidBannerGeometry
+import avinya.tech.yt.ads.screenWidthDp
 import com.google.android.libraries.ads.mobile.sdk.banner.BannerAd
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
@@ -71,7 +74,7 @@ public actual fun BannerAdView(placement: AdPlacement, modifier: Modifier, width
     LaunchedEffect(controller) {
         controller.loadState.collect { state ->
             bannerAd = when {
-                state is AdLoadState.Loaded -> (controller as? AndroidBannerAdController)?.currentAd()
+                state is AdLoadState.Loaded -> controller.currentAndroidBannerAd()
                 // Idle means cleared/detached and the SDK object is destroyed — drop the
                 // reference so Compose stops rendering a torn-down view. Reached both by an
                 // explicit clear() and by the consent-revocation purge (sub-project A).
@@ -105,7 +108,7 @@ public actual fun BannerAdView(placement: AdPlacement, modifier: Modifier, width
             // Still register the measured geometry so refresh() uses the container width
             // rather than failing for want of a prior load.
             if (placement.bannerRefreshPolicy is BannerRefreshPolicy.Manual) {
-                (controller as? AndroidBannerAdController)?.registerGeometry(
+                controller.registerAndroidBannerGeometry(
                     BannerGeometry(resolvedWidth),
                     placement.bannerSizePolicy,
                     placement.requestOptions
@@ -184,10 +187,10 @@ public actual fun BannerAdView(placement: AdPlacement, modifier: Modifier, width
         // shared placement isn't blanked mid-transition, yet a load-once-abandoned placement
         // is still torn down deterministically.
         DisposableEffect(controller) {
-            (controller as? AndroidBannerAdController)?.attach()
+            controller.attachAndroidBanner()
             onDispose {
                 bannerAd = null
-                (controller as? AndroidBannerAdController)?.detach()
+                controller.detachAndroidBanner()
             }
         }
     }
@@ -210,18 +213,4 @@ private fun FrameLayout.bindBanner(activity: Activity, bannerAd: BannerAd) {
 
 private fun View.detachFromParent() {
     (parent as? ViewGroup)?.removeView(this)
-}
-
-internal fun Activity.screenWidthDp(): Int {
-    val metrics = resources.displayMetrics
-    return (metrics.widthPixels / metrics.density).roundToInt()
-}
-
-internal fun AdSizePolicy.toAndroidAdSize(activity: Activity, widthDp: Int): AdSize = when (this) {
-    is AdSizePolicy.AnchoredAdaptive -> AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(activity, widthDp)
-    is AdSizePolicy.LargeAnchoredAdaptive -> AdSize.getLargeAnchoredAdaptiveBannerAdSize(activity, widthDp)
-    is AdSizePolicy.InlineAdaptive -> maxHeightDp?.let { AdSize.getInlineAdaptiveBannerAdSize(widthDp, it) }
-        ?: AdSize.getCurrentOrientationInlineAdaptiveBannerAdSize(activity, widthDp)
-    is AdSizePolicy.Fixed -> AdSize(widthDp, heightDp)
-    is AdSizePolicy.Fluid -> AdSize.FLUID
 }

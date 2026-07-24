@@ -210,3 +210,6 @@ internal class AndroidNativeAdPool internal constructor(
         }
     }
 }
+
+public fun NativeAdPool.peekAndroidNativeAd(token: NativeAdToken): NativeAd? =
+    (this as? AndroidNativeAdPool)?.peek(token)
