@@ -1,13 +1,10 @@
 package avinya.tech.yt.ads
 
-import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.Stable
 
 /**
  * Per-platform AdMob **app** IDs (not ad-unit IDs). Required for
  * [AdConfig] initialization. Obtain your app IDs from the AdMob dashboard.
  */
-@Immutable
 public data class AdAppIds(
     /** Android app ID (ca-app-pub-...). */
     val android: String,
@@ -20,7 +17,6 @@ public data class AdAppIds(
  * [AdManager.initialize]. The secondary constructor provides a convenient
  * surface for the most common fields.
  */
-@Immutable
 public data class AdConfig(
     /** Per-platform AdMob app IDs. */
     val appIds: AdAppIds,
@@ -102,7 +98,6 @@ public enum class AdInitializationPhase {
  * Implementations can perform side effects (e.g., server-side config fetch,
  * GDPR consent platform integration) at specific [AdInitializationPhase]s.
  */
-@Stable
 public interface AdInitializationHook {
     /** Called during the given [phase] with the [config] used for initialization. */
     public suspend fun onPhase(phase: AdInitializationPhase, config: AdConfig)
@@ -167,7 +162,6 @@ internal fun AdConfig.initializationIdentity(platformAppId: String): AdInitializ
  * Global request configuration applied to every ad request made through
  * the SDK. Fields mirror the GMA SDK request configuration.
  */
-@Immutable
 public data class GlobalRequestConfiguration(
     /** Test device IDs that receive test ads. */
     val testDeviceIds: List<String> = emptyList(),
@@ -217,7 +211,6 @@ public enum class PublisherPrivacyPersonalizationState { Default, Enabled, Disab
  * logs a warning at initialization rather than silently doing nothing — see
  * [avinya.tech.yt.ads.TestAdIds] for a ready-made safe configuration.
  */
-@Immutable
 public data class AdDebugOptions(
     /**
      * Enables UMP debug consent settings (requires [consentTestDeviceIds] or

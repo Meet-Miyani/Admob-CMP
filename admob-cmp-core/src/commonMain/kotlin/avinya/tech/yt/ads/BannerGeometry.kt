@@ -1,6 +1,5 @@
 package avinya.tech.yt.ads
 
-import androidx.compose.runtime.Immutable
 
 /**
  * Layout geometry supplied by the host for a banner request.
@@ -16,7 +15,6 @@ import androidx.compose.runtime.Immutable
  *
  * @property widthDp the container width the ad should be sized to, in dp. Must be positive.
  */
-@Immutable
 public data class BannerGeometry(public val widthDp: Int) {
     init {
         require(widthDp > 0) { "BannerGeometry.widthDp must be positive, was $widthDp" }

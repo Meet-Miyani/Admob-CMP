@@ -1,6 +1,5 @@
 package avinya.tech.yt.ads
 
-import androidx.compose.runtime.Immutable
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -19,7 +18,6 @@ import kotlin.time.Duration.Companion.seconds
  *   presentation and the SDK reporting anything. This does NOT bound how long a user
  *   watches an ad.
  */
-@Immutable
 public data class AdTimeoutPolicy(
     val loadTimeout: Duration = 30.seconds,
     val presentationHandOffTimeout: Duration = 10.seconds

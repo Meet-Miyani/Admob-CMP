@@ -1,11 +1,9 @@
 package avinya.tech.yt.ads.nativead
 
-import androidx.compose.runtime.Immutable
 
 /**
  * Options for native ad requests and rendering.
  */
-@Immutable
 public data class NativeAdOptions(
     /** Preferred media aspect ratio. */
     val mediaAspectRatio: NativeMediaAspectRatio = NativeMediaAspectRatio.Any,
@@ -35,7 +33,6 @@ public enum class AdChoicesPlacement { TopLeft, TopRight, BottomRight, BottomLef
 /**
  * Options for native video ads.
  */
-@Immutable
 public data class NativeVideoOptions(
     /** Start video with audio muted. */
     val startMuted: Boolean = true,
@@ -49,7 +46,6 @@ public data class NativeVideoOptions(
  * Custom click gesture for native ads.
  * **Android only.** Ignored on iOS.
  */
-@Immutable
 public data class NativeCustomClickGesture(
     /** Swipe direction that triggers a click. */
     val direction: SwipeGestureDirection,
@@ -63,7 +59,6 @@ public enum class SwipeGestureDirection { Right, Left, Up, Down }
 /**
  * Information about a native ad's media asset (image or video).
  */
-@Immutable
 public data class NativeMediaInfo(
     /** Aspect ratio (width/height) of the media, or null if unknown. */
     val aspectRatio: Float?,

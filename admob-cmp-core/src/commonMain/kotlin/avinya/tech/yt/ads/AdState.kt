@@ -1,13 +1,11 @@
 package avinya.tech.yt.ads
 
-import androidx.compose.runtime.Immutable
 import kotlin.time.Duration
 
 /**
  * Represents the current state of the [AdManager]. Emitted via
  * [AdManager.status] as a [StateFlow].
  */
-@Immutable
 public sealed interface AdManagerStatus {
     /** SDK is not yet initialized. */
     public data object Idle : AdManagerStatus
@@ -50,7 +48,6 @@ public enum class ConsentMode { GatherBeforeInitialize, InitializeOnlyIfAlreadyA
  * may be true even when consent was not explicitly obtained (e.g., in
  * non-EEA regions).
  */
-@Immutable
 public sealed interface ConsentStatus {
     /** Consent status has not been determined yet. */
     public data object Unknown : ConsentStatus
@@ -74,7 +71,6 @@ public enum class PrivacyOptionsRequirementStatus { Unknown, Required, NotRequir
 /**
  * Represents the current load state of an ad or ad pool.
  */
-@Immutable
 public sealed interface AdLoadState {
     /** No load has been started yet. */
     public data object Idle : AdLoadState
@@ -89,7 +85,6 @@ public sealed interface AdLoadState {
 /**
  * Availability information for cached ads.
  */
-@Immutable
 public data class AdAvailability(
     /** True when at least one ad is ready to show. */
     val isReady: Boolean,

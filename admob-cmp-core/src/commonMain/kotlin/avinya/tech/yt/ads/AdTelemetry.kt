@@ -1,11 +1,9 @@
 package avinya.tech.yt.ads
 
-import androidx.compose.runtime.Immutable
 
 /**
  * Monetary value of an ad event, specified in micro-units of a currency.
  */
-@Immutable
 public data class AdValue(
     /** Value in micro-units (e.g., 1_000_000 = 1 unit of currency). */
     val valueMicros: Long,
@@ -22,7 +20,6 @@ public enum class AdValuePrecision { Unknown, Estimated, PublisherProvided, Prec
  * Impression-level paid event with revenue data. Emitted via
  * [AdEvent.Paid].
  */
-@Immutable
 public data class PaidEvent(
     /** The placement that earned this revenue. */
     val placementId: String,
@@ -35,7 +32,6 @@ public data class PaidEvent(
 /**
  * Information about an ad response, including mediation chain details.
  */
-@Immutable
 public data class AdResponseInfo(
     /** Unique response identifier. */
     val responseId: String? = null,
@@ -52,7 +48,6 @@ public data class AdResponseInfo(
 /**
  * Response info for a single ad network in the mediation chain.
  */
-@Immutable
 public data class AdNetworkResponseInfo(
     /** Class name of the adapter. */
     val adapterClassName: String? = null,
@@ -73,7 +68,6 @@ public data class AdNetworkResponseInfo(
 /**
  * Initialization status of a mediation adapter.
  */
-@Immutable
 public data class AdapterInitializationStatus(
     /** Name of the adapter. */
     val adapterName: String,
@@ -89,7 +83,6 @@ public data class AdapterInitializationStatus(
  * Lifecycle events emitted by ad controllers and pools. Subscribe via
  * [AdManager.events] or individual controller/pool [events] flows.
  */
-@Immutable
 public sealed interface AdEvent {
     /** The placement that produced this event, or null for global events. */
     public val placementId: String?

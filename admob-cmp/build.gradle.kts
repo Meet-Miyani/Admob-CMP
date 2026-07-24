@@ -295,6 +295,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            implementation(project(":admob-cmp-core"))
             // The `compose.runtime/foundation/ui` accessors were deprecated; depend
             // on the Compose Multiplatform artifacts directly via the catalog.
             implementation(libs.runtime)

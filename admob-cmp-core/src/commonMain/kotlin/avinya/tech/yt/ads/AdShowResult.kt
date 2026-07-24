@@ -1,12 +1,10 @@
 package avinya.tech.yt.ads
 
-import androidx.compose.runtime.Immutable
 
 /**
  * Result of a full-screen ad [show] operation. [Rewarded] only occurs for
  * rewarded and rewarded-interstitial formats.
  */
-@Immutable
 public sealed interface AdShowResult {
     /** The ad was shown and dismissed successfully. No reward granted. */
     public data object Shown : AdShowResult

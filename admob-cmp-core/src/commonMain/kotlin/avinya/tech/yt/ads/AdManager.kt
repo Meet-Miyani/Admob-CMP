@@ -1,6 +1,5 @@
 package avinya.tech.yt.ads
 
-import androidx.compose.runtime.Stable
 import avinya.tech.yt.ads.internal.emitOrLogDrop
 import avinya.tech.yt.ads.internal.FullScreenPresentationArbiter
 import avinya.tech.yt.ads.nativead.NativeAdOptions
@@ -27,7 +26,6 @@ import kotlinx.coroutines.flow.StateFlow
  * accumulate controllers without bound. For repeating UI (feeds, lists), reuse
  * one placement id across items; the native pool handles per-item ads.
  */
-@Stable
 public interface AdManager {
     /** Current initialization and consent state of the SDK. */
     public val status: StateFlow<AdManagerStatus>
@@ -109,7 +107,6 @@ internal interface FullScreenPresenceAware {
  * Call [requestConsentInfoUpdate] on every app launch and [gatherConsent] to
  * show the consent form when required. Gate ad requests on [canRequestAds].
  */
-@Stable
 public interface ConsentController {
     /** Current UMP consent status ([ConsentStatus]). */
     public val status: StateFlow<ConsentStatus>
@@ -130,7 +127,6 @@ public interface ConsentController {
 /**
  * Diagnostics and debug tools for the Google Mobile Ads SDK.
  */
-@Stable
 public interface AdDiagnostics {
     /** Opens the Ad Inspector UI (debug tool). Returns true if successful. */
     public suspend fun openAdInspector(): Boolean
@@ -163,7 +159,6 @@ public interface AdDiagnostics {
  * lifecycle. For Compose UI, prefer [BannerAdView] which manages the
  * controller automatically.
  */
-@Stable
 public interface BannerAdController {
     /** The placement this controller is bound to. */
     public val placement: AdPlacement
@@ -202,7 +197,6 @@ public interface BannerAdController {
  * destroys the ad after dismissal. Cache and TTL are managed by
  * [AdCachePolicy].
  */
-@Stable
 public interface FullScreenAdController {
     /** The placement this controller is bound to. */
     public val placement: AdPlacement
@@ -231,15 +225,12 @@ public interface FullScreenAdController {
 public typealias FullScreenAdSlot = FullScreenAdController
 
 /** Full-screen ad controller for interstitial format. */
-@Stable
 public interface InterstitialAdController : FullScreenAdController
 
 /** Full-screen ad controller for rewarded video format. */
-@Stable
 public interface RewardedAdController : FullScreenAdController
 
 /** Full-screen ad controller for rewarded interstitial format. */
-@Stable
 public interface RewardedInterstitialAdController : FullScreenAdController
 
 /**
@@ -247,7 +238,6 @@ public interface RewardedInterstitialAdController : FullScreenAdController
  * returns to the foreground. For automated lifecycle management use
  * [AppOpenAdCoordinator].
  */
-@Stable
 public interface AppOpenAdController : FullScreenAdController {
     /** Shows the ad only if [isReady]. Returns [AdShowResult.NotReady] otherwise. */
     public suspend fun showIfAvailable(options: FullScreenAdOptions = placement.fullScreenOptions): AdShowResult =
@@ -260,7 +250,6 @@ public interface AppOpenAdController : FullScreenAdController {
  * [NativeAdView] handles acquire/release automatically. Use the pool directly
  * for manual native ad rendering.
  */
-@Stable
 public interface NativeAdPool {
     /** The placement this pool is bound to. */
     public val placement: AdPlacement

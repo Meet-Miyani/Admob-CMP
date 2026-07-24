@@ -1,6 +1,5 @@
 package avinya.tech.yt.ads
 
-import androidx.compose.runtime.Immutable
 import avinya.tech.yt.ads.nativead.NativeAdOptions
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
@@ -11,7 +10,6 @@ import kotlin.time.Duration.Companion.seconds
  * each platform the app targets; the correct ID is resolved at runtime
  * via [forPlatform].
  */
-@Immutable
 public data class AdUnitIds(
     /** Android ad-unit ID (ca-app-pub-.../...). */
     val android: String,
@@ -55,7 +53,6 @@ public data class AdUnitIds(
  * @throws IllegalArgumentException if [id] is blank, [cachePolicy.maxSize] < 1, or
  *   [strictTestMode] is enabled and any ad unit id is not a test unit.
  */
-@Immutable
 public data class AdPlacement(
     val id: String,
     val format: AdFormat,
@@ -136,7 +133,6 @@ public data class AdPlacement(
  * Per-request targeting and configuration options for ad loads. Android-only
  * fields are silently ignored on iOS.
  */
-@Immutable
 public data class AdRequestOptions(
     /** Keywords for ad targeting. */
     val keywords: Set<String> = emptySet(),
@@ -165,7 +161,6 @@ public data class AdRequestOptions(
  * full-screen). Cache is FIFO; ads are evicted when [maxSize] is exceeded
  * or when TTL (from [expirationPolicy]) expires.
  */
-@Immutable
 public data class AdCachePolicy(
     /** Maximum number of ads to cache. Must be >= 1. */
     val maxSize: Int = 1,
@@ -179,7 +174,6 @@ public data class AdCachePolicy(
  * Time-to-live policy for cached ads. Defaults: full-screen 1 hour,
  * app-open 4 hours, native 1 hour.
  */
-@Immutable
 public data class AdExpirationPolicy(
     /** TTL for cached interstitial and rewarded ads. Default 1h. */
     val fullScreenTtl: Duration = 1.hours,
@@ -194,7 +188,6 @@ public data class AdExpirationPolicy(
  * retryable failures (network, timeout, internal) are retried;
  * non-retryable failures (no fill, consent) are not.
  */
-@Immutable
 public data class AdRetryPolicy(
     /** Total load attempts, including the initial attempt. Default 2 (one retry). */
     val maxAttempts: Int = 2,
@@ -214,7 +207,6 @@ public data class AdRetryPolicy(
  * Defines the size of a banner ad. Choice depends on the desired ad format
  * and container constraints.
  */
-@Immutable
 public sealed interface AdSizePolicy {
     /** Anchored adaptive banner sized to fit the current screen orientation. */
     public data class AnchoredAdaptive(val collapsible: CollapsiblePlacement? = null) : AdSizePolicy
@@ -240,7 +232,6 @@ public enum class CollapsiblePlacement { Top, Bottom }
  *
  * @see BannerAdController.refresh
  */
-@Immutable
 public sealed interface BannerRefreshPolicy {
     /** AdMob server controls refresh via the AdMob UI. No client-side timer. */
     public data object AdServerManaged : BannerRefreshPolicy

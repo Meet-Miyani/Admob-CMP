@@ -1,13 +1,11 @@
 package avinya.tech.yt.ads.nativead
 
-import androidx.compose.runtime.Immutable
 
 /**
  * Opaque handle to a pooled native ad. Obtained from [NativeAdPool.acquire]
  * and returned via [NativeAdPool.release]. The [tokenId] uniquely identifies
  * the cached ad instance within its pool.
  */
-@Immutable
 public data class NativeAdToken(
     /** The placement that owns this token's pool. */
     val placementId: String,

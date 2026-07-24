@@ -1,6 +1,5 @@
 package avinya.tech.yt.ads
 
-import androidx.compose.runtime.Immutable
 
 /**
  * Represents an error from the ad SDK. [code] carries the SDK's own error
@@ -8,7 +7,6 @@ import androidx.compose.runtime.Immutable
  * code as a string. [message] is a human-readable description. [domain]
  * identifies the source subsystem.
  */
-@Immutable
 public data class AdError(
     /** SDK error code (e.g., "consent_required", "sdk_not_ready") or numeric GMA code. */
     val code: String? = null,

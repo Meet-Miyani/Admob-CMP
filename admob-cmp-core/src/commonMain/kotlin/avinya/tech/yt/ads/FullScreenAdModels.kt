@@ -1,6 +1,5 @@
 package avinya.tech.yt.ads
 
-import androidx.compose.runtime.Immutable
 
 /**
  * Display options for full-screen ads (interstitial, rewarded, app-open).
@@ -10,7 +9,6 @@ import androidx.compose.runtime.Immutable
  * @param serverSideVerification Server-side verification options for
  *   rewarded / rewarded-interstitial formats.
  */
-@Immutable
 public data class FullScreenAdOptions(
     val immersiveMode: Boolean = false,
     val serverSideVerification: ServerSideVerificationOptions? = null
@@ -21,7 +19,6 @@ public data class FullScreenAdOptions(
  * ads. Provides [userId] and [customData] to the reward server callback
  * for reward validation.
  */
-@Immutable
 public data class ServerSideVerificationOptions(
     /** User identifier sent to the reward server. */
     val userId: String? = null,
@@ -38,7 +35,6 @@ public data class ServerSideVerificationOptions(
  *   models money.
  * @property type Reward type (e.g., "coins", "lives").
  */
-@Immutable
 public data class AdReward(val amountMicros: Long, val type: String) {
     /** The amount as a whole number, or null if it is fractional. */
     public fun wholeAmountOrNull(): Int? =

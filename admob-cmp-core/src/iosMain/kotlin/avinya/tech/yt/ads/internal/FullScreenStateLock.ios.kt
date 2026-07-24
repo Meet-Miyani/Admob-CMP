@@ -4,10 +4,10 @@ package avinya.tech.yt.ads.internal
 
 import platform.Foundation.NSRecursiveLock
 
-internal actual class FullScreenStateLock actual constructor() {
+public actual class FullScreenStateLock public actual constructor() {
     private val lock = NSRecursiveLock()
 
-    actual fun <T> withLock(block: () -> T): T {
+    public actual fun <T> withLock(block: () -> T): T {
         lock.lock()
         try {
             return block()
