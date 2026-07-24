@@ -204,6 +204,25 @@ internal class BannerDelegate(
     override fun bannerViewDidRecordClick(bannerView: GADBannerView) { onClicked() }
 }
 
+public fun BannerAdController.currentIosBannerView(): GADBannerView? =
+    (this as? IosBannerAdController)?.currentView()
+
+public fun BannerAdController.attachIosBanner(): Unit {
+    (this as? IosBannerAdController)?.attach()
+}
+
+public fun BannerAdController.detachIosBanner(): Unit {
+    (this as? IosBannerAdController)?.detach()
+}
+
+public fun BannerAdController.registerIosBannerGeometry(
+    geometry: BannerGeometry,
+    sizePolicy: AdSizePolicy,
+    requestOptions: AdRequestOptions
+): Unit {
+    (this as? IosBannerAdController)?.registerGeometry(geometry, sizePolicy, requestOptions)
+}
+
 private fun AdRequestOptions.withCollapsible(sizePolicy: AdSizePolicy): AdRequestOptions {
     val collapsible = when (sizePolicy) {
         is AdSizePolicy.AnchoredAdaptive -> sizePolicy.collapsible

@@ -18,11 +18,11 @@ import avinya.tech.yt.ads.AdFormat
 import avinya.tech.yt.ads.AdLogger
 import avinya.tech.yt.ads.AdManagerStatus
 import avinya.tech.yt.ads.AdPlacement
-import avinya.tech.yt.ads.IosGoogleAdManager
-import avinya.tech.yt.ads.nativead.IosNativeAdPool
+import avinya.tech.yt.ads.IosAdMob
 import avinya.tech.yt.ads.LocalAdManager
 import avinya.tech.yt.ads.nativead.NativeAdToken
 import avinya.tech.yt.ads.nativead.layout.AdLayout
+import avinya.tech.yt.ads.nativead.peekIosNativeAd
 import avinya.tech.yt.ads.nativead.rendering.IosNativeAdRenderer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.flow.filter
@@ -62,14 +62,13 @@ public actual fun NativeAdView(
     }
 
     val sdk = LocalAdManager.current
-    val controller = sdk as? IosGoogleAdManager
-    if (controller == null) {
-        AdLogger.w("iOS NativeAdView skipped because LocalAdManager is not IosGoogleAdManager. placement=${placement.id}")
+    if (sdk !== IosAdMob.manager) {
+        AdLogger.w("iOS NativeAdView skipped because LocalAdManager is not IosAdMob.manager. placement=${placement.id}")
         return
     }
 
     val status by sdk.status.collectAsState()
-    val pool = remember(sdk, placement) { sdk.nativeAd(placement) as IosNativeAdPool }
+    val pool = remember(sdk, placement) { sdk.nativeAd(placement) }
     var token by remember(placement.id, itemKey, layout.identity) { mutableStateOf<NativeAdToken?>(null) }
 
     LaunchedEffect(pool) {
@@ -130,7 +129,8 @@ public actual fun NativeAdView(
             UIKitViewController(
                 factory = {
                     AdLogger.d("iOS NativeAdView factory render. placement=${placement.id} itemKey=$itemKey token=${currentToken.tokenId} layout=${layout.identity}")
-                    val nativeAd = pool.peek(currentToken) ?: return@UIKitViewController UIViewController()
+                    val nativeAd = pool.peekIosNativeAd(currentToken)
+                        ?: return@UIKitViewController UIViewController()
                     val nativeView = GADNativeAdView()
                     nativeView.translatesAutoresizingMaskIntoConstraints = false
                     val renderer = IosNativeAdRenderer(nativeAd, nativeView)

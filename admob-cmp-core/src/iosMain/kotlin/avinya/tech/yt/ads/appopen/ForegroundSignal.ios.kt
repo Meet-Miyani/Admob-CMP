@@ -49,6 +49,8 @@ internal actual fun appForegroundState(): Flow<Boolean> = callbackFlow {
     }
 }
 
+public fun iosAppForegroundState(): Flow<Boolean> = appForegroundState()
+
 internal actual suspend fun isAppInForeground(): Boolean =
     withContext(Dispatchers.Main.immediate) {
         UIApplication.sharedApplication.applicationState == UIApplicationState.UIApplicationStateActive

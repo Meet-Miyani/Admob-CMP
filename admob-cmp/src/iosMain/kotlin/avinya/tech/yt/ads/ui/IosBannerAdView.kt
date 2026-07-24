@@ -24,10 +24,12 @@ import avinya.tech.yt.ads.AdManagerStatus
 import avinya.tech.yt.ads.AdPlacement
 import avinya.tech.yt.ads.BannerGeometry
 import avinya.tech.yt.ads.BannerRefreshPolicy
-import avinya.tech.yt.ads.IosBannerAdController
-import avinya.tech.yt.ads.IosGoogleAdManager
 import avinya.tech.yt.ads.LocalAdManager
-import avinya.tech.yt.ads.appopen.appForegroundState
+import avinya.tech.yt.ads.attachIosBanner
+import avinya.tech.yt.ads.currentIosBannerView
+import avinya.tech.yt.ads.detachIosBanner
+import avinya.tech.yt.ads.registerIosBannerGeometry
+import avinya.tech.yt.ads.appopen.iosAppForegroundState
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.useContents
 import GoogleMobileAds.GADBannerView
@@ -48,7 +50,7 @@ public actual fun BannerAdView(placement: AdPlacement, modifier: Modifier, width
     }
     // remember the flow so recomposition doesn't rebuild the callbackFlow and re-register
     // NSNotificationCenter observers each time.
-    val foregroundFlow = remember { appForegroundState() }
+    val foregroundFlow = remember { iosAppForegroundState() }
     val isForeground by foregroundFlow.collectAsState(true)
 
     LaunchedEffect(controller) {
@@ -67,7 +69,7 @@ public actual fun BannerAdView(placement: AdPlacement, modifier: Modifier, width
     LaunchedEffect(controller) {
         controller.loadState.collect { state ->
             bannerView = when {
-                state is AdLoadState.Loaded -> (controller as? IosBannerAdController)?.currentView()
+                state is AdLoadState.Loaded -> controller.currentIosBannerView()
                 // Idle means cleared/detached and the GADBannerView has been torn down —
                 // drop the reference so Compose stops rendering it. Reached both by an
                 // explicit clear() and by the consent-revocation purge (sub-project A).
@@ -101,7 +103,7 @@ public actual fun BannerAdView(placement: AdPlacement, modifier: Modifier, width
             // Still register the measured geometry so refresh() uses the container width
             // rather than failing for want of a prior load.
             if (placement.bannerRefreshPolicy is BannerRefreshPolicy.Manual) {
-                (controller as? IosBannerAdController)?.registerGeometry(
+                controller.registerIosBannerGeometry(
                     BannerGeometry(resolvedWidth),
                     placement.bannerSizePolicy,
                     placement.requestOptions
@@ -169,10 +171,10 @@ public actual fun BannerAdView(placement: AdPlacement, modifier: Modifier, width
         // shared placement isn't blanked mid-transition, yet a load-once-abandoned placement
         // is still torn down deterministically.
         DisposableEffect(controller) {
-            (controller as? IosBannerAdController)?.attach()
+            controller.attachIosBanner()
             onDispose {
                 bannerView = null
-                (controller as? IosBannerAdController)?.detach()
+                controller.detachIosBanner()
             }
         }
     }

@@ -10,8 +10,6 @@ import GoogleMobileAds.GADCurrentOrientationInlineAdaptiveBannerAdSizeWithWidth
 import GoogleMobileAds.GADInlineAdaptiveBannerAdSizeWithWidthAndMaxHeight
 import GoogleMobileAds.GADLargeAnchoredAdaptiveBannerAdSizeWithWidth
 import GoogleMobileAds.GADMobileAds
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import avinya.tech.yt.ads.internal.AdRequestAdmission
 import avinya.tech.yt.ads.internal.FullScreenPresentationArbiter
 import avinya.tech.yt.ads.internal.deriveAdmission
@@ -48,9 +46,9 @@ private object IosAdManagerHolder {
     val instance: IosGoogleAdManager = IosGoogleAdManager()
 }
 
-@Composable
-public actual fun rememberAdManager(): AdManager = remember {
-    IosAdManagerHolder.instance
+/** Public entry point for the process-wide iOS [AdManager] singleton. */
+public object IosAdMob {
+    public val manager: AdManager get() = IosAdManagerHolder.instance
 }
 
 internal class IosGoogleAdManager : AdManager, FullScreenPresenceAware {

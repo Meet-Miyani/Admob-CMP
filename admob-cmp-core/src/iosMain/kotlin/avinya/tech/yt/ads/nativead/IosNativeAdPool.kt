@@ -442,6 +442,9 @@ internal class NativeAdDelegate(
     override fun nativeAdDidDismissScreen(nativeAd: GADNativeAd) {}
 }
 
+public fun NativeAdPool.peekIosNativeAd(token: NativeAdToken): GADNativeAd? =
+    (this as? IosNativeAdPool)?.peek(token)
+
 internal fun NativeMediaAspectRatio.toGADMediaAspectRatio(): GoogleMobileAds.GADMediaAspectRatio = when (this) {
     NativeMediaAspectRatio.Unknown -> GoogleMobileAds.GADMediaAspectRatioUnknown
     NativeMediaAspectRatio.Any -> GoogleMobileAds.GADMediaAspectRatioAny
