@@ -1,14 +1,5 @@
 import org.gradle.api.publish.maven.MavenPublication
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.w3c.dom.Element
-import javax.xml.parsers.DocumentBuilderFactory
-
-private fun Element.directChild(tagName: String): Element? =
-    (0 until childNodes.length)
-        .asSequence()
-        .map(childNodes::item)
-        .filterIsInstance<Element>()
-        .firstOrNull { it.tagName == tagName }
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -59,55 +50,18 @@ kotlin {
 
 publishing {
     publications.named<MavenPublication>("kotlinMultiplatform") {
-        pom.withXml {
-            val dependencies = asElement().getElementsByTagName("dependency")
-            for (index in 0 until dependencies.length) {
-                val dependency = dependencies.item(index) as? Element ?: continue
-                val groupId = dependency.directChild("groupId")?.textContent
-                val artifactId = dependency.directChild("artifactId")?.textContent
-                val scope = dependency.directChild("scope")
-
-                // Gradle metadata already carries API variants; preserve compile scope for POM-only consumers.
-                if (
-                    groupId == "dev.avinya.ads" &&
-                    artifactId == "admob-cmp-core" &&
-                    scope?.textContent == "runtime"
-                ) {
-                    scope.textContent = "compile"
-                }
-            }
-        }
+        pom.withXml(PromotePomDependenciesToCompileScope("dev.avinya.ads", setOf("admob-cmp-core")))
     }
 }
 
-val verifyKotlinMultiplatformPomDependencyScopes = tasks.register("verifyKotlinMultiplatformPomDependencyScopes") {
+val verifyKotlinMultiplatformPomDependencyScopes = tasks.register<VerifyPomDependencyScopes>("verifyKotlinMultiplatformPomDependencyScopes") {
     group = "verification"
     description = "Verifies API dependencies retain compile scope in the root multiplatform POM."
     dependsOn("generatePomFileForKotlinMultiplatformPublication")
 
-    val pomFile = layout.buildDirectory.file("publications/kotlinMultiplatform/pom-default.xml")
-    inputs.file(pomFile)
-
-    doLast {
-        val document = DocumentBuilderFactory.newInstance()
-            .newDocumentBuilder()
-            .parse(pomFile.get().asFile)
-        val dependencies = document.getElementsByTagName("dependency")
-        val coreDependency = (0 until dependencies.length)
-            .asSequence()
-            .mapNotNull { dependencies.item(it) as? Element }
-            .firstOrNull {
-                it.directChild("groupId")?.textContent == "dev.avinya.ads" &&
-                    it.directChild("artifactId")?.textContent == "admob-cmp-core"
-            }
-
-        checkNotNull(coreDependency) {
-            "The root admob-cmp-compose POM must declare dev.avinya.ads:admob-cmp-core."
-        }
-        check(coreDependency.directChild("scope")?.textContent == "compile") {
-            "The root admob-cmp-compose POM must publish dev.avinya.ads:admob-cmp-core with compile scope."
-        }
-    }
+    pomFile.set(layout.buildDirectory.file("publications/kotlinMultiplatform/pom-default.xml"))
+    groupId.set("dev.avinya.ads")
+    expectedArtifactIds.set(setOf("admob-cmp-core"))
 }
 
 tasks.named("check") {

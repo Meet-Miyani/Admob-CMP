@@ -26,7 +26,7 @@ export ORG_GRADLE_PROJECT_mavenCentralUsername=...   # Central Portal token user
 export ORG_GRADLE_PROJECT_mavenCentralPassword=...   # token password
 export ORG_GRADLE_PROJECT_signingInMemoryKey=...     # ASCII-armored GPG key
 export ORG_GRADLE_PROJECT_signingInMemoryKeyPassword=...
-./scripts/publish-maven-central.sh   # = publishAndReleaseToMavenCentral --no-configuration-cache
+./scripts/publish-maven-central.sh   # = publishAndReleaseToMavenCentral
 ```
 
 ## API stability workflow
