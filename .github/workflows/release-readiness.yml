@@ -33,8 +33,6 @@ jobs:
           ./gradlew \
             :admob-cmp-core:testAndroidHostTest \
             :admob-cmp-compose:testAndroidHostTest \
-            :admob-cmp-core:checkKotlinAbi \
-            :admob-cmp-compose:checkKotlinAbi \
             :admob-cmp:verifyKotlinMultiplatformPomDependencyScopes \
             :admob-cmp-compose:verifyKotlinMultiplatformPomDependencyScopes \
             :androidApp:assembleDebug \
@@ -54,11 +52,13 @@ jobs:
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v6
 
-      - name: Test iOS SDK targets
+      - name: Test iOS SDK targets and verify klib ABI
         run: |
           ./gradlew \
             :admob-cmp-core:iosSimulatorArm64Test \
             :admob-cmp-compose:iosSimulatorArm64Test \
+            :admob-cmp-core:checkKotlinAbi \
+            :admob-cmp-compose:checkKotlinAbi \
             --no-configuration-cache
 
       - name: Publish all SDK modules locally

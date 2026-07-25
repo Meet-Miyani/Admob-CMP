@@ -142,6 +142,7 @@ fun frameworkDir(baseName: String, targetName: String): File {
  * the `admobCmpTestLinkerOpts` extension below — so consumers never hardcode admob-cmp-core's paths.
  */
 fun admobTestLinkerOpts(targetName: String): List<String> {
+    if (!org.gradle.internal.os.OperatingSystem.current().isMacOsX) return emptyList()
     val swiftPlatform = when (targetName) {
         "iosArm64" -> "iphoneos"
         "iosSimulatorArm64" -> "iphonesimulator"
@@ -189,6 +190,12 @@ kotlin {
         iosSimulatorArm64()
     ).forEach { iosTarget ->
         val targetName = iosTarget.name
+
+        iosTarget.binaries.all {
+            freeCompilerArgs += listOf(
+                "-Xoverride-konan-properties=osVersionMin.ios_simulator_arm64=15.0;osVersionMin.ios_arm64=15.0;osVersionMin=15.0"
+            )
+        }
 
         iosTarget.binaries.framework {
             baseName = "AdMobCmp"

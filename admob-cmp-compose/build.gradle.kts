@@ -1,5 +1,6 @@
 import org.gradle.api.publish.maven.MavenPublication
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.plugin.extraProperties
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -8,6 +9,9 @@ plugins {
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.mavenPublish)
 }
+
+// Ensure :admob-cmp-core is evaluated first so its admobCmpTestLinkerOpts extra property is available.
+evaluationDependsOn(":admob-cmp-core")
 
 kotlin {
     explicitApi()
@@ -23,8 +27,32 @@ kotlin {
         compilerOptions { jvmTarget.set(JvmTarget.JVM_11) }
     }
 
-    iosArm64()
-    iosSimulatorArm64()
+    listOf(
+        iosArm64(),
+        iosSimulatorArm64()
+    ).forEach { iosTarget ->
+        val targetName = iosTarget.name
+
+        // Set minimum iOS deployment target to 15.0 for all iOS binaries
+        iosTarget.binaries.all {
+            freeCompilerArgs += listOf(
+                "-Xoverride-konan-properties=osVersionMin.ios_simulator_arm64=15.0;osVersionMin.ios_arm64=15.0;osVersionMin=15.0"
+            )
+        }
+
+        // Test executables need:
+        //  1. osVersionMin ≥ 18.0 to match Xcode 16's iOS 18+ SDK symbols in Compose/Skiko (UIViewLayoutRegion).
+        //  2. admob-cmp-core linker options for GMA/UMP native frameworks.
+        iosTarget.binaries.withType(org.jetbrains.kotlin.gradle.plugin.mpp.TestExecutable::class.java).configureEach {
+            freeCompilerArgs += listOf(
+                "-Xoverride-konan-properties=osVersionMin.ios_simulator_arm64=18.0;osVersionMin.ios_arm64=18.0;osVersionMin=18.0"
+            )
+
+            @Suppress("UNCHECKED_CAST")
+            val testLinkerOpts = project(":admob-cmp-core").extraProperties.get("admobCmpTestLinkerOpts") as (String) -> List<String>
+            linkerOpts(testLinkerOpts(targetName))
+        }
+    }
 
     sourceSets {
         commonMain.dependencies {
