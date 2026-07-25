@@ -15,7 +15,7 @@ stream. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
 
 ```kotlin
 // commonMain
-implementation("dev.avinya.ads:admob-cmp:0.1.0")
+implementation("dev.avinya.ads:admob-cmp:1.0.0")
 ```
 
 Platform setup (Android manifest entry, iOS SPM packages + Info.plist) is
@@ -29,7 +29,7 @@ compatible compiler.
 
 | admob-cmp | Kotlin | Compose Multiplatform | Android minSdk | iOS deployment target |
 |---|---|---|---|---|
-| 0.1.0 | 2.3.20 | 1.11.1 | 26 | 15.0 |
+| 1.0.0 | 2.3.20 | 1.11.1 | 26 | 15.0 |
 
 **Kotlin:** the module is compiled with 2.3.20. Consumers on a different Kotlin
 *minor* version may fail to resolve the klib. Patch versions are generally safe.

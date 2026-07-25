@@ -1,5 +1,10 @@
 rootProject.name = "AdmobCMP"
 
+val consumePublishedAdmobCmp =
+    providers.gradleProperty("admobCmpConsumePublished")
+        .map(String::toBoolean)
+        .getOrElse(false)
+
 pluginManagement {
     repositories {
         google {
@@ -19,6 +24,16 @@ pluginManagement {
 
 dependencyResolutionManagement {
     repositories {
+        if (consumePublishedAdmobCmp) {
+            exclusiveContent {
+                forRepository {
+                    mavenLocal()
+                }
+                filter {
+                    includeGroup("dev.avinya.ads")
+                }
+            }
+        }
         google {
             mavenContent {
                 includeGroupAndSubgroups("androidx")

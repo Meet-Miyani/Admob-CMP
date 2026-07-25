@@ -272,6 +272,7 @@ public open class AdLayoutScope internal constructor() {
     public fun adBadge(
         modifier: AdModifier = AdModifier
             .padding(horizontal = 6.dp, vertical = 2.dp)
+            .sizeIn(minWidth = 15.dp, minHeight = 15.dp)
             .border(1.dp, Color(0xFF777777), 3.dp),
         text: String = "Ad",
         style: AdTextStyle = AdTextStyle.badge,

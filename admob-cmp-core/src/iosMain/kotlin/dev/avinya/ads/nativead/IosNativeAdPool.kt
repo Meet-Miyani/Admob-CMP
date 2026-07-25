@@ -272,8 +272,7 @@ internal class NativeAdLoaderDelegate(
         invalidation.retired.forEach(::teardownLoaded)
         if (invalidation.shouldResume && continuation.isActive) {
             continuation.resume(
-                AdAttemptResult.Failure(AdError.message("Native ad preload was cleared.")),
-                null
+                AdAttemptResult.Failure(AdError.message("Native ad preload was cleared."))
             )
         }
     }

@@ -38,16 +38,21 @@ public object AdTemplates {
         ) {
             box(modifier = AdModifier.fillMaxWidth()) {
                 media()
-                adChoices(
-                    modifier = AdModifier.size(24.dp),
-                    visibilityPolicy = AdVisibilityPolicy.KeepSpace
-                )
+                row(
+                    modifier = AdModifier.fillMaxWidth().padding(8.dp),
+                ) {
+                    adBadge()
+                    spacer(AdModifier.weight(1f))
+                    adChoices(
+                        modifier = AdModifier.size(24.dp),
+                        visibilityPolicy = AdVisibilityPolicy.KeepSpace
+                    )
+                }
             }
             row(spacing = 10.dp) {
                 icon(AdModifier.size(44.dp).cornerRadius(8.dp))
                 column(modifier = AdModifier.weight(1f), spacing = 4.dp) {
                     row(spacing = 6.dp) {
-                        adBadge()
                         headline(modifier = AdModifier.weight(1f), maxLines = 2)
                     }
                     body(maxLines = 2)
@@ -69,13 +74,18 @@ public object AdTemplates {
         ) {
             box(modifier = AdModifier.fillMaxWidth()) {
                 media()
-                adChoices(AdModifier.size(24.dp))
+                row(
+                    modifier = AdModifier.fillMaxWidth().padding(8.dp),
+                ) {
+                    adBadge()
+                    spacer(AdModifier.weight(1f))
+                    adChoices(AdModifier.size(24.dp))
+                }
             }
             row(spacing = 12.dp) {
                 icon(AdModifier.size(56.dp).cornerRadius(12.dp))
                 column(modifier = AdModifier.weight(1f), spacing = 5.dp) {
                     row(spacing = 8.dp) {
-                        adBadge()
                         headline(modifier = AdModifier.weight(1f), maxLines = 2)
                     }
                     body(maxLines = 3)

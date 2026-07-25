@@ -9,10 +9,12 @@ import dev.avinya.ads.nativead.layout.AdSpacer
 import dev.avinya.ads.nativead.layout.AdAssetNode
 import dev.avinya.ads.nativead.layout.AdAlignment
 import dev.avinya.ads.nativead.layout.AdStaticText
+import dev.avinya.ads.nativead.layout.AdTemplates
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import androidx.compose.ui.unit.dp
 
 class AdLayoutValidatorTest {
 
@@ -143,5 +145,44 @@ class AdLayoutValidatorTest {
         )
         val warnings = layout.validation.warnings
         assertTrue(warnings.any { it.code == "blank_static_text" })
+    }
+
+    @Test
+    fun `ad attribution below the top region triggers a policy warning`() {
+        val layout = AdLayout(
+            root = AdContainerNode.Column(
+                modifier = AdModifier.empty,
+                children = listOf(
+                    AdAssetNode.Media(),
+                    AdAssetNode.AdBadge(),
+                    AdAssetNode.Headline(),
+                ),
+            ),
+        )
+
+        assertTrue(
+            layout.validation.warnings.any { it.code == "ad_attribution_not_at_top" },
+        )
+    }
+
+    @Test
+    fun `default ad attribution meets Google's minimum badge dimensions`() {
+        val badge = AdAssetNode.AdBadge()
+
+        assertEquals(15.dp.value, badge.modifier.minWidthDp)
+        assertEquals(15.dp.value, badge.modifier.minHeightDp)
+    }
+
+    @Test
+    fun `built in template attribution meets Google's minimum badge dimensions`() {
+        fun findBadge(node: AdNode): AdAssetNode.AdBadge? = when (node) {
+            is AdAssetNode.AdBadge -> node
+            is AdContainerNode -> node.children.firstNotNullOfOrNull(::findBadge)
+            else -> null
+        }
+
+        val badge = requireNotNull(findBadge(AdTemplates.medium.root))
+        assertEquals(15.dp.value, badge.modifier.minWidthDp)
+        assertEquals(15.dp.value, badge.modifier.minHeightDp)
     }
 }

@@ -10,6 +10,7 @@ import kotlinx.cinterop.useContents
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 import kotlinx.coroutines.withContext
 import kotlin.runCatching
 
@@ -55,7 +56,7 @@ internal class IosAdDiagnostics : AdDiagnostics {
         suspendCancellableCoroutine { continuation ->
             continuation.invokeOnCancellation { }
             GADMobileAds.sharedInstance.presentAdInspectorFromViewController(rootVC) { error ->
-                if (continuation.isActive) continuation.resume(error == null, null)
+                if (continuation.isActive) continuation.resume(error == null)
             }
         }
     }

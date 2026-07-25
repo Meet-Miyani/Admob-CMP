@@ -5,7 +5,7 @@
 ```toml
 # libs.versions.toml
 [libraries]
-admob-cmp = { group = "dev.avinya.ads", name = "admob-cmp", version = "0.1.0" }
+admob-cmp = { group = "dev.avinya.ads", name = "admob-cmp", version = "1.0.0" }
 ```
 
 ```kotlin
@@ -147,6 +147,26 @@ adManager.initialize(config, ConsentMode.SkipConsent)              // you own co
 Every ad request is gated: before initialization succeeds (and consent allows
 requests), loads fail fast with `AdErrorCode.SDK_NOT_READY` /
 `AdErrorCode.CONSENT_REQUIRED` — nothing reaches the network.
+
+### Child and teen treatment
+
+Consent and ad-request treatment are separate settings:
+
+```kotlin
+AdConfig(
+    androidAppId = "...",
+    iosAppId = "...",
+    // UMP consent-flow setting:
+    consentTagForUnderAgeOfConsent = true,
+    globalRequestConfiguration = GlobalRequestConfiguration(
+        // Google Mobile Ads request setting:
+        ageRestrictedTreatment = AgeRestrictedTreatment.Child
+    )
+)
+```
+
+Use `Teen` only when your app has determined that treatment is appropriate.
+The SDK deliberately does not infer either setting from the other.
 
 **Calling `initialize`/`gatherConsentAndInitialize` more than once is safe but
 does not re-configure the SDK.** The underlying Google Mobile Ads singleton

@@ -8,6 +8,11 @@ plugins {
     alias(libs.plugins.composeCompiler)
 }
 
+val consumePublishedAdmobCmp =
+    providers.gradleProperty("admobCmpConsumePublished")
+        .map(String::toBoolean)
+        .getOrElse(false)
+
 kotlin {
     applyDefaultHierarchyTemplate()
 
@@ -75,7 +80,11 @@ kotlin {
         val adCapableMain by creating {
             dependsOn(commonMain)
             dependencies {
-                implementation(project(":admob-cmp-compose"))
+                if (consumePublishedAdmobCmp) {
+                    implementation("dev.avinya.ads:admob-cmp:${providers.gradleProperty("VERSION_NAME").get()}")
+                } else {
+                    implementation(project(":admob-cmp-compose"))
+                }
             }
         }
         val adCapableTest by creating {

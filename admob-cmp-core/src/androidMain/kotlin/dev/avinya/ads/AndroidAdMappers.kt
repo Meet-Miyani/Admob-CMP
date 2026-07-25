@@ -9,7 +9,9 @@ import com.google.android.libraries.ads.mobile.sdk.common.AdChoicesPlacement as 
 import com.google.android.libraries.ads.mobile.sdk.common.AdRequest
 import com.google.android.libraries.ads.mobile.sdk.common.AdSourceResponseInfo as GmaAdSourceResponseInfo
 import com.google.android.libraries.ads.mobile.sdk.common.AdValue as GmaAdValue
+import com.google.android.libraries.ads.mobile.sdk.common.AgeRestrictedTreatment as GmaAgeRestrictedTreatment
 import com.google.android.libraries.ads.mobile.sdk.common.BaseRequestBuilder
+import com.google.android.libraries.ads.mobile.sdk.common.ExperimentalApi
 import com.google.android.libraries.ads.mobile.sdk.common.FullScreenContentError
 import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 import com.google.android.libraries.ads.mobile.sdk.common.PrecisionType
@@ -40,6 +42,7 @@ internal fun AdRequestOptions.toAndroidNativeAdRequest(adUnitId: String, nativeO
     return builder.build()
 }
 
+@OptIn(ExperimentalApi::class)
 internal fun <T : BaseRequestBuilder<T>> T.applyOptions(options: AdRequestOptions): T {
     if (options.skipUninitializedAdapters) skipUninitializedAdapters()
     options.keywords.forEach(::addKeyword)
@@ -61,31 +64,18 @@ internal fun <T : BaseRequestBuilder<T>> T.applyOptions(options: AdRequestOption
 }
 
 internal fun GlobalRequestConfiguration.toAndroidRequestConfiguration(): GmaRequestConfiguration {
-    // NOTE: setTagForChildDirectedTreatment / setTagForUnderAgeOfConsent are deprecated
-    // in GMA Next-Gen 1.1.0+ in favor of the single setAgeRestrictedTreatment. We keep
-    // the two-flag form deliberately: the common GlobalRequestConfiguration exposes both
-    // tags as independent tri-states, which does not map 1:1 onto the collapsed
-    // age-restricted enum without a public API change. The deprecated setters remain
-    // functional in 1.2.0; revisit if/when they are removed upstream.
     val builder = GmaRequestConfiguration.Builder()
         .setTestDeviceIds(testDeviceIds)
-        .setTagForChildDirectedTreatment(tagForChildDirectedTreatment.toAndroidChildTag())
-        .setTagForUnderAgeOfConsent(tagForUnderAgeOfConsent.toAndroidUnderAgeTag())
+        .setAgeRestrictedTreatment(ageRestrictedTreatment.toAndroid())
         .setMaxAdContentRating(maxAdContentRating.toAndroid())
         .setPublisherPrivacyPersonalizationState(publisherPrivacyPersonalizationState.toAndroid())
     return builder.build()
 }
 
-private fun RequestTag.toAndroidChildTag(): GmaRequestConfiguration.TagForChildDirectedTreatment = when (this) {
-    RequestTag.Unspecified -> GmaRequestConfiguration.TagForChildDirectedTreatment.TAG_FOR_CHILD_DIRECTED_TREATMENT_UNSPECIFIED
-    RequestTag.True -> GmaRequestConfiguration.TagForChildDirectedTreatment.TAG_FOR_CHILD_DIRECTED_TREATMENT_TRUE
-    RequestTag.False -> GmaRequestConfiguration.TagForChildDirectedTreatment.TAG_FOR_CHILD_DIRECTED_TREATMENT_FALSE
-}
-
-private fun RequestTag.toAndroidUnderAgeTag(): GmaRequestConfiguration.TagForUnderAgeOfConsent = when (this) {
-    RequestTag.Unspecified -> GmaRequestConfiguration.TagForUnderAgeOfConsent.TAG_FOR_UNDER_AGE_OF_CONSENT_UNSPECIFIED
-    RequestTag.True -> GmaRequestConfiguration.TagForUnderAgeOfConsent.TAG_FOR_UNDER_AGE_OF_CONSENT_TRUE
-    RequestTag.False -> GmaRequestConfiguration.TagForUnderAgeOfConsent.TAG_FOR_UNDER_AGE_OF_CONSENT_FALSE
+private fun AgeRestrictedTreatment.toAndroid(): GmaAgeRestrictedTreatment = when (this) {
+    AgeRestrictedTreatment.Unspecified -> GmaAgeRestrictedTreatment.UNSPECIFIED
+    AgeRestrictedTreatment.Child -> GmaAgeRestrictedTreatment.CHILD
+    AgeRestrictedTreatment.Teen -> GmaAgeRestrictedTreatment.TEEN
 }
 
 private fun MaxAdContentRating.toAndroid(): GmaRequestConfiguration.MaxAdContentRating = when (this) {
@@ -164,5 +154,13 @@ private fun PrecisionType.toCommon(): AdValuePrecision = when (this) {
 
 private fun Bundle?.toStringMap(): Map<String, String> {
     if (this == null || isEmpty) return emptyMap()
-    return keySet().associateWith { key -> get(key)?.toString().orEmpty() }
+    return keySet().associateWith { key -> untypedValue(key)?.toString().orEmpty() }
 }
+
+/**
+ * `Bundle.get(String)` is deprecated as of API 33, but Android provides no
+ * type-safe replacement when a bundle intentionally contains heterogeneous
+ * response metadata from a third-party SDK.
+ */
+@Suppress("DEPRECATION")
+private fun Bundle.untypedValue(key: String): Any? = get(key)

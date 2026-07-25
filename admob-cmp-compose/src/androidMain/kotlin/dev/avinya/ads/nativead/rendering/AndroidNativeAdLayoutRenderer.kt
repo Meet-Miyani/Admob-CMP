@@ -44,8 +44,8 @@ internal class AndroidNativeAdLayoutRenderer(
     fun renderInto(nativeAdView: NativeAdView, layout: AdLayout): NativeAdView {
         AdLogger.d("Android native renderer renderInto. layout=${layout.identity}")
         nativeAdView.removeAllViews()
-        nativeAdView.clipChildren = false
-        nativeAdView.clipToPadding = false
+        nativeAdView.clipChildren = true
+        nativeAdView.clipToPadding = true
         nativeAdView.setBackgroundColor(Color.TRANSPARENT)
         renderedMediaView = null
 
@@ -55,9 +55,68 @@ internal class AndroidNativeAdLayoutRenderer(
             frameParams(layout.root.modifier, AdAlignment.Box.TopStart)
         )
 
-        nativeAdView.registerNativeAd(nativeAd, renderedMediaView)
-        AdLogger.d("Android native renderer registered native ad. hasMediaView=${renderedMediaView != null}")
+        registerAfterContainedLayout(nativeAdView)
         return nativeAdView
+    }
+
+    private fun registerAfterContainedLayout(nativeAdView: NativeAdView) {
+        val listener = object : View.OnLayoutChangeListener {
+            override fun onLayoutChange(
+                view: View,
+                left: Int,
+                top: Int,
+                right: Int,
+                bottom: Int,
+                oldLeft: Int,
+                oldTop: Int,
+                oldRight: Int,
+                oldBottom: Int,
+            ) {
+                if (view.width <= 0 || view.height <= 0) return
+                view.removeOnLayoutChangeListener(this)
+
+                val rootBounds = view.screenBounds()
+                val issues = listOfNotNull(
+                    nativeAdView.headlineView?.let { "headline" to it },
+                    nativeAdView.bodyView?.let { "body" to it },
+                    nativeAdView.callToActionView?.let { "callToAction" to it },
+                    nativeAdView.iconView?.let { "icon" to it },
+                    nativeAdView.mediaView?.let { "media" to it },
+                    nativeAdView.advertiserView?.let { "advertiser" to it },
+                    nativeAdView.priceView?.let { "price" to it },
+                    nativeAdView.storeView?.let { "store" to it },
+                    nativeAdView.starRatingView?.let { "starRating" to it },
+                ).mapNotNull { (name, asset) ->
+                    val assetBounds = asset.screenBounds()
+                    "$name=$assetBounds".takeUnless { rootBounds.contains(assetBounds) }
+                }
+                if (issues.isNotEmpty()) {
+                    AdLogger.e(
+                        "Android native ad registration blocked because asset bounds escape " +
+                            "NativeAdView $rootBounds: ${issues.joinToString()}"
+                    )
+                    return
+                }
+
+                nativeAdView.registerNativeAd(nativeAd, renderedMediaView)
+                AdLogger.d(
+                    "Android native renderer registered after containment. " +
+                        "hasMediaView=${renderedMediaView != null}"
+                )
+            }
+        }
+        nativeAdView.addOnLayoutChangeListener(listener)
+    }
+
+    private fun View.screenBounds(): NativeAdBounds {
+        val location = IntArray(2)
+        getLocationOnScreen(location)
+        return NativeAdBounds(
+            left = location[0],
+            top = location[1],
+            right = location[0] + width,
+            bottom = location[1] + height,
+        )
     }
 
     private fun buildNode(node: AdNode, nativeAdView: NativeAdView): View = when (node) {

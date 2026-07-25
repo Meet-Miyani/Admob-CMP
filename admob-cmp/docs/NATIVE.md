@@ -72,6 +72,12 @@ Every node takes an `AdModifier` (padding, size, background, border, clip,
 weight, alpha, ...). `AdLayoutValidator` runs in debug and reports issues like a
 missing AdBadge.
 
+On debug builds, Google may show its Native Ad Validator. AdMob requires every
+registered asset to stay fully inside the platform native-ad root and the ad
+attribution to appear at the top. The built-in templates enforce these rules
+on Android and iOS; custom layouts should keep `AdBadge` at the top and avoid
+offsets that move registered assets outside the root bounds.
+
 ## Pooling
 
 `NativeAdView` handles acquire/release automatically via `itemKey`. For manual

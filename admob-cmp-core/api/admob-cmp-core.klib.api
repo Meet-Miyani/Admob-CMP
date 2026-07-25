@@ -111,6 +111,18 @@ final enum class dev.avinya.ads/AdValuePrecision : kotlin/Enum<dev.avinya.ads/Ad
     final fun values(): kotlin/Array<dev.avinya.ads/AdValuePrecision> // dev.avinya.ads/AdValuePrecision.values|values#static(){}[0]
 }
 
+final enum class dev.avinya.ads/AgeRestrictedTreatment : kotlin/Enum<dev.avinya.ads/AgeRestrictedTreatment> { // dev.avinya.ads/AgeRestrictedTreatment|null[0]
+    enum entry Child // dev.avinya.ads/AgeRestrictedTreatment.Child|null[0]
+    enum entry Teen // dev.avinya.ads/AgeRestrictedTreatment.Teen|null[0]
+    enum entry Unspecified // dev.avinya.ads/AgeRestrictedTreatment.Unspecified|null[0]
+
+    final val entries // dev.avinya.ads/AgeRestrictedTreatment.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<dev.avinya.ads/AgeRestrictedTreatment> // dev.avinya.ads/AgeRestrictedTreatment.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): dev.avinya.ads/AgeRestrictedTreatment // dev.avinya.ads/AgeRestrictedTreatment.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<dev.avinya.ads/AgeRestrictedTreatment> // dev.avinya.ads/AgeRestrictedTreatment.values|values#static(){}[0]
+}
+
 final enum class dev.avinya.ads/CollapsiblePlacement : kotlin/Enum<dev.avinya.ads/CollapsiblePlacement> { // dev.avinya.ads/CollapsiblePlacement|null[0]
     enum entry Bottom // dev.avinya.ads/CollapsiblePlacement.Bottom|null[0]
     enum entry Top // dev.avinya.ads/CollapsiblePlacement.Top|null[0]
@@ -182,18 +194,6 @@ final enum class dev.avinya.ads/PublisherPrivacyPersonalizationState : kotlin/En
 
     final fun valueOf(kotlin/String): dev.avinya.ads/PublisherPrivacyPersonalizationState // dev.avinya.ads/PublisherPrivacyPersonalizationState.valueOf|valueOf#static(kotlin.String){}[0]
     final fun values(): kotlin/Array<dev.avinya.ads/PublisherPrivacyPersonalizationState> // dev.avinya.ads/PublisherPrivacyPersonalizationState.values|values#static(){}[0]
-}
-
-final enum class dev.avinya.ads/RequestTag : kotlin/Enum<dev.avinya.ads/RequestTag> { // dev.avinya.ads/RequestTag|null[0]
-    enum entry False // dev.avinya.ads/RequestTag.False|null[0]
-    enum entry True // dev.avinya.ads/RequestTag.True|null[0]
-    enum entry Unspecified // dev.avinya.ads/RequestTag.Unspecified|null[0]
-
-    final val entries // dev.avinya.ads/RequestTag.entries|#static{}entries[0]
-        final fun <get-entries>(): kotlin.enums/EnumEntries<dev.avinya.ads/RequestTag> // dev.avinya.ads/RequestTag.entries.<get-entries>|<get-entries>#static(){}[0]
-
-    final fun valueOf(kotlin/String): dev.avinya.ads/RequestTag // dev.avinya.ads/RequestTag.valueOf|valueOf#static(kotlin.String){}[0]
-    final fun values(): kotlin/Array<dev.avinya.ads/RequestTag> // dev.avinya.ads/RequestTag.values|values#static(){}[0]
 }
 
 abstract interface dev.avinya.ads/AdDiagnostics { // dev.avinya.ads/AdDiagnostics|null[0]
@@ -964,13 +964,15 @@ final class dev.avinya.ads/AdCachePolicy { // dev.avinya.ads/AdCachePolicy|null[
 }
 
 final class dev.avinya.ads/AdConfig { // dev.avinya.ads/AdConfig|null[0]
-    constructor <init>(dev.avinya.ads/AdAppIds, dev.avinya.ads/GlobalRequestConfiguration = ..., dev.avinya.ads/AdDebugOptions = ..., kotlin/Boolean? = ..., kotlin/Boolean? = ..., kotlin.collections/List<dev.avinya.ads/AdInitializationHook> = ...) // dev.avinya.ads/AdConfig.<init>|<init>(dev.avinya.ads.AdAppIds;dev.avinya.ads.GlobalRequestConfiguration;dev.avinya.ads.AdDebugOptions;kotlin.Boolean?;kotlin.Boolean?;kotlin.collections.List<dev.avinya.ads.AdInitializationHook>){}[0]
-    constructor <init>(kotlin/String, kotlin/String, kotlin/Boolean = ..., kotlin.collections/List<kotlin/String> = ..., dev.avinya.ads/ConsentDebugGeography = ..., kotlin/Boolean? = ..., kotlin/Boolean? = ..., kotlin.collections/List<dev.avinya.ads/AdInitializationHook> = ...) // dev.avinya.ads/AdConfig.<init>|<init>(kotlin.String;kotlin.String;kotlin.Boolean;kotlin.collections.List<kotlin.String>;dev.avinya.ads.ConsentDebugGeography;kotlin.Boolean?;kotlin.Boolean?;kotlin.collections.List<dev.avinya.ads.AdInitializationHook>){}[0]
+    constructor <init>(dev.avinya.ads/AdAppIds, dev.avinya.ads/GlobalRequestConfiguration = ..., dev.avinya.ads/AdDebugOptions = ..., kotlin/Boolean = ..., kotlin.collections/List<dev.avinya.ads/AdInitializationHook> = ...) // dev.avinya.ads/AdConfig.<init>|<init>(dev.avinya.ads.AdAppIds;dev.avinya.ads.GlobalRequestConfiguration;dev.avinya.ads.AdDebugOptions;kotlin.Boolean;kotlin.collections.List<dev.avinya.ads.AdInitializationHook>){}[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/Boolean = ..., kotlin.collections/List<kotlin/String> = ..., dev.avinya.ads/ConsentDebugGeography = ..., dev.avinya.ads/AgeRestrictedTreatment = ..., kotlin/Boolean = ..., kotlin.collections/List<dev.avinya.ads/AdInitializationHook> = ...) // dev.avinya.ads/AdConfig.<init>|<init>(kotlin.String;kotlin.String;kotlin.Boolean;kotlin.collections.List<kotlin.String>;dev.avinya.ads.ConsentDebugGeography;dev.avinya.ads.AgeRestrictedTreatment;kotlin.Boolean;kotlin.collections.List<dev.avinya.ads.AdInitializationHook>){}[0]
 
     final val androidAppId // dev.avinya.ads/AdConfig.androidAppId|{}androidAppId[0]
         final fun <get-androidAppId>(): kotlin/String // dev.avinya.ads/AdConfig.androidAppId.<get-androidAppId>|<get-androidAppId>(){}[0]
     final val appIds // dev.avinya.ads/AdConfig.appIds|{}appIds[0]
         final fun <get-appIds>(): dev.avinya.ads/AdAppIds // dev.avinya.ads/AdConfig.appIds.<get-appIds>|<get-appIds>(){}[0]
+    final val consentTagForUnderAgeOfConsent // dev.avinya.ads/AdConfig.consentTagForUnderAgeOfConsent|{}consentTagForUnderAgeOfConsent[0]
+        final fun <get-consentTagForUnderAgeOfConsent>(): kotlin/Boolean // dev.avinya.ads/AdConfig.consentTagForUnderAgeOfConsent.<get-consentTagForUnderAgeOfConsent>|<get-consentTagForUnderAgeOfConsent>(){}[0]
     final val debugGeography // dev.avinya.ads/AdConfig.debugGeography|{}debugGeography[0]
         final fun <get-debugGeography>(): dev.avinya.ads/ConsentDebugGeography // dev.avinya.ads/AdConfig.debugGeography.<get-debugGeography>|<get-debugGeography>(){}[0]
     final val debugOptions // dev.avinya.ads/AdConfig.debugOptions|{}debugOptions[0]
@@ -981,10 +983,6 @@ final class dev.avinya.ads/AdConfig { // dev.avinya.ads/AdConfig|null[0]
         final fun <get-initializationHooks>(): kotlin.collections/List<dev.avinya.ads/AdInitializationHook> // dev.avinya.ads/AdConfig.initializationHooks.<get-initializationHooks>|<get-initializationHooks>(){}[0]
     final val iosAppId // dev.avinya.ads/AdConfig.iosAppId|{}iosAppId[0]
         final fun <get-iosAppId>(): kotlin/String // dev.avinya.ads/AdConfig.iosAppId.<get-iosAppId>|<get-iosAppId>(){}[0]
-    final val requestUnderAgeOfConsent // dev.avinya.ads/AdConfig.requestUnderAgeOfConsent|{}requestUnderAgeOfConsent[0]
-        final fun <get-requestUnderAgeOfConsent>(): kotlin/Boolean? // dev.avinya.ads/AdConfig.requestUnderAgeOfConsent.<get-requestUnderAgeOfConsent>|<get-requestUnderAgeOfConsent>(){}[0]
-    final val tagForChildDirectedTreatment // dev.avinya.ads/AdConfig.tagForChildDirectedTreatment|{}tagForChildDirectedTreatment[0]
-        final fun <get-tagForChildDirectedTreatment>(): kotlin/Boolean? // dev.avinya.ads/AdConfig.tagForChildDirectedTreatment.<get-tagForChildDirectedTreatment>|<get-tagForChildDirectedTreatment>(){}[0]
     final val testDeviceIds // dev.avinya.ads/AdConfig.testDeviceIds|{}testDeviceIds[0]
         final fun <get-testDeviceIds>(): kotlin.collections/List<kotlin/String> // dev.avinya.ads/AdConfig.testDeviceIds.<get-testDeviceIds>|<get-testDeviceIds>(){}[0]
     final val testMode // dev.avinya.ads/AdConfig.testMode|{}testMode[0]
@@ -993,10 +991,9 @@ final class dev.avinya.ads/AdConfig { // dev.avinya.ads/AdConfig|null[0]
     final fun component1(): dev.avinya.ads/AdAppIds // dev.avinya.ads/AdConfig.component1|component1(){}[0]
     final fun component2(): dev.avinya.ads/GlobalRequestConfiguration // dev.avinya.ads/AdConfig.component2|component2(){}[0]
     final fun component3(): dev.avinya.ads/AdDebugOptions // dev.avinya.ads/AdConfig.component3|component3(){}[0]
-    final fun component4(): kotlin/Boolean? // dev.avinya.ads/AdConfig.component4|component4(){}[0]
-    final fun component5(): kotlin/Boolean? // dev.avinya.ads/AdConfig.component5|component5(){}[0]
-    final fun component6(): kotlin.collections/List<dev.avinya.ads/AdInitializationHook> // dev.avinya.ads/AdConfig.component6|component6(){}[0]
-    final fun copy(dev.avinya.ads/AdAppIds = ..., dev.avinya.ads/GlobalRequestConfiguration = ..., dev.avinya.ads/AdDebugOptions = ..., kotlin/Boolean? = ..., kotlin/Boolean? = ..., kotlin.collections/List<dev.avinya.ads/AdInitializationHook> = ...): dev.avinya.ads/AdConfig // dev.avinya.ads/AdConfig.copy|copy(dev.avinya.ads.AdAppIds;dev.avinya.ads.GlobalRequestConfiguration;dev.avinya.ads.AdDebugOptions;kotlin.Boolean?;kotlin.Boolean?;kotlin.collections.List<dev.avinya.ads.AdInitializationHook>){}[0]
+    final fun component4(): kotlin/Boolean // dev.avinya.ads/AdConfig.component4|component4(){}[0]
+    final fun component5(): kotlin.collections/List<dev.avinya.ads/AdInitializationHook> // dev.avinya.ads/AdConfig.component5|component5(){}[0]
+    final fun copy(dev.avinya.ads/AdAppIds = ..., dev.avinya.ads/GlobalRequestConfiguration = ..., dev.avinya.ads/AdDebugOptions = ..., kotlin/Boolean = ..., kotlin.collections/List<dev.avinya.ads/AdInitializationHook> = ...): dev.avinya.ads/AdConfig // dev.avinya.ads/AdConfig.copy|copy(dev.avinya.ads.AdAppIds;dev.avinya.ads.GlobalRequestConfiguration;dev.avinya.ads.AdDebugOptions;kotlin.Boolean;kotlin.collections.List<dev.avinya.ads.AdInitializationHook>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // dev.avinya.ads/AdConfig.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // dev.avinya.ads/AdConfig.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // dev.avinya.ads/AdConfig.toString|toString(){}[0]
@@ -1366,8 +1363,10 @@ final class dev.avinya.ads/FullScreenAdOptions { // dev.avinya.ads/FullScreenAdO
 }
 
 final class dev.avinya.ads/GlobalRequestConfiguration { // dev.avinya.ads/GlobalRequestConfiguration|null[0]
-    constructor <init>(kotlin.collections/List<kotlin/String> = ..., dev.avinya.ads/MaxAdContentRating = ..., dev.avinya.ads/RequestTag = ..., dev.avinya.ads/RequestTag = ..., dev.avinya.ads/PublisherPrivacyPersonalizationState = ..., kotlin/Boolean? = ..., kotlin/Boolean? = ..., kotlin/Float? = ...) // dev.avinya.ads/GlobalRequestConfiguration.<init>|<init>(kotlin.collections.List<kotlin.String>;dev.avinya.ads.MaxAdContentRating;dev.avinya.ads.RequestTag;dev.avinya.ads.RequestTag;dev.avinya.ads.PublisherPrivacyPersonalizationState;kotlin.Boolean?;kotlin.Boolean?;kotlin.Float?){}[0]
+    constructor <init>(kotlin.collections/List<kotlin/String> = ..., dev.avinya.ads/MaxAdContentRating = ..., dev.avinya.ads/AgeRestrictedTreatment = ..., dev.avinya.ads/PublisherPrivacyPersonalizationState = ..., kotlin/Boolean? = ..., kotlin/Boolean? = ..., kotlin/Float? = ...) // dev.avinya.ads/GlobalRequestConfiguration.<init>|<init>(kotlin.collections.List<kotlin.String>;dev.avinya.ads.MaxAdContentRating;dev.avinya.ads.AgeRestrictedTreatment;dev.avinya.ads.PublisherPrivacyPersonalizationState;kotlin.Boolean?;kotlin.Boolean?;kotlin.Float?){}[0]
 
+    final val ageRestrictedTreatment // dev.avinya.ads/GlobalRequestConfiguration.ageRestrictedTreatment|{}ageRestrictedTreatment[0]
+        final fun <get-ageRestrictedTreatment>(): dev.avinya.ads/AgeRestrictedTreatment // dev.avinya.ads/GlobalRequestConfiguration.ageRestrictedTreatment.<get-ageRestrictedTreatment>|<get-ageRestrictedTreatment>(){}[0]
     final val appMuted // dev.avinya.ads/GlobalRequestConfiguration.appMuted|{}appMuted[0]
         final fun <get-appMuted>(): kotlin/Boolean? // dev.avinya.ads/GlobalRequestConfiguration.appMuted.<get-appMuted>|<get-appMuted>(){}[0]
     final val appVolume // dev.avinya.ads/GlobalRequestConfiguration.appVolume|{}appVolume[0]
@@ -1378,22 +1377,17 @@ final class dev.avinya.ads/GlobalRequestConfiguration { // dev.avinya.ads/Global
         final fun <get-publisherFirstPartyIdEnabled>(): kotlin/Boolean? // dev.avinya.ads/GlobalRequestConfiguration.publisherFirstPartyIdEnabled.<get-publisherFirstPartyIdEnabled>|<get-publisherFirstPartyIdEnabled>(){}[0]
     final val publisherPrivacyPersonalizationState // dev.avinya.ads/GlobalRequestConfiguration.publisherPrivacyPersonalizationState|{}publisherPrivacyPersonalizationState[0]
         final fun <get-publisherPrivacyPersonalizationState>(): dev.avinya.ads/PublisherPrivacyPersonalizationState // dev.avinya.ads/GlobalRequestConfiguration.publisherPrivacyPersonalizationState.<get-publisherPrivacyPersonalizationState>|<get-publisherPrivacyPersonalizationState>(){}[0]
-    final val tagForChildDirectedTreatment // dev.avinya.ads/GlobalRequestConfiguration.tagForChildDirectedTreatment|{}tagForChildDirectedTreatment[0]
-        final fun <get-tagForChildDirectedTreatment>(): dev.avinya.ads/RequestTag // dev.avinya.ads/GlobalRequestConfiguration.tagForChildDirectedTreatment.<get-tagForChildDirectedTreatment>|<get-tagForChildDirectedTreatment>(){}[0]
-    final val tagForUnderAgeOfConsent // dev.avinya.ads/GlobalRequestConfiguration.tagForUnderAgeOfConsent|{}tagForUnderAgeOfConsent[0]
-        final fun <get-tagForUnderAgeOfConsent>(): dev.avinya.ads/RequestTag // dev.avinya.ads/GlobalRequestConfiguration.tagForUnderAgeOfConsent.<get-tagForUnderAgeOfConsent>|<get-tagForUnderAgeOfConsent>(){}[0]
     final val testDeviceIds // dev.avinya.ads/GlobalRequestConfiguration.testDeviceIds|{}testDeviceIds[0]
         final fun <get-testDeviceIds>(): kotlin.collections/List<kotlin/String> // dev.avinya.ads/GlobalRequestConfiguration.testDeviceIds.<get-testDeviceIds>|<get-testDeviceIds>(){}[0]
 
     final fun component1(): kotlin.collections/List<kotlin/String> // dev.avinya.ads/GlobalRequestConfiguration.component1|component1(){}[0]
     final fun component2(): dev.avinya.ads/MaxAdContentRating // dev.avinya.ads/GlobalRequestConfiguration.component2|component2(){}[0]
-    final fun component3(): dev.avinya.ads/RequestTag // dev.avinya.ads/GlobalRequestConfiguration.component3|component3(){}[0]
-    final fun component4(): dev.avinya.ads/RequestTag // dev.avinya.ads/GlobalRequestConfiguration.component4|component4(){}[0]
-    final fun component5(): dev.avinya.ads/PublisherPrivacyPersonalizationState // dev.avinya.ads/GlobalRequestConfiguration.component5|component5(){}[0]
+    final fun component3(): dev.avinya.ads/AgeRestrictedTreatment // dev.avinya.ads/GlobalRequestConfiguration.component3|component3(){}[0]
+    final fun component4(): dev.avinya.ads/PublisherPrivacyPersonalizationState // dev.avinya.ads/GlobalRequestConfiguration.component4|component4(){}[0]
+    final fun component5(): kotlin/Boolean? // dev.avinya.ads/GlobalRequestConfiguration.component5|component5(){}[0]
     final fun component6(): kotlin/Boolean? // dev.avinya.ads/GlobalRequestConfiguration.component6|component6(){}[0]
-    final fun component7(): kotlin/Boolean? // dev.avinya.ads/GlobalRequestConfiguration.component7|component7(){}[0]
-    final fun component8(): kotlin/Float? // dev.avinya.ads/GlobalRequestConfiguration.component8|component8(){}[0]
-    final fun copy(kotlin.collections/List<kotlin/String> = ..., dev.avinya.ads/MaxAdContentRating = ..., dev.avinya.ads/RequestTag = ..., dev.avinya.ads/RequestTag = ..., dev.avinya.ads/PublisherPrivacyPersonalizationState = ..., kotlin/Boolean? = ..., kotlin/Boolean? = ..., kotlin/Float? = ...): dev.avinya.ads/GlobalRequestConfiguration // dev.avinya.ads/GlobalRequestConfiguration.copy|copy(kotlin.collections.List<kotlin.String>;dev.avinya.ads.MaxAdContentRating;dev.avinya.ads.RequestTag;dev.avinya.ads.RequestTag;dev.avinya.ads.PublisherPrivacyPersonalizationState;kotlin.Boolean?;kotlin.Boolean?;kotlin.Float?){}[0]
+    final fun component7(): kotlin/Float? // dev.avinya.ads/GlobalRequestConfiguration.component7|component7(){}[0]
+    final fun copy(kotlin.collections/List<kotlin/String> = ..., dev.avinya.ads/MaxAdContentRating = ..., dev.avinya.ads/AgeRestrictedTreatment = ..., dev.avinya.ads/PublisherPrivacyPersonalizationState = ..., kotlin/Boolean? = ..., kotlin/Boolean? = ..., kotlin/Float? = ...): dev.avinya.ads/GlobalRequestConfiguration // dev.avinya.ads/GlobalRequestConfiguration.copy|copy(kotlin.collections.List<kotlin.String>;dev.avinya.ads.MaxAdContentRating;dev.avinya.ads.AgeRestrictedTreatment;dev.avinya.ads.PublisherPrivacyPersonalizationState;kotlin.Boolean?;kotlin.Boolean?;kotlin.Float?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // dev.avinya.ads/GlobalRequestConfiguration.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // dev.avinya.ads/GlobalRequestConfiguration.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // dev.avinya.ads/GlobalRequestConfiguration.toString|toString(){}[0]

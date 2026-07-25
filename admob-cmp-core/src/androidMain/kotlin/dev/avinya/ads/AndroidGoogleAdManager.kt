@@ -675,7 +675,7 @@ private class AndroidConsentController(
 
     private fun buildConsentParams(activity: Activity, config: AdConfig): ConsentRequestParameters {
         val builder = ConsentRequestParameters.Builder()
-        config.requestUnderAgeOfConsent?.let(builder::setTagForUnderAgeOfConsent)
+        builder.setTagForUnderAgeOfConsent(config.consentTagForUnderAgeOfConsent)
         if (config.testMode && (config.testDeviceIds.isNotEmpty() || config.debugOptions.consentTestDeviceIds.isNotEmpty() || config.debugGeography != ConsentDebugGeography.Disabled)) {
             val debugBuilder = ConsentDebugSettings.Builder(activity)
             (config.debugOptions.consentTestDeviceIds + config.testDeviceIds).distinct().forEach(debugBuilder::addTestDeviceHashedId)

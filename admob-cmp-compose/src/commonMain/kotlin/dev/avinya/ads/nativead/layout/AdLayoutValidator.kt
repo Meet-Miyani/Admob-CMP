@@ -89,11 +89,27 @@ public object AdLayoutValidator {
 
         visit(root, "root")
 
+        fun containsAdBadge(node: AdNode): Boolean = when (node) {
+            is AdAssetNode.AdBadge -> true
+            is AdContainerNode -> node.children.any(::containsAdBadge)
+            else -> false
+        }
+        val topRegion = when (root) {
+            is AdContainerNode.Column -> root.children.firstOrNull()
+            else -> root
+        }
+
         if ("headline" !in assets) {
             warnings += warning("missing_headline", "Native layout does not include a headline asset.", "root")
         }
         if ("ad_badge" !in assets) {
             warnings += warning("missing_ad_badge", "Native layout should include a visible ad attribution badge.", "root")
+        } else if (topRegion?.let(::containsAdBadge) != true) {
+            warnings += warning(
+                "ad_attribution_not_at_top",
+                "Ad attribution must be displayed at the top of the native ad.",
+                "root",
+            )
         }
         if ("ad_choices" !in assets) {
             warnings += warning("missing_ad_choices_space", "Native layout should reserve space for the SDK-owned AdChoices overlay.", "root")

@@ -10,4 +10,7 @@ set -eu
 : "${ORG_GRADLE_PROJECT_signingInMemoryKey:?Missing ORG_GRADLE_PROJECT_signingInMemoryKey}"
 : "${ORG_GRADLE_PROJECT_signingInMemoryKeyPassword:?Missing ORG_GRADLE_PROJECT_signingInMemoryKeyPassword}"
 cd "$(dirname "$0")/../.."
-./gradlew :admob-cmp:publishAndReleaseToMavenCentral
+# Upload every module into one Central Portal staging deployment. Deliberately
+# do not auto-release: inspect the deployment in Central Portal, then publish it
+# manually once all artifacts and signatures are confirmed.
+./gradlew publishToMavenCentral

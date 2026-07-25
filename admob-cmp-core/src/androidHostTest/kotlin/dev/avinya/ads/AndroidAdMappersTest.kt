@@ -1,5 +1,6 @@
 package dev.avinya.ads
 
+import com.google.android.libraries.ads.mobile.sdk.common.AgeRestrictedTreatment as GmaAgeRestrictedTreatment
 import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -21,6 +22,23 @@ class AndroidAdMappersTest {
 
     private fun loadAdError(code: LoadAdError.ErrorCode): LoadAdError =
         LoadAdError(code, "test failure", null)
+
+    @Test
+    fun `maps every common age treatment to the matching GMA value`() {
+        val expected = mapOf(
+            AgeRestrictedTreatment.Unspecified to GmaAgeRestrictedTreatment.UNSPECIFIED,
+            AgeRestrictedTreatment.Child to GmaAgeRestrictedTreatment.CHILD,
+            AgeRestrictedTreatment.Teen to GmaAgeRestrictedTreatment.TEEN,
+        )
+
+        for ((common, gma) in expected) {
+            val mapped = GlobalRequestConfiguration(
+                ageRestrictedTreatment = common,
+            ).toAndroidRequestConfiguration()
+
+            assertEquals(gma, mapped.ageRestrictedTreatment)
+        }
+    }
 
     @Test
     fun `maps load error code to enum name not ordinal`() {

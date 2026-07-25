@@ -24,10 +24,13 @@ public data class AdConfig(
     val globalRequestConfiguration: GlobalRequestConfiguration = GlobalRequestConfiguration(),
     /** Debug and test-mode options. */
     val debugOptions: AdDebugOptions = AdDebugOptions(),
-    /** Marks ad requests as coming from a user under the age of consent (COPPA). Null = unspecified. */
-    val requestUnderAgeOfConsent: Boolean? = null,
-    /** Tags ad requests for child-directed treatment (COPPA). Null = unspecified. */
-    val tagForChildDirectedTreatment: Boolean? = null,
+    /**
+     * UMP-only tag indicating whether the user is under the age of consent.
+     *
+     * This controls consent-form behavior and is intentionally independent from
+     * [GlobalRequestConfiguration.ageRestrictedTreatment], which controls GMA ad requests.
+     */
+    val consentTagForUnderAgeOfConsent: Boolean = false,
     /** Hooks invoked during initialization phases. */
     val initializationHooks: List<AdInitializationHook> = emptyList()
 ) {
@@ -42,8 +45,8 @@ public data class AdConfig(
      * @param testDeviceIds Device IDs registered as GMA test devices; this is what actually
      *   forces test ads for a physical device (emulators/simulators qualify automatically).
      * @param debugGeography Force UMP debug geography.
-     * @param requestUnderAgeOfConsent Marks requests as under age of consent (COPPA).
-     * @param tagForChildDirectedTreatment Tags for child-directed treatment (COPPA).
+     * @param ageRestrictedTreatment Age treatment applied to GMA ad requests.
+     * @param consentTagForUnderAgeOfConsent UMP-only under-age-of-consent tag.
      * @param initializationHooks Hooks invoked during initialization phases.
      */
     public constructor(
@@ -52,19 +55,17 @@ public data class AdConfig(
         testMode: Boolean = false,
         testDeviceIds: List<String> = emptyList(),
         debugGeography: ConsentDebugGeography = ConsentDebugGeography.Disabled,
-        requestUnderAgeOfConsent: Boolean? = null,
-        tagForChildDirectedTreatment: Boolean? = null,
+        ageRestrictedTreatment: AgeRestrictedTreatment = AgeRestrictedTreatment.Unspecified,
+        consentTagForUnderAgeOfConsent: Boolean = false,
         initializationHooks: List<AdInitializationHook> = emptyList()
     ) : this(
         appIds = AdAppIds(androidAppId, iosAppId),
         globalRequestConfiguration = GlobalRequestConfiguration(
             testDeviceIds = testDeviceIds,
-            tagForUnderAgeOfConsent = requestUnderAgeOfConsent.toRequestTag(),
-            tagForChildDirectedTreatment = tagForChildDirectedTreatment.toRequestTag()
+            ageRestrictedTreatment = ageRestrictedTreatment,
         ),
         debugOptions = AdDebugOptions(testMode = testMode, consentDebugGeography = debugGeography),
-        requestUnderAgeOfConsent = requestUnderAgeOfConsent,
-        tagForChildDirectedTreatment = tagForChildDirectedTreatment,
+        consentTagForUnderAgeOfConsent = consentTagForUnderAgeOfConsent,
         initializationHooks = initializationHooks
     )
 
@@ -129,17 +130,12 @@ internal fun AdConfig.testModeWarningOrNull(): String? {
 
 /**
  * Returns the single request configuration applied to GMA on every platform.
- * Explicit top-level privacy flags take precedence; null keeps the nested
- * request configuration value. UMP continues to read the top-level under-age
- * flag directly when building its consent request parameters.
+ *
+ * UMP configuration is deliberately excluded: [AdConfig.consentTagForUnderAgeOfConsent]
+ * controls consent gathering and must not implicitly alter GMA request treatment.
  */
 internal fun AdConfig.effectiveGlobalRequestConfiguration(): GlobalRequestConfiguration =
-    globalRequestConfiguration.copy(
-        tagForUnderAgeOfConsent = requestUnderAgeOfConsent?.toRequestTag()
-            ?: globalRequestConfiguration.tagForUnderAgeOfConsent,
-        tagForChildDirectedTreatment = tagForChildDirectedTreatment?.toRequestTag()
-            ?: globalRequestConfiguration.tagForChildDirectedTreatment
-    )
+    globalRequestConfiguration
 
 /**
  * Identity of the process-wide GMA configuration that cannot be replaced after
@@ -167,10 +163,8 @@ public data class GlobalRequestConfiguration(
     val testDeviceIds: List<String> = emptyList(),
     /** Maximum ad content rating filter. */
     val maxAdContentRating: MaxAdContentRating = MaxAdContentRating.Unspecified,
-    /** Tag for child-directed treatment (COPPA). */
-    val tagForChildDirectedTreatment: RequestTag = RequestTag.Unspecified,
-    /** Tag for under-age-of-consent requests (GDPR). */
-    val tagForUnderAgeOfConsent: RequestTag = RequestTag.Unspecified,
+    /** Age treatment applied to all GMA ad requests. */
+    val ageRestrictedTreatment: AgeRestrictedTreatment = AgeRestrictedTreatment.Unspecified,
     /** Publisher privacy personalization state. */
     val publisherPrivacyPersonalizationState: PublisherPrivacyPersonalizationState = PublisherPrivacyPersonalizationState.Default,
     /** Enable publisher first-party ID. Null = unspecified. */
@@ -181,12 +175,15 @@ public data class GlobalRequestConfiguration(
     val appVolume: Float? = null
 )
 
-/**
- * Ternary tag for request-level flags like child-directed treatment or
- * under-age-of-consent. [Unspecified] means the tag is not set and the
- * AdMob dashboard default applies.
- */
-public enum class RequestTag { Unspecified, True, False }
+/** Age treatment applied to Google Mobile Ads requests. */
+public enum class AgeRestrictedTreatment {
+    /** No specific age-restricted treatment signal. */
+    Unspecified,
+    /** Apply child-directed treatment. */
+    Child,
+    /** Apply teen-directed treatment. */
+    Teen,
+}
 
 /**
  * Maximum ad content rating filter. Corresponds to GMA
@@ -234,9 +231,3 @@ public data class AdDebugOptions(
  * forces non-EEA behavior. Never use in production builds.
  */
 public enum class ConsentDebugGeography { Disabled, Eea, NotEea }
-
-private fun Boolean?.toRequestTag(): RequestTag = when (this) {
-    true -> RequestTag.True
-    false -> RequestTag.False
-    null -> RequestTag.Unspecified
-}

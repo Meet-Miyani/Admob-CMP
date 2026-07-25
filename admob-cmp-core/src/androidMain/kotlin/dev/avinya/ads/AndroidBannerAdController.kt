@@ -3,6 +3,7 @@ package dev.avinya.ads
 import dev.avinya.ads.internal.BannerCore
 import dev.avinya.ads.internal.BannerPlatform
 import com.google.android.libraries.ads.mobile.sdk.banner.AdSize
+import com.google.android.libraries.ads.mobile.sdk.banner.AdView
 import com.google.android.libraries.ads.mobile.sdk.banner.BannerAd
 import com.google.android.libraries.ads.mobile.sdk.banner.BannerAdEventCallback
 import com.google.android.libraries.ads.mobile.sdk.banner.BannerAdRequest
@@ -27,7 +28,7 @@ internal class AndroidBannerAdController internal constructor(
     globalEvents: MutableSharedFlow<AdEvent>,
     private val adRequestBlockedError: () -> AdError?,
     private val activityProvider: () -> android.app.Activity? = { null }
-) : BannerAdController, BannerPlatform<BannerAd, AdSize> {
+) : BannerAdController, BannerPlatform<AndroidLoadedBanner, AdSize> {
 
     private val stateLock = Any()
     private val core = BannerCore(placement, this, globalEvents)
@@ -35,7 +36,8 @@ internal class AndroidBannerAdController internal constructor(
     override val loadState: StateFlow<AdLoadState> get() = core.loadState
     override val events: SharedFlow<AdEvent> get() = core.events
 
-    internal fun currentAd(): BannerAd? = core.currentBanner()
+    internal fun currentAd(): BannerAd? = core.currentBanner()?.ad
+    internal fun currentView(): AdView? = core.currentBanner()?.view
 
     internal fun attach() = core.attach()
     internal fun detach() = core.detach()
@@ -73,25 +75,34 @@ internal class AndroidBannerAdController internal constructor(
         return sizePolicy.toAndroidAdSize(activity, widthDp)
     }
 
-    override fun destroy(banner: BannerAd) = banner.destroy()
+    override fun destroy(banner: AndroidLoadedBanner) = banner.destroy()
 
-    override fun responseInfo(banner: BannerAd): AdResponseInfo? = banner.getResponseInfo().toCommon()
+    override fun responseInfo(banner: AndroidLoadedBanner): AdResponseInfo? =
+        banner.ad.getResponseInfo().toCommon()
 
     override suspend fun loadBanner(
         size: AdSize,
         requestOptions: AdRequestOptions,
         requiredGeneration: Long
-    ): AdAttemptResult<BannerAd> = withContext(Dispatchers.Main.immediate) {
+    ): AdAttemptResult<AndroidLoadedBanner> = withContext(Dispatchers.Main.immediate) {
         suspendCancellableCoroutine { continuation ->
-            continuation.invokeOnCancellation { }
+            val activity = activityProvider()
+            if (activity == null) {
+                continuation.resume(
+                    AdAttemptResult.Failure(AdError.message("No current Android Activity."))
+                )
+                return@suspendCancellableCoroutine
+            }
             val mergedOptions = requestOptions.withCollapsible(placement.bannerSizePolicy)
             val request = BannerAdRequest.Builder(placement.androidAdUnitId, size)
                 .applyOptions(mergedOptions)
                 .build()
-            BannerAd.load(request, object : AdLoadCallback<BannerAd> {
+            val adView = AdView(activity)
+            continuation.invokeOnCancellation { adView.destroyOnMain() }
+            adView.loadAd(request, object : AdLoadCallback<BannerAd> {
                 override fun onAdLoaded(ad: BannerAd) {
                     if (!continuation.isActive) {
-                        ad.destroy()
+                        adView.destroy()
                         return
                     }
                     ad.adEventCallback = object : BannerAdEventCallback {
@@ -114,22 +125,59 @@ internal class AndroidBannerAdController internal constructor(
                     }
                     // The core publishes Loaded/_loadState after the banner is swapped, so the
                     // composable mirrors the NEW ad.
+                    // AdView.loadAd automatically registers before this callback. Detach the
+                    // loaded ad immediately so the SDK's server-driven refresh loop is cancelled;
+                    // BannerCore remains the single owner of refresh/load-once semantics.
+                    val detachedAd = adView.unregisterBannerAd() ?: ad
+                    val loaded = AndroidLoadedBanner(adView, detachedAd)
                     continuation.resume(
-                        AdAttemptResult.Success(ad),
-                        onCancellation = { _, _, _ -> ad.destroy() }
+                        AdAttemptResult.Success(loaded),
+                        onCancellation = { _, _, _ -> loaded.destroy() }
                     )
                 }
 
                 override fun onAdFailedToLoad(adError: LoadAdError) {
-                    if (continuation.isActive) continuation.resume(AdAttemptResult.Failure(adError.toAdError()))
+                    adView.destroy()
+                    if (continuation.isActive) {
+                        continuation.resume(AdAttemptResult.Failure(adError.toAdError()))
+                    }
                 }
             })
         }
     }
 }
 
+internal data class AndroidLoadedBanner(
+    val view: AdView,
+    val ad: BannerAd,
+) {
+    fun destroy() {
+        val cleanup = {
+            view.unregisterBannerAd()
+            view.destroy()
+            ad.destroy()
+        }
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+            cleanup()
+        } else {
+            android.os.Handler(android.os.Looper.getMainLooper()).post(cleanup)
+        }
+    }
+}
+
+private fun AdView.destroyOnMain() {
+    if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+        destroy()
+    } else {
+        android.os.Handler(android.os.Looper.getMainLooper()).post(::destroy)
+    }
+}
+
 public fun BannerAdController.currentAndroidBannerAd(): BannerAd? =
     (this as? AndroidBannerAdController)?.currentAd()
+
+public fun BannerAdController.currentAndroidBannerView(): AdView? =
+    (this as? AndroidBannerAdController)?.currentView()
 
 public fun BannerAdController.attachAndroidBanner(): Unit {
     (this as? AndroidBannerAdController)?.attach()

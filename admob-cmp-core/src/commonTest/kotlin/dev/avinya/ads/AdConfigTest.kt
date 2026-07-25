@@ -2,6 +2,7 @@ package dev.avinya.ads
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -9,87 +10,70 @@ import kotlin.test.assertTrue
 class AdConfigTest {
 
     private fun config(
-        requestUnderAgeOfConsent: Boolean? = null,
-        tagForChildDirectedTreatment: Boolean? = null,
+        consentTagForUnderAgeOfConsent: Boolean = false,
         globalRequestConfiguration: GlobalRequestConfiguration = GlobalRequestConfiguration()
     ) = AdConfig(
         appIds = AdAppIds(android = "ca-app-pub-android", ios = "ca-app-pub-ios"),
         globalRequestConfiguration = globalRequestConfiguration,
-        requestUnderAgeOfConsent = requestUnderAgeOfConsent,
-        tagForChildDirectedTreatment = tagForChildDirectedTreatment
+        consentTagForUnderAgeOfConsent = consentTagForUnderAgeOfConsent
     )
 
     @Test
-    fun `explicit COPPA flags win over nested request configuration`() {
-        val effective = config(
-            requestUnderAgeOfConsent = true,
-            tagForChildDirectedTreatment = true,
+    fun `GMA age treatment remains independent from UMP consent tag`() {
+        val config = config(
+            consentTagForUnderAgeOfConsent = true,
             globalRequestConfiguration = GlobalRequestConfiguration(
-                tagForUnderAgeOfConsent = RequestTag.False,
-                tagForChildDirectedTreatment = RequestTag.False
-            )
-        ).effectiveGlobalRequestConfiguration()
+                ageRestrictedTreatment = AgeRestrictedTreatment.Teen
+            ),
+        )
 
-        assertEquals(RequestTag.True, effective.tagForUnderAgeOfConsent)
-        assertEquals(RequestTag.True, effective.tagForChildDirectedTreatment)
+        assertTrue(config.consentTagForUnderAgeOfConsent)
+        assertEquals(
+            AgeRestrictedTreatment.Teen,
+            config.effectiveGlobalRequestConfiguration().ageRestrictedTreatment,
+        )
     }
 
     @Test
-    fun `explicit false COPPA flags win over nested true configuration`() {
-        val effective = config(
-            requestUnderAgeOfConsent = false,
-            tagForChildDirectedTreatment = false,
-            globalRequestConfiguration = GlobalRequestConfiguration(
-                tagForUnderAgeOfConsent = RequestTag.True,
-                tagForChildDirectedTreatment = RequestTag.True
-            )
-        ).effectiveGlobalRequestConfiguration()
+    fun `default age treatment and consent tag are explicit and safe`() {
+        val config = config()
 
-        assertEquals(RequestTag.False, effective.tagForUnderAgeOfConsent)
-        assertEquals(RequestTag.False, effective.tagForChildDirectedTreatment)
+        assertFalse(config.consentTagForUnderAgeOfConsent)
+        assertEquals(
+            AgeRestrictedTreatment.Unspecified,
+            config.effectiveGlobalRequestConfiguration().ageRestrictedTreatment,
+        )
     }
 
     @Test
-    fun `null COPPA flags preserve nested request configuration`() {
+    fun `unrelated global request configuration fields survive effective configuration`() {
         val effective = config(
-            requestUnderAgeOfConsent = null,
-            tagForChildDirectedTreatment = null,
-            globalRequestConfiguration = GlobalRequestConfiguration(
-                tagForUnderAgeOfConsent = RequestTag.True,
-                tagForChildDirectedTreatment = RequestTag.False
-            )
-        ).effectiveGlobalRequestConfiguration()
-
-        assertEquals(RequestTag.True, effective.tagForUnderAgeOfConsent)
-        assertEquals(RequestTag.False, effective.tagForChildDirectedTreatment)
-    }
-
-    @Test
-    fun `unrelated global request configuration fields survive the merge`() {
-        val effective = config(
-            tagForChildDirectedTreatment = true,
             globalRequestConfiguration = GlobalRequestConfiguration(
                 testDeviceIds = listOf("device-a", "device-b"),
-                maxAdContentRating = MaxAdContentRating.Teen
-            )
+                maxAdContentRating = MaxAdContentRating.Teen,
+                ageRestrictedTreatment = AgeRestrictedTreatment.Child,
+            ),
         ).effectiveGlobalRequestConfiguration()
 
         assertEquals(listOf("device-a", "device-b"), effective.testDeviceIds)
         assertEquals(MaxAdContentRating.Teen, effective.maxAdContentRating)
-        assertEquals(RequestTag.True, effective.tagForChildDirectedTreatment)
+        assertEquals(AgeRestrictedTreatment.Child, effective.ageRestrictedTreatment)
     }
 
     @Test
-    fun `convenience constructor propagates COPPA flags into the effective configuration`() {
-        val effective = AdConfig(
+    fun `convenience constructor propagates independent age and UMP settings`() {
+        val config = AdConfig(
             androidAppId = "ca-app-pub-android",
             iosAppId = "ca-app-pub-ios",
-            requestUnderAgeOfConsent = true,
-            tagForChildDirectedTreatment = true
-        ).effectiveGlobalRequestConfiguration()
+            ageRestrictedTreatment = AgeRestrictedTreatment.Child,
+            consentTagForUnderAgeOfConsent = true,
+        )
 
-        assertEquals(RequestTag.True, effective.tagForUnderAgeOfConsent)
-        assertEquals(RequestTag.True, effective.tagForChildDirectedTreatment)
+        assertTrue(config.consentTagForUnderAgeOfConsent)
+        assertEquals(
+            AgeRestrictedTreatment.Child,
+            config.effectiveGlobalRequestConfiguration().ageRestrictedTreatment,
+        )
     }
 
     @Test

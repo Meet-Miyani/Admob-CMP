@@ -81,6 +81,7 @@ internal class IosNativeAdRenderer(
                 bottom = p.bottomDp.toDouble()
                 right = p.endDp.toDouble()
             }
+            stack.layoutMarginsRelativeArrangement = true
         }
         applyModifier(modifier, stack, handlesPadding = true)
         for (child in children) {
@@ -98,13 +99,25 @@ internal class IosNativeAdRenderer(
         val box = UIView()
         box.setTranslatesAutoresizingMaskIntoConstraints(false)
         applyModifier(modifier, box)
-        for (child in children) {
+        val sizingChildIndex = children.indexOfFirst { it is AdAssetNode.Media }
+            .takeIf { it >= 0 }
+            ?: 0
+        for ((index, child) in children.withIndex()) {
             val childView = wrapForMargin(render(child), modifierOf(child))
+            val childModifier = modifierOf(child)
             box.addSubview(childView)
             childView.leadingAnchor.constraintEqualToAnchor(box.leadingAnchor).active = true
-            childView.trailingAnchor.constraintLessThanOrEqualToAnchor(box.trailingAnchor).active = true
+            if (childModifier.width == AdLayoutSize.Match) {
+                childView.trailingAnchor.constraintEqualToAnchor(box.trailingAnchor).active = true
+            } else {
+                childView.trailingAnchor.constraintLessThanOrEqualToAnchor(box.trailingAnchor).active = true
+            }
             childView.topAnchor.constraintEqualToAnchor(box.topAnchor).active = true
-            childView.bottomAnchor.constraintLessThanOrEqualToAnchor(box.bottomAnchor).active = true
+            if (index == sizingChildIndex) {
+                childView.bottomAnchor.constraintEqualToAnchor(box.bottomAnchor).active = true
+            } else {
+                childView.bottomAnchor.constraintLessThanOrEqualToAnchor(box.bottomAnchor).active = true
+            }
         }
         return box
     }

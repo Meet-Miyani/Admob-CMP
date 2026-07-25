@@ -8,6 +8,9 @@ import GoogleMobileAds.GADAdValuePrecisionEstimated
 import GoogleMobileAds.GADAdValuePrecisionPrecise
 import GoogleMobileAds.GADAdValuePrecisionPublisherProvided
 import GoogleMobileAds.GADAdValuePrecisionUnknown
+import GoogleMobileAds.GADAgeRestrictedTreatmentChild
+import GoogleMobileAds.GADAgeRestrictedTreatmentTeen
+import GoogleMobileAds.GADAgeRestrictedTreatmentUnspecified
 import GoogleMobileAds.GADAdNetworkResponseInfo
 import GoogleMobileAds.GADErrorUserInfoKeyResponseInfo
 import GoogleMobileAds.GADExtras
@@ -28,7 +31,6 @@ import platform.Foundation.NSDecimalNumberHandler
 import platform.Foundation.NSRoundingMode
 import platform.Foundation.NSError
 import kotlinx.cinterop.ExperimentalForeignApi
-import platform.Foundation.NSNumber
 
 internal fun AdRequestOptions.toGADRequest(): GADRequest {
     val request = GADRequest()
@@ -64,15 +66,10 @@ internal fun GlobalRequestConfiguration.applyTo(requestConfiguration: GADRequest
         MaxAdContentRating.MatureAudience -> requestConfiguration.maxAdContentRating = GADMaxAdContentRatingMatureAudience
         MaxAdContentRating.Unspecified -> Unit
     }
-    when (tagForChildDirectedTreatment) {
-        RequestTag.True -> requestConfiguration.tagForChildDirectedTreatment = NSNumber(true)
-        RequestTag.False -> requestConfiguration.tagForChildDirectedTreatment = NSNumber(false)
-        RequestTag.Unspecified -> Unit
-    }
-    when (tagForUnderAgeOfConsent) {
-        RequestTag.True -> requestConfiguration.tagForUnderAgeOfConsent = NSNumber(true)
-        RequestTag.False -> requestConfiguration.tagForUnderAgeOfConsent = NSNumber(false)
-        RequestTag.Unspecified -> Unit
+    requestConfiguration.ageRestrictedTreatment = when (ageRestrictedTreatment) {
+        AgeRestrictedTreatment.Unspecified -> GADAgeRestrictedTreatmentUnspecified
+        AgeRestrictedTreatment.Child -> GADAgeRestrictedTreatmentChild
+        AgeRestrictedTreatment.Teen -> GADAgeRestrictedTreatmentTeen
     }
     when (publisherPrivacyPersonalizationState) {
         PublisherPrivacyPersonalizationState.Enabled -> requestConfiguration.publisherPrivacyPersonalizationState = GADPublisherPrivacyPersonalizationStateEnabled

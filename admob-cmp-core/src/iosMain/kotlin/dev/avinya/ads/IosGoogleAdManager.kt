@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -382,7 +383,7 @@ internal class IosGoogleAdManager : AdManager, FullScreenPresenceAware {
                                 AdLogger.d("iOS adapter '${name}'")
                             }
                         }
-                        if (continuation.isActive) continuation.resume(Unit, null)
+                        if (continuation.isActive) continuation.resume(Unit)
                     }
                 }
                 config.globalRequestConfiguration.publisherFirstPartyIdEnabled?.let {

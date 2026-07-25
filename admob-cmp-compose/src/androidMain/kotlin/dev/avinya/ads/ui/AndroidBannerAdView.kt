@@ -36,9 +36,11 @@ import dev.avinya.ads.BannerRefreshPolicy
 import dev.avinya.ads.LocalAdManager
 import dev.avinya.ads.attachAndroidBanner
 import dev.avinya.ads.currentAndroidBannerAd
+import dev.avinya.ads.currentAndroidBannerView
 import dev.avinya.ads.detachAndroidBanner
 import dev.avinya.ads.registerAndroidBannerGeometry
 import dev.avinya.ads.screenWidthDp
+import com.google.android.libraries.ads.mobile.sdk.banner.AdView
 import com.google.android.libraries.ads.mobile.sdk.banner.BannerAd
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
@@ -154,8 +156,9 @@ public actual fun BannerAdView(placement: AdPlacement, modifier: Modifier, width
         }
 
         val currentBanner = bannerAd
+        val currentBannerView = controller.currentAndroidBannerView()
         val currentActivity = activity
-        if (currentActivity != null && currentBanner != null) {
+        if (currentActivity != null && currentBanner != null && currentBannerView != null) {
             val loadedHeightDp = currentBanner.getAdSize().height
             val baseModifier = if (loadedHeightDp > 0) {
                 Modifier.fillMaxWidth().height(loadedHeightDp.dp)
@@ -170,11 +173,11 @@ public actual fun BannerAdView(placement: AdPlacement, modifier: Modifier, width
                     FrameLayout(context).apply {
                         clipChildren = false
                         clipToPadding = false
-                        bindBanner(currentActivity, currentBanner)
+                        bindBanner(currentActivity, currentBannerView, currentBanner)
                     }
                 },
                 update = { frame ->
-                    frame.bindBanner(currentActivity, currentBanner)
+                    frame.bindBanner(currentActivity, currentBannerView, currentBanner)
                 },
                 modifier = bannerModifier
             )
@@ -196,8 +199,10 @@ public actual fun BannerAdView(placement: AdPlacement, modifier: Modifier, width
     }
 }
 
-private fun FrameLayout.bindBanner(activity: Activity, bannerAd: BannerAd) {
-    val bannerView = bannerAd.getView(activity)
+private fun FrameLayout.bindBanner(activity: Activity, bannerView: AdView, bannerAd: BannerAd) {
+    if (bannerView.getBannerAd() !== bannerAd) {
+        bannerView.registerBannerAd(bannerAd, activity)
+    }
     if (bannerView.parent !== this) {
         bannerView.detachFromParent()
         removeAllViews()

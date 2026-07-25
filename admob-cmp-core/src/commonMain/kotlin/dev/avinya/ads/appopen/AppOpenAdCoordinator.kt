@@ -7,8 +7,10 @@ import dev.avinya.ads.AppOpenAdController
 import dev.avinya.ads.FullScreenPresenceAware
 import dev.avinya.ads.internal.FullScreenPresentationArbiter
 import dev.avinya.ads.internal.FullScreenStateLock
+import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -53,7 +55,7 @@ public class AppOpenAdCoordinator internal constructor(
     private val controller: AppOpenAdController,
     private val config: AppOpenConfig = AppOpenConfig(),
     internal val foregroundEvents: Flow<Boolean>,
-    internal val elapsedRealtime: () -> Duration
+    internal val clock: () -> Instant
 ) {
     public constructor(
         manager: AdManager,
@@ -64,14 +66,14 @@ public class AppOpenAdCoordinator internal constructor(
         controller = controller,
         config = config,
         foregroundEvents = appForegroundState(),
-        elapsedRealtime = { appOpenElapsedRealtime() }
+        clock = { Clock.System.now() }
     )
 
     private var foregroundJob: Job? = null
     private var preloadJob: Job? = null
     private var scope: CoroutineScope? = null
-    private var lastShowMark: Duration? = null
-    private var backgroundedAtMark: Duration? = null
+    private var lastShowInstant: Instant? = null
+    private var backgroundedAtInstant: Instant? = null
     // This only serializes coordinator admission. The manager-wide presentation handle remains
     // the source of truth for whether an ad is actually on screen.
     private val showAdmissionLock = FullScreenStateLock()
@@ -136,19 +138,19 @@ public class AppOpenAdCoordinator internal constructor(
         }
     }
 
-    private fun elapsedSince(startMark: Duration?): Duration {
-        if (startMark == null) return Duration.INFINITE
-        val diff = elapsedRealtime() - startMark
+    private fun elapsedSince(startInstant: Instant?): Duration {
+        if (startInstant == null) return Duration.INFINITE
+        val diff = clock() - startInstant
         return if (diff < Duration.ZERO) Duration.ZERO else diff
     }
 
     private fun onBackground() {
-        backgroundedAtMark = elapsedRealtime()
+        backgroundedAtInstant = clock()
     }
 
     private suspend fun onForeground() {
-        val backgroundDuration = backgroundedAtMark?.let { elapsedSince(it) } ?: Duration.ZERO
-        backgroundedAtMark = null
+        val backgroundDuration = backgroundedAtInstant?.let { elapsedSince(it) } ?: Duration.ZERO
+        backgroundedAtInstant = null
         if (backgroundDuration >= config.minBackgroundDuration && tryAcquireShowAdmission()) {
             showNow()
         }
@@ -175,7 +177,7 @@ public class AppOpenAdCoordinator internal constructor(
     private fun canShowNowLocked(): Boolean {
         if (blocked || showInFlight) return false
         if (manager.status.value != AdManagerStatus.Ready) return false
-        val sinceLastShow = elapsedSince(lastShowMark)
+        val sinceLastShow = elapsedSince(lastShowInstant)
         if (sinceLastShow < config.cooldownBetweenShows) return false
         return controller.isReady()
     }
@@ -227,7 +229,7 @@ public class AppOpenAdCoordinator internal constructor(
             val result = controller.show()
             if (result is AdShowResult.Shown || result is AdShowResult.Rewarded) {
                 showAdmissionLock.withLock {
-                    lastShowMark = elapsedRealtime()
+                    lastShowInstant = clock()
                 }
             }
         } finally {

@@ -7,10 +7,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.UIKitInteropProperties
 import androidx.compose.ui.viewinterop.UIKitViewController
 import dev.avinya.ads.AdEvent
@@ -25,8 +28,15 @@ import dev.avinya.ads.nativead.layout.AdLayout
 import dev.avinya.ads.nativead.peekIosNativeAd
 import dev.avinya.ads.nativead.rendering.IosNativeAdRenderer
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.useContents
 import kotlinx.coroutines.flow.filter
+import platform.CoreGraphics.CGSizeMake
+import platform.UIKit.NSLayoutConstraint
+import platform.UIKit.UILayoutPriorityFittingSizeLevel
+import platform.UIKit.UILayoutPriorityRequired
+import platform.UIKit.UIView
 import platform.UIKit.UIViewController
+import kotlin.math.abs
 
 // See KDoc on the expect declaration in commonMain (ui/NativeAdView.kt).
 @OptIn(ExperimentalForeignApi::class)
@@ -70,6 +80,9 @@ public actual fun NativeAdView(
     val status by sdk.status.collectAsState()
     val pool = remember(sdk, placement) { sdk.nativeAd(placement) }
     var token by remember(placement.id, itemKey, layout.identity) { mutableStateOf<NativeAdToken?>(null) }
+    var nativeContentHeight by remember(placement.id, itemKey, layout.identity) {
+        mutableDoubleStateOf(1.0)
+    }
 
     LaunchedEffect(pool) {
         // collect, not collectLatest: collectLatest cancels the in-flight onEvent when a
@@ -139,17 +152,16 @@ public actual fun NativeAdView(
                     content.leadingAnchor.constraintEqualToAnchor(nativeView.leadingAnchor).active = true
                     content.trailingAnchor.constraintEqualToAnchor(nativeView.trailingAnchor).active = true
                     content.topAnchor.constraintEqualToAnchor(nativeView.topAnchor).active = true
-                    content.bottomAnchor.constraintLessThanOrEqualToAnchor(nativeView.bottomAnchor).active = true
-                    nativeView.nativeAd = nativeAd
-                    val vc = UIViewController()
-                    vc.view.addSubview(nativeView)
-                    nativeView.leadingAnchor.constraintEqualToAnchor(vc.view.leadingAnchor).active = true
-                    nativeView.trailingAnchor.constraintEqualToAnchor(vc.view.trailingAnchor).active = true
-                    nativeView.topAnchor.constraintEqualToAnchor(vc.view.topAnchor).active = true
-                    nativeView.bottomAnchor.constraintEqualToAnchor(vc.view.bottomAnchor).active = true
-                    vc
+                    IosNativeAdHostController(
+                        nativeView = nativeView,
+                        content = content,
+                        registerNativeAd = { nativeView.nativeAd = nativeAd },
+                        onPreferredHeightChanged = { measuredHeight ->
+                            nativeContentHeight = measuredHeight
+                        },
+                    )
                 },
-                modifier = modifier,
+                modifier = modifier.then(Modifier.height(nativeContentHeight.dp)),
                 properties = UIKitInteropProperties(
                     isInteractive = true,
                     isNativeAccessibilityEnabled = true
@@ -165,4 +177,140 @@ public actual fun NativeAdView(
             tokenToRelease?.let(pool::release)
         }
     }
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private class IosNativeAdHostController(
+    private val nativeView: GADNativeAdView,
+    private val content: UIView,
+    private val registerNativeAd: () -> Unit,
+    private val onPreferredHeightChanged: (Double) -> Unit,
+) : UIViewController(nibName = null, bundle = null) {
+    private var nativeAdRegistered: Boolean = false
+    private val containmentConstraint: NSLayoutConstraint =
+        content.bottomAnchor.constraintLessThanOrEqualToAnchor(nativeView.bottomAnchor)
+
+    init {
+        nativeView.clipsToBounds = true
+        view.addSubview(nativeView)
+        nativeView.leadingAnchor.constraintEqualToAnchor(view.leadingAnchor).active = true
+        nativeView.trailingAnchor.constraintEqualToAnchor(view.trailingAnchor).active = true
+        nativeView.topAnchor.constraintEqualToAnchor(view.topAnchor).active = true
+        nativeView.bottomAnchor.constraintEqualToAnchor(view.bottomAnchor).active = true
+    }
+
+    override fun viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        if (nativeAdRegistered) return
+
+        val currentSize = view.bounds.useContents { size.width to size.height }
+        val width = currentSize.first
+        if (!width.isFinite() || width <= 0.0) return
+
+        val measuredHeight = content.systemLayoutSizeFittingSize(
+            targetSize = CGSizeMake(width, 0.0),
+            withHorizontalFittingPriority = UILayoutPriorityRequired,
+            verticalFittingPriority = UILayoutPriorityFittingSizeLevel,
+        ).useContents { height }
+        val sizing = resolveNativeAdLayoutSizing(
+            currentHeight = currentSize.second,
+            measuredHeight = measuredHeight,
+        )
+        if (sizing.shouldUpdateHeight) {
+            AdLogger.d(
+                "iOS native host sizing. currentHeight=${currentSize.second} " +
+                    "measuredHeight=$measuredHeight"
+            )
+            onPreferredHeightChanged(measuredHeight)
+            return
+        }
+        if (sizing.shouldRegisterNativeAd) {
+            containmentConstraint.active = true
+            view.layoutIfNeeded()
+            nativeView.layoutIfNeeded()
+            val containmentIssues = registeredAssetContainmentIssues()
+            if (containmentIssues.isNotEmpty()) {
+                AdLogger.e(
+                    "iOS native ad registration blocked because asset bounds escape " +
+                        "GADNativeAdView: ${containmentIssues.joinToString()}"
+                )
+                return
+            }
+            registerNativeAd()
+            nativeAdRegistered = true
+            AdLogger.d(
+                "iOS native ad registered after containment. height=${currentSize.second}"
+            )
+        }
+    }
+
+    private fun registeredAssetContainmentIssues(): List<String> {
+        val root = nativeView.bounds.toRectSnapshot()
+        val assets = listOfNotNull(
+            nativeView.headlineView?.let { "headline" to it },
+            nativeView.bodyView?.let { "body" to it },
+            nativeView.callToActionView?.let { "callToAction" to it },
+            nativeView.iconView?.let { "icon" to it },
+            nativeView.mediaView?.let { "media" to it },
+            nativeView.advertiserView?.let { "advertiser" to it },
+            nativeView.priceView?.let { "price" to it },
+            nativeView.storeView?.let { "store" to it },
+            nativeView.starRatingView?.let { "starRating" to it },
+            nativeView.adChoicesView?.let { "adChoices" to it },
+        )
+        return assets.mapNotNull { (name, asset) ->
+            val converted = nativeView.convertRect(asset.bounds, fromView = asset).toRectSnapshot()
+            "$name=$converted root=$root".takeUnless { root.contains(converted) }
+        }
+    }
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private data class RectSnapshot(
+    val x: Double,
+    val y: Double,
+    val width: Double,
+    val height: Double,
+) {
+    fun contains(other: RectSnapshot, tolerance: Double = 0.5): Boolean =
+        other.x >= x - tolerance &&
+            other.y >= y - tolerance &&
+            other.x + other.width <= x + width + tolerance &&
+            other.y + other.height <= y + height + tolerance
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private fun kotlinx.cinterop.CValue<platform.CoreGraphics.CGRect>.toRectSnapshot(): RectSnapshot =
+    useContents {
+        RectSnapshot(
+            x = origin.x,
+            y = origin.y,
+            width = size.width,
+            height = size.height,
+        )
+    }
+
+internal data class IosNativeAdLayoutSizing(
+    val shouldUpdateHeight: Boolean,
+    val shouldRegisterNativeAd: Boolean,
+)
+
+internal fun resolveNativeAdLayoutSizing(
+    currentHeight: Double,
+    measuredHeight: Double,
+    tolerance: Double = 0.5,
+): IosNativeAdLayoutSizing {
+    if (!measuredHeight.isFinite() || measuredHeight <= 0.0) {
+        return IosNativeAdLayoutSizing(
+            shouldUpdateHeight = false,
+            shouldRegisterNativeAd = false,
+        )
+    }
+    val heightMatches = currentHeight.isFinite() &&
+        currentHeight > 0.0 &&
+        abs(currentHeight - measuredHeight) <= tolerance
+    return IosNativeAdLayoutSizing(
+        shouldUpdateHeight = !heightMatches,
+        shouldRegisterNativeAd = heightMatches,
+    )
 }

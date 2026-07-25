@@ -56,7 +56,7 @@ internal class IosConsentController(
                         ConsentStatus.Failed(AdError(code = (error.code ?: 0).toString(), message = error.localizedDescription ?: "Consent info update failed."))
                     }
                     _status.value = result
-                    continuation.resume(Unit, null)
+                    continuation.resume(Unit)
                 }
             }
         }
@@ -79,7 +79,7 @@ internal class IosConsentController(
                     updatePrivacyState(consentInformation)
                     _canRequestAds.value = consentInformation.canRequestAds
                     _status.value = consentInformationStatus(consentInformation)
-                    continuation.resume(Unit, null)
+                    continuation.resume(Unit)
                 }
             }
         }
@@ -91,7 +91,7 @@ internal class IosConsentController(
         val success = suspendCancellableCoroutine { continuation ->
             continuation.invokeOnCancellation { }
             UMPConsentForm.presentPrivacyOptionsFormFromViewController(rootVC) { error ->
-                if (continuation.isActive) continuation.resume(error == null, null)
+                if (continuation.isActive) continuation.resume(error == null)
             }
         }
         // The user may have changed their choices; refresh exposed state so consumers
@@ -116,7 +116,7 @@ internal class IosConsentController(
 
     private fun buildParams(config: AdConfig): UMPRequestParameters {
         val params = UMPRequestParameters()
-        config.requestUnderAgeOfConsent?.let { params.tagForUnderAgeOfConsent = it }
+        params.tagForUnderAgeOfConsent = config.consentTagForUnderAgeOfConsent
         if (config.testMode) {
             val debug = UMPDebugSettings()
             val ids = (config.debugOptions.consentTestDeviceIds + config.testDeviceIds).distinct()

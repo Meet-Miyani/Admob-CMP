@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.cinterop.CValue
@@ -109,11 +110,11 @@ internal class IosBannerAdController internal constructor(
                 bannerDelegate = BannerDelegate(
                     onLoaded = {
                         if (continuation.isActive) {
-                            continuation.resume(AdAttemptResult.Success(IosLoadedBanner(banner, bannerDelegate)), null)
+                            continuation.resume(AdAttemptResult.Success(IosLoadedBanner(banner, bannerDelegate)))
                         }
                     },
                     onFailedToLoad = { error ->
-                        if (continuation.isActive) continuation.resume(AdAttemptResult.Failure(error.toAdError()), null)
+                        if (continuation.isActive) continuation.resume(AdAttemptResult.Failure(error.toAdError()))
                     },
                     onImpression = { emit(AdEvent.Impression(placement.id)) },
                     onClicked = { emit(AdEvent.Clicked(placement.id)) }
@@ -145,7 +146,7 @@ internal class IosBannerAdController internal constructor(
                     banner.loadRequest(requestOptions.withCollapsible(placement.bannerSizePolicy).toGADRequest())
                 } else {
                     teardownBanner(banner)
-                    continuation.resume(AdAttemptResult.Failure(AdError.message("Banner load was cleared.")), null)
+                    continuation.resume(AdAttemptResult.Failure(AdError.message("Banner load was cleared.")))
                 }
             }
             if (result is AdAttemptResult.Failure) {

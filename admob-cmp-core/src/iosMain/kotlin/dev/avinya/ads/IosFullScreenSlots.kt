@@ -46,7 +46,7 @@ internal class IosInterstitialSlot(
                 GADInterstitialAd.loadWithAdUnitID(placement.iosAdUnitId, requestOptions.toGADRequest()) { ad, error ->
                     if (continuation.isActive) {
                         if (error != null) {
-                            continuation.resume(AdAttemptResult.Failure(error.toAdError()), null)
+                            continuation.resume(AdAttemptResult.Failure(error.toAdError()))
                         } else if (ad != null) {
                             val weakAd = WeakReference(ad)
                             ad.paidEventHandler = { value ->
@@ -56,9 +56,9 @@ internal class IosInterstitialSlot(
                                     emit(AdEvent.Paid(placement.id, PaidEvent(placement.id, adValue, strongAd.responseInfo?.toCommon())))
                                 }
                             }
-                            continuation.resume(AdAttemptResult.Success(ad), null)
+                            continuation.resume(AdAttemptResult.Success(ad))
                         } else {
-                            continuation.resume(AdAttemptResult.Failure(AdError.message("iOS SDK returned no ad and no error.")), null)
+                            continuation.resume(AdAttemptResult.Failure(AdError.message("iOS SDK returned no ad and no error.")))
                         }
                     }
                 }
@@ -82,13 +82,13 @@ internal class IosInterstitialSlot(
                 onClosed = {
                     if (presentation.close(wasShown = true)) {
                         emit(AdEvent.ClosedFullScreen(placement.id))
-                        if (continuation.isActive) continuation.resume(AdShowResult.Shown, null)
+                        if (continuation.isActive) continuation.resume(AdShowResult.Shown)
                     }
                 },
                 onFailedToShow = { error ->
                     if (presentation.close(wasShown = false)) {
                         emit(AdEvent.ShowFailed(placement.id, error))
-                        if (continuation.isActive) continuation.resume(AdShowResult.Failed(error), null)
+                        if (continuation.isActive) continuation.resume(AdShowResult.Failed(error))
                     }
                 },
                 onImpression = { emit(AdEvent.Impression(placement.id)) },
@@ -137,7 +137,7 @@ internal class IosRewardedSlot(
                 GADRewardedAd.loadWithAdUnitID(placement.iosAdUnitId, requestOptions.toGADRequest()) { ad, error ->
                     if (continuation.isActive) {
                         if (error != null) {
-                            continuation.resume(AdAttemptResult.Failure(error.toAdError()), null)
+                            continuation.resume(AdAttemptResult.Failure(error.toAdError()))
                         } else if (ad != null) {
                             val weakAd = WeakReference(ad)
                             ad.paidEventHandler = { value ->
@@ -147,9 +147,9 @@ internal class IosRewardedSlot(
                                     emit(AdEvent.Paid(placement.id, PaidEvent(placement.id, adValue, strongAd.responseInfo?.toCommon())))
                                 }
                             }
-                            continuation.resume(AdAttemptResult.Success(ad), null)
+                            continuation.resume(AdAttemptResult.Success(ad))
                         } else {
-                            continuation.resume(AdAttemptResult.Failure(AdError.message("iOS SDK returned no ad and no error.")), null)
+                            continuation.resume(AdAttemptResult.Failure(AdError.message("iOS SDK returned no ad and no error.")))
                         }
                     }
                 }
@@ -176,14 +176,14 @@ internal class IosRewardedSlot(
                     if (presentation.close(wasShown = true)) {
                         emit(AdEvent.ClosedFullScreen(placement.id))
                         if (continuation.isActive) {
-                            continuation.resume(reward?.let(AdShowResult::Rewarded) ?: AdShowResult.Shown, null)
+                            continuation.resume(reward?.let(AdShowResult::Rewarded) ?: AdShowResult.Shown)
                         }
                     }
                 },
                 onFailedToShow = { error ->
                     if (presentation.close(wasShown = false)) {
                         emit(AdEvent.ShowFailed(placement.id, error))
-                        if (continuation.isActive) continuation.resume(AdShowResult.Failed(error), null)
+                        if (continuation.isActive) continuation.resume(AdShowResult.Failed(error))
                     }
                 },
                 onImpression = { emit(AdEvent.Impression(placement.id)) },
@@ -242,7 +242,7 @@ internal class IosRewardedInterstitialSlot(
                 GADRewardedInterstitialAd.loadWithAdUnitID(placement.iosAdUnitId, requestOptions.toGADRequest()) { ad, error ->
                     if (continuation.isActive) {
                         if (error != null) {
-                            continuation.resume(AdAttemptResult.Failure(error.toAdError()), null)
+                            continuation.resume(AdAttemptResult.Failure(error.toAdError()))
                         } else if (ad != null) {
                             val weakAd = WeakReference(ad)
                             ad.paidEventHandler = { value ->
@@ -252,9 +252,9 @@ internal class IosRewardedInterstitialSlot(
                                     emit(AdEvent.Paid(placement.id, PaidEvent(placement.id, adValue, strongAd.responseInfo?.toCommon())))
                                 }
                             }
-                            continuation.resume(AdAttemptResult.Success(ad), null)
+                            continuation.resume(AdAttemptResult.Success(ad))
                         } else {
-                            continuation.resume(AdAttemptResult.Failure(AdError.message("iOS SDK returned no ad and no error.")), null)
+                            continuation.resume(AdAttemptResult.Failure(AdError.message("iOS SDK returned no ad and no error.")))
                         }
                     }
                 }
@@ -281,14 +281,14 @@ internal class IosRewardedInterstitialSlot(
                     if (presentation.close(wasShown = true)) {
                         emit(AdEvent.ClosedFullScreen(placement.id))
                         if (continuation.isActive) {
-                            continuation.resume(reward?.let(AdShowResult::Rewarded) ?: AdShowResult.Shown, null)
+                            continuation.resume(reward?.let(AdShowResult::Rewarded) ?: AdShowResult.Shown)
                         }
                     }
                 },
                 onFailedToShow = { error ->
                     if (presentation.close(wasShown = false)) {
                         emit(AdEvent.ShowFailed(placement.id, error))
-                        if (continuation.isActive) continuation.resume(AdShowResult.Failed(error), null)
+                        if (continuation.isActive) continuation.resume(AdShowResult.Failed(error))
                     }
                 },
                 onImpression = { emit(AdEvent.Impression(placement.id)) },
@@ -349,7 +349,7 @@ internal class IosAppOpenSlot(
                 GADAppOpenAd.loadWithAdUnitID(placement.iosAdUnitId, requestOptions.toGADRequest()) { ad, error ->
                     if (continuation.isActive) {
                         if (error != null) {
-                            continuation.resume(AdAttemptResult.Failure(error.toAdError()), null)
+                            continuation.resume(AdAttemptResult.Failure(error.toAdError()))
                         } else if (ad != null) {
                             val weakAd = WeakReference(ad)
                             ad.paidEventHandler = { value ->
@@ -359,9 +359,9 @@ internal class IosAppOpenSlot(
                                     emit(AdEvent.Paid(placement.id, PaidEvent(placement.id, adValue, strongAd.responseInfo?.toCommon())))
                                 }
                             }
-                            continuation.resume(AdAttemptResult.Success(ad), null)
+                            continuation.resume(AdAttemptResult.Success(ad))
                         } else {
-                            continuation.resume(AdAttemptResult.Failure(AdError.message("iOS SDK returned no ad and no error.")), null)
+                            continuation.resume(AdAttemptResult.Failure(AdError.message("iOS SDK returned no ad and no error.")))
                         }
                     }
                 }
@@ -385,13 +385,13 @@ internal class IosAppOpenSlot(
                 onClosed = {
                     if (presentation.close(wasShown = true)) {
                         emit(AdEvent.ClosedFullScreen(placement.id))
-                        if (continuation.isActive) continuation.resume(AdShowResult.Shown, null)
+                        if (continuation.isActive) continuation.resume(AdShowResult.Shown)
                     }
                 },
                 onFailedToShow = { error ->
                     if (presentation.close(wasShown = false)) {
                         emit(AdEvent.ShowFailed(placement.id, error))
-                        if (continuation.isActive) continuation.resume(AdShowResult.Failed(error), null)
+                        if (continuation.isActive) continuation.resume(AdShowResult.Failed(error))
                     }
                 },
                 onImpression = { emit(AdEvent.Impression(placement.id)) },

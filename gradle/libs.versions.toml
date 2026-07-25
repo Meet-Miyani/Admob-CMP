@@ -18,9 +18,9 @@ material3 = "1.11.0-alpha07"
 mockito = "5.15.2"
 
 # --- admob-cmp-core (Google Mobile Ads / UMP) ---
-gmaIos = "13.5.0"       # GMA iOS XCFramework (downloaded by admob-cmp-core at build time)
+gmaIos = "13.7.0"       # GMA iOS XCFramework (downloaded by admob-cmp-core at build time)
 gmaUmpIos = "3.1.0"     # UMP iOS XCFramework
-gmaNextGen = "1.2.1"    # Android GMA Next-Gen SDK
+gmaNextGen = "1.3.0"    # Android GMA Next-Gen SDK
 gmaUmp = "4.0.0"        # Android UMP (also pulled transitively by gmaNextGen)
 
 [libraries]
@@ -53,4 +53,4 @@ composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "composeMul
 composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlinJvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
-mavenPublish = { id = "com.vanniktech.maven.publish", version = "0.30.0" }
+mavenPublish = { id = "com.vanniktech.maven.publish", version = "0.37.0" }

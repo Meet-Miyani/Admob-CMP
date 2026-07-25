@@ -200,6 +200,7 @@ public sealed interface AdAssetNode : AdNode {
     public data class AdBadge(
         override val modifier: AdModifier = AdModifier
             .padding(horizontal = 6.dp, vertical = 2.dp)
+            .sizeIn(minWidth = 15.dp, minHeight = 15.dp)
             .border(1.dp, androidx.compose.ui.graphics.Color(0xFF777777), 3.dp),
         /** Badge text (default "Ad"). */
         val text: String = "Ad",

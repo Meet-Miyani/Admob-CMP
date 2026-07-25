@@ -1,5 +1,11 @@
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+
 package dev.avinya.ads
 
+import GoogleMobileAds.GADAgeRestrictedTreatmentChild
+import GoogleMobileAds.GADAgeRestrictedTreatmentTeen
+import GoogleMobileAds.GADAgeRestrictedTreatmentUnspecified
+import GoogleMobileAds.GADRequestConfiguration
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -11,6 +17,22 @@ class IosAdMappersTest {
 
     private fun gadError(code: Long, message: String = "test failure"): NSError =
         NSError.errorWithDomain("com.google.admob", code, null)
+
+    @Test
+    fun `maps every common age treatment to the matching GMA value`() {
+        val expected = mapOf(
+            AgeRestrictedTreatment.Unspecified to GADAgeRestrictedTreatmentUnspecified,
+            AgeRestrictedTreatment.Child to GADAgeRestrictedTreatmentChild,
+            AgeRestrictedTreatment.Teen to GADAgeRestrictedTreatmentTeen,
+        )
+
+        for ((common, gma) in expected) {
+            val requestConfiguration = GADRequestConfiguration()
+            GlobalRequestConfiguration(ageRestrictedTreatment = common).applyTo(requestConfiguration)
+
+            assertEquals(gma, requestConfiguration.ageRestrictedTreatment)
+        }
+    }
 
     @Test
     fun `maps NSError code to its numeric string not a name`() {
