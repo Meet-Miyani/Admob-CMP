@@ -208,8 +208,6 @@ public data class AdRetryPolicy(
  * and container constraints.
  */
 public sealed interface AdSizePolicy {
-    /** Anchored adaptive banner sized to fit the current screen orientation. */
-    public data class AnchoredAdaptive(val collapsible: CollapsiblePlacement? = null) : AdSizePolicy
     /** Larger anchored adaptive banner (up to 120dp). */
     public data class LargeAnchoredAdaptive(val collapsible: CollapsiblePlacement? = null) : AdSizePolicy
     /** Inline adaptive banner with an optional maximum height. */

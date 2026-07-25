@@ -63,7 +63,7 @@ public val debugAdPlacements: List<AdPlacement> = listOf(
         id = "global_banner",
         format = AdFormat.Banner,
         adUnitIds = AdUnitIds(TestAdIds.ANDROID_BANNER, TestAdIds.IOS_BANNER),
-        bannerSizePolicy = AdSizePolicy.AnchoredAdaptive()
+        bannerSizePolicy = AdSizePolicy.LargeAnchoredAdaptive()
     ),
     AdPlacement("feed_native", AdFormat.Native, TestAdIds.ANDROID_NATIVE, TestAdIds.IOS_NATIVE, maxCacheSize = 5),
     AdPlacement("transition_interstitial", AdFormat.Interstitial, TestAdIds.ANDROID_INTERSTITIAL, TestAdIds.IOS_INTERSTITIAL),

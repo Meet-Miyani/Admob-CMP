@@ -41,13 +41,12 @@ AdPlacement(
     id = "banner_home",
     format = AdFormat.Banner,
     adUnitIds = AdUnitIds(android = "...", ios = "..."),
-    bannerSizePolicy = AdSizePolicy.AnchoredAdaptive()   // default is LargeAnchoredAdaptive()
+    bannerSizePolicy = AdSizePolicy.LargeAnchoredAdaptive()   // default
 )
 ```
 
 | Policy | Maps to |
 |---|---|
-| `AnchoredAdaptive()` | Standard anchored adaptive banner (≤ 90dp) |
 | `LargeAnchoredAdaptive()` | Large anchored adaptive (50–150pt) |
 | `InlineAdaptive(maxHeightDp)` | Inline adaptive for scrolling content |
 | `Fixed(widthDp, heightDp)` | Fixed custom size |
@@ -58,7 +57,7 @@ AdPlacement(
 Collapsible is a property of the anchored adaptive policies:
 
 ```kotlin
-bannerSizePolicy = AdSizePolicy.AnchoredAdaptive(collapsible = CollapsiblePlacement.Bottom)
+bannerSizePolicy = AdSizePolicy.LargeAnchoredAdaptive(collapsible = CollapsiblePlacement.Bottom)
 ```
 
 Test with the dedicated demo units — regular banner test ids never serve

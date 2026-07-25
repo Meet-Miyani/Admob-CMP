@@ -10,7 +10,6 @@ public fun Activity.screenWidthDp(): Int {
 }
 
 public fun AdSizePolicy.toAndroidAdSize(activity: Activity, widthDp: Int): AdSize = when (this) {
-    is AdSizePolicy.AnchoredAdaptive -> AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(activity, widthDp)
     is AdSizePolicy.LargeAnchoredAdaptive -> AdSize.getLargeAnchoredAdaptiveBannerAdSize(activity, widthDp)
     is AdSizePolicy.InlineAdaptive -> maxHeightDp?.let { AdSize.getInlineAdaptiveBannerAdSize(widthDp, it) }
         ?: AdSize.getCurrentOrientationInlineAdaptiveBannerAdSize(activity, widthDp)

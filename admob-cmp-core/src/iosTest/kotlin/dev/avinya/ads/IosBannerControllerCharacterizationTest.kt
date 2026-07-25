@@ -122,12 +122,6 @@ class IosBannerControllerCharacterizationTest {
             assertEquals(50.0, size.height, absoluteTolerance = 0.01)
         }
 
-        val anchored = AdSizePolicy.AnchoredAdaptive().toIOSAdSize(375)
-        anchored.useContents {
-            assertEquals(375.0, size.width, absoluteTolerance = 0.01)
-            assertTrue(size.height in 32.0..90.0, "anchored adaptive height was ${size.height}")
-        }
-
         val large = AdSizePolicy.LargeAnchoredAdaptive().toIOSAdSize(375)
         large.useContents {
             assertTrue(size.height in 50.0..150.0, "large anchored height was ${size.height}")

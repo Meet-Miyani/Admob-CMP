@@ -5,7 +5,6 @@ package dev.avinya.ads
 import GoogleMobileAds.GADAdSize
 import GoogleMobileAds.GADAdSizeFromCGSize
 import GoogleMobileAds.GADAdSizeFluid
-import GoogleMobileAds.GADCurrentOrientationAnchoredAdaptiveBannerAdSizeWithWidth
 import GoogleMobileAds.GADCurrentOrientationInlineAdaptiveBannerAdSizeWithWidth
 import GoogleMobileAds.GADInlineAdaptiveBannerAdSizeWithWidthAndMaxHeight
 import GoogleMobileAds.GADLargeAnchoredAdaptiveBannerAdSizeWithWidth
@@ -564,12 +563,8 @@ internal class IosGoogleAdManager : AdManager, FullScreenPresenceAware {
     }
 }
 
-@Suppress("UNCHECKED_CAST", "DEPRECATION")
+@Suppress("UNCHECKED_CAST")
 internal fun AdSizePolicy.toIOSAdSize(widthDp: Int): CValue<GADAdSize> = when (this) {
-    // GMA iOS 13 deprecates the standard anchored size in favor of the "large" (50-150pt)
-    // variant, but Android's AnchoredAdaptive still produces the standard <=90dp banner.
-    // Keep the deprecated function so the same placement renders the same height on both.
-    is AdSizePolicy.AnchoredAdaptive -> GADCurrentOrientationAnchoredAdaptiveBannerAdSizeWithWidth(widthDp.toDouble()) as CValue<GADAdSize>
     is AdSizePolicy.LargeAnchoredAdaptive -> GADLargeAnchoredAdaptiveBannerAdSizeWithWidth(widthDp.toDouble()) as CValue<GADAdSize>
     is AdSizePolicy.InlineAdaptive -> maxHeightDp?.let {
         GADInlineAdaptiveBannerAdSizeWithWidthAndMaxHeight(widthDp.toDouble(), it.toDouble()) as CValue<GADAdSize>

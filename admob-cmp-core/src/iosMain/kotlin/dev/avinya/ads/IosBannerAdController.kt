@@ -225,7 +225,6 @@ public fun BannerAdController.registerIosBannerGeometry(
 
 private fun AdRequestOptions.withCollapsible(sizePolicy: AdSizePolicy): AdRequestOptions {
     val collapsible = when (sizePolicy) {
-        is AdSizePolicy.AnchoredAdaptive -> sizePolicy.collapsible
         is AdSizePolicy.LargeAnchoredAdaptive -> sizePolicy.collapsible
         else -> null
     } ?: return this

@@ -654,19 +654,6 @@ sealed interface dev.avinya.ads/AdShowResult { // dev.avinya.ads/AdShowResult|nu
 }
 
 sealed interface dev.avinya.ads/AdSizePolicy { // dev.avinya.ads/AdSizePolicy|null[0]
-    final class AnchoredAdaptive : dev.avinya.ads/AdSizePolicy { // dev.avinya.ads/AdSizePolicy.AnchoredAdaptive|null[0]
-        constructor <init>(dev.avinya.ads/CollapsiblePlacement? = ...) // dev.avinya.ads/AdSizePolicy.AnchoredAdaptive.<init>|<init>(dev.avinya.ads.CollapsiblePlacement?){}[0]
-
-        final val collapsible // dev.avinya.ads/AdSizePolicy.AnchoredAdaptive.collapsible|{}collapsible[0]
-            final fun <get-collapsible>(): dev.avinya.ads/CollapsiblePlacement? // dev.avinya.ads/AdSizePolicy.AnchoredAdaptive.collapsible.<get-collapsible>|<get-collapsible>(){}[0]
-
-        final fun component1(): dev.avinya.ads/CollapsiblePlacement? // dev.avinya.ads/AdSizePolicy.AnchoredAdaptive.component1|component1(){}[0]
-        final fun copy(dev.avinya.ads/CollapsiblePlacement? = ...): dev.avinya.ads/AdSizePolicy.AnchoredAdaptive // dev.avinya.ads/AdSizePolicy.AnchoredAdaptive.copy|copy(dev.avinya.ads.CollapsiblePlacement?){}[0]
-        final fun equals(kotlin/Any?): kotlin/Boolean // dev.avinya.ads/AdSizePolicy.AnchoredAdaptive.equals|equals(kotlin.Any?){}[0]
-        final fun hashCode(): kotlin/Int // dev.avinya.ads/AdSizePolicy.AnchoredAdaptive.hashCode|hashCode(){}[0]
-        final fun toString(): kotlin/String // dev.avinya.ads/AdSizePolicy.AnchoredAdaptive.toString|toString(){}[0]
-    }
-
     final class Fixed : dev.avinya.ads/AdSizePolicy { // dev.avinya.ads/AdSizePolicy.Fixed|null[0]
         constructor <init>(kotlin/Int, kotlin/Int) // dev.avinya.ads/AdSizePolicy.Fixed.<init>|<init>(kotlin.Int;kotlin.Int){}[0]
 

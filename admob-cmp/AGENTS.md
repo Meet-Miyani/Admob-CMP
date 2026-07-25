@@ -68,7 +68,7 @@ calling it again.
 AdPlacement(
     id = "home_banner", format = AdFormat.Banner,
     adUnitIds = AdUnitIds(android = "…", ios = "…"),
-    bannerSizePolicy = AdSizePolicy.AnchoredAdaptive(collapsible = CollapsiblePlacement.Bottom),
+    bannerSizePolicy = AdSizePolicy.LargeAnchoredAdaptive(collapsible = CollapsiblePlacement.Bottom),
     bannerRefreshPolicy = BannerRefreshPolicy.SdkManaged(60.seconds)  // 30s–120s; or AdServerManaged / Manual
 )
 BannerAdView(placement = placement, modifier = Modifier.fillMaxWidth())

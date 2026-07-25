@@ -76,7 +76,7 @@ class BannerCoreTest {
 
         val state = core.load(
             geometry = null,
-            sizePolicy = AdSizePolicy.AnchoredAdaptive(),
+            sizePolicy = AdSizePolicy.LargeAnchoredAdaptive(),
             requestOptions = testRequestOptions()
         ) { null }
 
@@ -88,7 +88,7 @@ class BannerCoreTest {
         val platform = FakeBannerPlatform().apply { fallbackWidth = 999 }
         val core = core(platform)
 
-        core.load(BannerGeometry(320), AdSizePolicy.AnchoredAdaptive(), testRequestOptions()) { null }
+        core.load(BannerGeometry(320), AdSizePolicy.LargeAnchoredAdaptive(), testRequestOptions()) { null }
 
         assertEquals(320, platform.lastSize, "host-supplied width must not be overridden by the fallback")
     }
@@ -99,7 +99,7 @@ class BannerCoreTest {
         val core = core(platform)
         val custom = testRequestOptions().copy(contentUrl = "https://example.com/article")
 
-        core.load(BannerGeometry(320), AdSizePolicy.AnchoredAdaptive(), custom) { null }
+        core.load(BannerGeometry(320), AdSizePolicy.LargeAnchoredAdaptive(), custom) { null }
         platform.lastRequestOptions = null
         core.refresh { null }
 
@@ -124,7 +124,7 @@ class BannerCoreTest {
     fun aFailedRefreshKeepsThePreviousBannerAlive() = runTest {
         val platform = FakeBannerPlatform()
         val core = core(platform)
-        core.load(BannerGeometry(320), AdSizePolicy.AnchoredAdaptive(), testRequestOptions()) { null }
+        core.load(BannerGeometry(320), AdSizePolicy.LargeAnchoredAdaptive(), testRequestOptions()) { null }
         val first = assertNotNull(core.currentBanner())
 
         platform.nextResult = { AdAttemptResult.Failure(AdError.message("no fill")) }
@@ -147,7 +147,7 @@ class BannerCoreTest {
         val core = core(platform)
         platform.nextResult = { AdAttemptResult.Failure(AdError.message("no fill")) }
 
-        val state = core.load(BannerGeometry(320), AdSizePolicy.AnchoredAdaptive(), testRequestOptions()) { null }
+        val state = core.load(BannerGeometry(320), AdSizePolicy.LargeAnchoredAdaptive(), testRequestOptions()) { null }
 
         assertNull(core.currentBanner(), "no banner was ever loaded, so nothing should be displayed")
         assertTrue(
@@ -183,7 +183,7 @@ class BannerCoreTest {
         // eventually arrives belongs to a generation nobody is attached to.
         platform.beforeReturn = { core.detach() }
 
-        core.load(BannerGeometry(320), AdSizePolicy.AnchoredAdaptive(), testRequestOptions()) { null }
+        core.load(BannerGeometry(320), AdSizePolicy.LargeAnchoredAdaptive(), testRequestOptions()) { null }
 
         assertNull(core.currentBanner(), "a banner arriving after the last detach must not be adopted")
         assertEquals(1, late.destroyCount, "the in-flight banner must be torn down exactly once")
@@ -198,7 +198,7 @@ class BannerCoreTest {
         platform.nextResult = { AdAttemptResult.Success(late) }
         platform.beforeReturn = { core.clear() }
 
-        core.load(BannerGeometry(320), AdSizePolicy.AnchoredAdaptive(), testRequestOptions()) { null }
+        core.load(BannerGeometry(320), AdSizePolicy.LargeAnchoredAdaptive(), testRequestOptions()) { null }
 
         assertNull(core.currentBanner(), "a cleared controller must not adopt a late banner")
         assertEquals(1, late.destroyCount, "the in-flight banner must be torn down exactly once")
@@ -211,7 +211,7 @@ class BannerCoreTest {
         platform.beforeReturn = { throw IllegalStateException("beta SDK mapper blew up") }
 
         runCatching {
-            core.load(BannerGeometry(320), AdSizePolicy.AnchoredAdaptive(), testRequestOptions()) { null }
+            core.load(BannerGeometry(320), AdSizePolicy.LargeAnchoredAdaptive(), testRequestOptions()) { null }
         }
 
         // P1-1: only CancellationException was handled, so an arbitrary Throwable escaped with
@@ -227,7 +227,7 @@ class BannerCoreTest {
     fun anUnexpectedThrowableKeepsTheDisplayedBannerAndItsLoadedState() = runTest {
         val platform = FakeBannerPlatform()
         val core = core(platform)
-        core.load(BannerGeometry(320), AdSizePolicy.AnchoredAdaptive(), testRequestOptions()) { null }
+        core.load(BannerGeometry(320), AdSizePolicy.LargeAnchoredAdaptive(), testRequestOptions()) { null }
         val displayed = assertNotNull(core.currentBanner())
 
         platform.beforeReturn = { throw IllegalStateException("boom") }
@@ -248,7 +248,7 @@ class BannerCoreTest {
 
         val state = core.load(
             BannerGeometry(320),
-            AdSizePolicy.AnchoredAdaptive(),
+            AdSizePolicy.LargeAnchoredAdaptive(),
             testRequestOptions()
         ) { null }
 

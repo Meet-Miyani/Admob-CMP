@@ -51,7 +51,7 @@ public class AdDebugCatalog(
                     android = TestAdIds.ANDROID_COLLAPSIBLE_BANNER,
                     ios = TestAdIds.IOS_COLLAPSIBLE_BANNER,
                 ),
-                bannerSizePolicy = AdSizePolicy.AnchoredAdaptive(
+                bannerSizePolicy = AdSizePolicy.LargeAnchoredAdaptive(
                     collapsible = CollapsiblePlacement.Bottom,
                 ),
                 bannerRefreshPolicy = BannerRefreshPolicy.SdkManaged(30.seconds),
