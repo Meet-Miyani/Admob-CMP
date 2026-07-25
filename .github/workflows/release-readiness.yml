@@ -43,7 +43,7 @@ jobs:
 
   ios-and-published-consumer:
     name: iOS and published facade consumer
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-java@v5
@@ -51,6 +51,9 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v6
+
+      - name: Assert Xcode 26 (iOS Simulator SDK 26)
+        run: xcodebuild -showsdks | grep -q "iphonesimulator26" || { echo "SDK 26 not found"; xcodebuild -showsdks; exit 1; }
 
       - name: Test iOS SDK targets and verify klib ABI
         run: |

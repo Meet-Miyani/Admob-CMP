@@ -158,12 +158,6 @@ fun admobTestLinkerOpts(targetName: String): List<String> {
     }.standardOutput.asText.get().trim()
     val swiftCompatLibDir =
         "$developerDir/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$swiftPlatform"
-    val privateFrameworksDir =
-        "$developerDir/Platforms/$sdkPlatformName.platform/Developer/SDKs/$sdkPlatformName.sdk/System/Library/PrivateFrameworks"
-    val extraOpts = mutableListOf<String>()
-    if (File(privateFrameworksDir).exists()) {
-        extraOpts += listOf("-F$privateFrameworksDir")
-    }
     return listOf(
         "-F" + frameworkDir("GoogleMobileAds", targetName).parentFile.absolutePath,
         "-F" + frameworkDir("UserMessagingPlatform", targetName).parentFile.absolutePath,
@@ -174,7 +168,7 @@ fun admobTestLinkerOpts(targetName: String): List<String> {
         // / __swift_FORCE_LOAD_$_swiftCompatibility56.
         "-framework", "JavaScriptCore",
         "-L$swiftCompatLibDir",
-    ) + extraOpts
+    )
 }
 
 // Expose the per-target opts to consuming projects (keyed by Kotlin target name) so a consumer

@@ -30,7 +30,7 @@ Use the run configurations provided by the run widget in your IDE's toolbar. You
 - Web app:
   - Wasm target (faster, modern browsers): `./gradlew :webApp:wasmJsBrowserDevelopmentRun`
   - JS target (slower, supports older browsers): `./gradlew :webApp:jsBrowserDevelopmentRun`
-- iOS app: open the [/iosApp](./iosApp) directory in Xcode and run it from there.
+- iOS app: open the [/iosApp](./iosApp) directory in Xcode and run it from there. Note: Compose Multiplatform requires **Xcode 26** (and the iOS 26 SDK) due to `UIViewLayoutRegion` linkage.
 
 ### Running tests
 
