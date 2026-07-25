@@ -770,7 +770,7 @@ sealed interface dev.avinya.ads/ConsentStatus { // dev.avinya.ads/ConsentStatus|
 }
 
 final class dev.avinya.ads.appopen/AppOpenAdCoordinator { // dev.avinya.ads.appopen/AppOpenAdCoordinator|null[0]
-    constructor <init>(dev.avinya.ads/AdManager, dev.avinya.ads/AppOpenAdController, dev.avinya.ads.appopen/AppOpenConfig = ..., kotlinx.coroutines.flow/Flow<kotlin/Boolean> = ..., kotlin/Function0<kotlin.time/Instant> = ...) // dev.avinya.ads.appopen/AppOpenAdCoordinator.<init>|<init>(dev.avinya.ads.AdManager;dev.avinya.ads.AppOpenAdController;dev.avinya.ads.appopen.AppOpenConfig;kotlinx.coroutines.flow.Flow<kotlin.Boolean>;kotlin.Function0<kotlin.time.Instant>){}[0]
+    constructor <init>(dev.avinya.ads/AdManager, dev.avinya.ads/AppOpenAdController, dev.avinya.ads.appopen/AppOpenConfig = ...) // dev.avinya.ads.appopen/AppOpenAdCoordinator.<init>|<init>(dev.avinya.ads.AdManager;dev.avinya.ads.AppOpenAdController;dev.avinya.ads.appopen.AppOpenConfig){}[0]
 
     final var isBlocked // dev.avinya.ads.appopen/AppOpenAdCoordinator.isBlocked|{}isBlocked[0]
         final fun <get-isBlocked>(): kotlin/Boolean // dev.avinya.ads.appopen/AppOpenAdCoordinator.isBlocked.<get-isBlocked>|<get-isBlocked>(){}[0]

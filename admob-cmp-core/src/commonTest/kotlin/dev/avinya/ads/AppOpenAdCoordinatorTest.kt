@@ -5,13 +5,13 @@ import dev.avinya.ads.appopen.AppOpenConfig
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
-import kotlin.time.Duration.Companion.seconds
-import kotlin.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppOpenAdCoordinatorTest {
@@ -23,21 +23,38 @@ class AppOpenAdCoordinatorTest {
         val manager = FakeAdManager()
         val scope = CoroutineScope(UnconfinedTestDispatcher())
 
-        val ticks = mutableListOf(
-            Instant.fromEpochSeconds(1000), // background
-            Instant.fromEpochSeconds(1005), // foreground: duration check
-            Instant.fromEpochSeconds(1005), // showNow: lastShowInstant
-        )
-        val clock: () -> Instant = { ticks.removeFirstOrNull() ?: error("no tick") }
-
+        var now = 1000.seconds
         val coordinator = AppOpenAdCoordinator(
             manager = manager,
             controller = controller,
             config = AppOpenConfig(preloadOnStart = false),
             foregroundEvents = foreground,
-            clock = clock,
+            elapsedRealtime = { now },
         )
         coordinator.start(scope)
+        now = 1005.seconds // 5s > 4s minBackgroundDuration
+        foreground.value = true
+
+        assertTrue(controller.showCalled)
+    }
+
+    @Test
+    fun `exact minBackgroundDuration threshold triggers show`() = runTest(UnconfinedTestDispatcher()) {
+        val foreground = MutableStateFlow(false)
+        val controller = FakeAppOpenAdController()
+        val manager = FakeAdManager()
+        val scope = CoroutineScope(UnconfinedTestDispatcher())
+
+        var now = 1000.seconds
+        val coordinator = AppOpenAdCoordinator(
+            manager = manager,
+            controller = controller,
+            config = AppOpenConfig(preloadOnStart = false, minBackgroundDuration = 4.seconds),
+            foregroundEvents = foreground,
+            elapsedRealtime = { now },
+        )
+        coordinator.start(scope)
+        now = 1004.seconds // exact threshold 4s
         foreground.value = true
 
         assertTrue(controller.showCalled)
@@ -50,20 +67,60 @@ class AppOpenAdCoordinatorTest {
         val manager = FakeAdManager()
         val scope = CoroutineScope(UnconfinedTestDispatcher())
 
-        val ticks = mutableListOf(
-            Instant.fromEpochSeconds(1000), // background
-            Instant.fromEpochSeconds(1001), // foreground: 1s < 4s → no show
+        var now = 1000.seconds
+        val coordinator = AppOpenAdCoordinator(
+            manager = manager,
+            controller = controller,
+            config = AppOpenConfig(preloadOnStart = false, minBackgroundDuration = 4.seconds),
+            foregroundEvents = foreground,
+            elapsedRealtime = { now },
         )
-        val clock: () -> Instant = { ticks.removeFirstOrNull() ?: error("no tick") }
+        coordinator.start(scope)
+        now = 1003.99.seconds // 3.99s < 4s → no show
+        foreground.value = true
 
+        assertFalse(controller.showCalled)
+    }
+
+    @Test
+    fun `long background sleep triggers show`() = runTest(UnconfinedTestDispatcher()) {
+        val foreground = MutableStateFlow(false)
+        val controller = FakeAppOpenAdController()
+        val manager = FakeAdManager()
+        val scope = CoroutineScope(UnconfinedTestDispatcher())
+
+        var now = 1000.seconds
         val coordinator = AppOpenAdCoordinator(
             manager = manager,
             controller = controller,
             config = AppOpenConfig(preloadOnStart = false),
             foregroundEvents = foreground,
-            clock = clock,
+            elapsedRealtime = { now },
         )
         coordinator.start(scope)
+        now = 1000.seconds + 10.hours // 10h sleep
+        foreground.value = true
+
+        assertTrue(controller.showCalled)
+    }
+
+    @Test
+    fun `simulated backward reading is clamped to zero and does not trigger show`() = runTest(UnconfinedTestDispatcher()) {
+        val foreground = MutableStateFlow(false)
+        val controller = FakeAppOpenAdController()
+        val manager = FakeAdManager()
+        val scope = CoroutineScope(UnconfinedTestDispatcher())
+
+        var now = 1000.seconds
+        val coordinator = AppOpenAdCoordinator(
+            manager = manager,
+            controller = controller,
+            config = AppOpenConfig(preloadOnStart = false, minBackgroundDuration = 4.seconds),
+            foregroundEvents = foreground,
+            elapsedRealtime = { now },
+        )
+        coordinator.start(scope)
+        now = 500.seconds // time jumped backward: 500s - 1000s = -500s -> clamped to 0s < 4s
         foreground.value = true
 
         assertFalse(controller.showCalled)
@@ -76,21 +133,17 @@ class AppOpenAdCoordinatorTest {
         val manager = FakeAdManager()
         val scope = CoroutineScope(UnconfinedTestDispatcher())
 
-        val ticks = mutableListOf(
-            Instant.fromEpochSeconds(1000), // background
-            Instant.fromEpochSeconds(1005), // foreground: duration check
-        )
-        val clock: () -> Instant = { ticks.removeFirstOrNull() ?: error("no tick") }
-
+        var now = 1000.seconds
         val coordinator = AppOpenAdCoordinator(
             manager = manager,
             controller = controller,
             config = AppOpenConfig(preloadOnStart = false),
             foregroundEvents = foreground,
-            clock = clock,
+            elapsedRealtime = { now },
         )
         coordinator.isBlocked = true
         coordinator.start(scope)
+        now = 1005.seconds
         foreground.value = true
 
         assertFalse(controller.showCalled)
@@ -103,35 +156,28 @@ class AppOpenAdCoordinatorTest {
         val manager = FakeAdManager()
         val scope = CoroutineScope(UnconfinedTestDispatcher())
 
-        // Round 1: bg(1000), fg-duration(1005), fg-lastShow(1005) = 3 ticks
-        // Round 2: bg(1010), fg-duration(1020), canShowNow-clock(1020) = 3 ticks
-        val ticks = mutableListOf(
-            Instant.fromEpochSeconds(1000), // bg #1
-            Instant.fromEpochSeconds(1005), // fg #1: duration check
-            Instant.fromEpochSeconds(1005), // fg #1: lastShowInstant
-            Instant.fromEpochSeconds(1010), // bg #2
-            Instant.fromEpochSeconds(1020), // fg #2: duration check
-            Instant.fromEpochSeconds(1020), // fg #2: canShowNow checks lastShowInstant → sinceLastShow = 1020-1005 = 15s < 30s → suppressed
-        )
-        val clock: () -> Instant = { ticks.removeFirstOrNull() ?: error("no tick") }
-
+        var now = 1000.seconds
         val coordinator = AppOpenAdCoordinator(
             manager = manager,
             controller = controller,
             config = AppOpenConfig(
                 preloadOnStart = false,
+                minBackgroundDuration = 4.seconds,
                 cooldownBetweenShows = 30.seconds,
             ),
             foregroundEvents = foreground,
-            clock = clock,
+            elapsedRealtime = { now },
         )
         coordinator.start(scope)
 
+        now = 1005.seconds
         foreground.value = true
         assertTrue(controller.showCalled)
         controller.showCalled = false
 
+        now = 1010.seconds
         foreground.value = false
+        now = 1020.seconds // sinceLastShow = 1020-1005 = 15s < 30s -> suppressed by cooldown
         foreground.value = true
 
         assertFalse(controller.showCalled, "Second show suppressed by cooldown")
@@ -144,23 +190,18 @@ class AppOpenAdCoordinatorTest {
         val manager = FakeAdManager()
         val scope = CoroutineScope(UnconfinedTestDispatcher())
 
-        val ticks = mutableListOf(
-            Instant.fromEpochSeconds(1000), // background
-            Instant.fromEpochSeconds(1005), // foreground: duration check
-        )
-        val clock: () -> Instant = { ticks.removeFirstOrNull() ?: error("no tick") }
-
+        var now = 1000.seconds
         val coordinator = AppOpenAdCoordinator(
             manager = manager,
             controller = controller,
             config = AppOpenConfig(preloadOnStart = false),
             foregroundEvents = foreground,
-            clock = clock,
+            elapsedRealtime = { now },
         )
         coordinator.start(scope)
 
-        // Another full-screen format (e.g. rewarded) holds the process-wide token.
         manager.holdFullScreenToken()
+        now = 1005.seconds
         foreground.value = true
 
         assertFalse(controller.showCalled, "App-open must not stack on top of another full-screen ad")
@@ -173,25 +214,19 @@ class AppOpenAdCoordinatorTest {
         val manager = FakeAdManager()
         val scope = CoroutineScope(UnconfinedTestDispatcher())
 
-        val ticks = mutableListOf(
-            Instant.fromEpochSeconds(1000), // background
-            Instant.fromEpochSeconds(1005), // foreground: duration check
-            Instant.fromEpochSeconds(1005), // showNow: lastShowInstant
-        )
-        val clock: () -> Instant = { ticks.removeFirstOrNull() ?: error("no tick") }
-
+        var now = 1000.seconds
         val coordinator = AppOpenAdCoordinator(
             manager = manager,
             controller = controller,
             config = AppOpenConfig(preloadOnStart = false),
             foregroundEvents = foreground,
-            clock = clock,
+            elapsedRealtime = { now },
         )
         coordinator.start(scope)
 
-        // Foreign format was presenting, then released the token before the foreground transition.
         val otherFormatToken = manager.holdFullScreenToken()
         manager.fullScreenArbiter.release(otherFormatToken)
+        now = 1005.seconds
         foreground.value = true
 
         assertTrue(controller.showCalled, "App-open should show once no other full-screen ad is presenting")
@@ -200,28 +235,20 @@ class AppOpenAdCoordinatorTest {
     @Test
     fun `reload triggered after show when not ready`() = runTest(UnconfinedTestDispatcher()) {
         val foreground = MutableStateFlow(false)
-        // Controller starts ready (simulatedLoadState=Loaded) → show triggers.
-        // The show() sets ready=false (see FakeAppOpenAdController.show()),
-        // so onForeground() then calls controller.load().
         val controller = FakeAppOpenAdController(simulatedShowResult = AdShowResult.Shown)
         val manager = FakeAdManager()
         val scope = CoroutineScope(UnconfinedTestDispatcher())
 
-        val ticks = mutableListOf(
-            Instant.fromEpochSeconds(1000), // background
-            Instant.fromEpochSeconds(1005), // foreground: duration check
-            Instant.fromEpochSeconds(1005), // showNow: lastShowInstant
-        )
-        val clock: () -> Instant = { ticks.removeFirstOrNull() ?: error("no tick") }
-
+        var now = 1000.seconds
         val coordinator = AppOpenAdCoordinator(
             manager = manager,
             controller = controller,
             config = AppOpenConfig(preloadOnStart = false),
             foregroundEvents = foreground,
-            clock = clock,
+            elapsedRealtime = { now },
         )
         coordinator.start(scope)
+        now = 1005.seconds
         foreground.value = true
 
         assertTrue(controller.showCalled)
@@ -236,26 +263,18 @@ class AppOpenAdCoordinatorTest {
             val manager = FakeAdManager()
             val scope = CoroutineScope(UnconfinedTestDispatcher())
 
-            // Another full-screen format is presenting. Note this holds the ARBITER, not the
-            // isFullScreenPresenting flow — the coordinator no longer reads that flow, because
-            // reading it was the TOCTOU this test pins closed.
             manager.holdFullScreenToken()
 
-            val ticks = mutableListOf(
-                Instant.fromEpochSeconds(1000),
-                Instant.fromEpochSeconds(1005),
-                Instant.fromEpochSeconds(1005),
-            )
-            val clock: () -> Instant = { ticks.removeFirstOrNull() ?: error("no tick") }
-
+            var now = 1000.seconds
             val coordinator = AppOpenAdCoordinator(
                 manager = manager,
                 controller = controller,
                 config = AppOpenConfig(preloadOnStart = false),
                 foregroundEvents = foreground,
-                clock = clock,
+                elapsedRealtime = { now },
             )
             coordinator.start(scope)
+            now = 1005.seconds
             foreground.value = true
 
             assertFalse(
@@ -274,28 +293,23 @@ class AppOpenAdCoordinatorTest {
 
             val otherFormatToken = manager.holdFullScreenToken()
 
-            val ticks = mutableListOf(
-                Instant.fromEpochSeconds(1000), // initial background
-                Instant.fromEpochSeconds(1005), // 1st foreground: duration check (gap=5s, but arbiter held)
-                Instant.fromEpochSeconds(1010), // 2nd background
-                Instant.fromEpochSeconds(1020), // 2nd foreground: duration check (gap=10s, arbiter free)
-                Instant.fromEpochSeconds(1020), // showNow: lastShowInstant
-            )
-            val clock: () -> Instant = { ticks.removeFirstOrNull() ?: error("no tick") }
-
+            var now = 1000.seconds
             val coordinator = AppOpenAdCoordinator(
                 manager = manager,
                 controller = controller,
                 config = AppOpenConfig(preloadOnStart = false),
                 foregroundEvents = foreground,
-                clock = clock,
+                elapsedRealtime = { now },
             )
             coordinator.start(scope)
+            now = 1005.seconds
             foreground.value = true
             assertFalse(controller.showCalled, "precondition: blocked while the token is held")
 
             manager.fullScreenArbiter.release(otherFormatToken)
+            now = 1010.seconds
             foreground.value = false
+            now = 1020.seconds
             foreground.value = true
 
             assertTrue(
