@@ -18,3 +18,6 @@ captures
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
 .worktrees/
+.gradle_home/
+.codegraph/
+kotlin-js-store/
