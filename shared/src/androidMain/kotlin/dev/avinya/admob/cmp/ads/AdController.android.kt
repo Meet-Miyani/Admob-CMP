@@ -49,47 +49,47 @@ private class AndroidAdController(
      * demo operation from cancelling later operations. Only the application-backed manager is
      * retained, never an Activity.
      *
-     * The controller cache is accessed only from this Main-confined scope.
+     * The single controller is initialized only from this Main-confined scope after the common
+     * finite-placement resolver has accepted the caller's ID.
      */
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val interstitials = mutableMapOf<String, InterstitialAdController>()
+    private val interstitial: InterstitialAdController by lazy {
+        manager.interstitial(
+            AdPlacement(
+                id = DemoAdPlacementIds.INTERSTITIAL,
+                format = AdFormat.Interstitial,
+                adUnitIds = AdUnitIds(
+                    android = TestAdIds.ANDROID_INTERSTITIAL,
+                    ios = TestAdIds.IOS_INTERSTITIAL,
+                ),
+                strictTestMode = true,
+            ),
+        )
+    }
 
     override val adsSupported: Boolean = true
 
     override fun loadInterstitial(placementId: String) {
-        launchHandled("load interstitial '$placementId'") {
-            when (val result = interstitial(placementId).load()) {
-                is AdLoadState.Failed -> Log.w(TAG, "Interstitial '$placementId' failed to load: ${result.error}")
-                else -> Log.d(TAG, "Interstitial '$placementId' load result: $result")
+        val resolvedPlacementId = resolveDemoInterstitialPlacementId(placementId)
+        launchHandled("load interstitial '$resolvedPlacementId'") {
+            when (val result = interstitial.load()) {
+                is AdLoadState.Failed -> Log.w(TAG, "Interstitial '$resolvedPlacementId' failed to load: ${result.error}")
+                else -> Log.d(TAG, "Interstitial '$resolvedPlacementId' load result: $result")
             }
         }
     }
 
     override fun showInterstitial(placementId: String) {
-        launchHandled("show interstitial '$placementId'") {
-            when (val result = interstitial(placementId).show()) {
-                is AdShowResult.Failed -> Log.w(TAG, "Interstitial '$placementId' failed to show: ${result.error}")
-                AdShowResult.NotReady -> Log.d(TAG, "Interstitial '$placementId' is not ready")
-                AdShowResult.Shown -> Log.d(TAG, "Interstitial '$placementId' was shown")
-                is AdShowResult.Rewarded -> Log.d(TAG, "Interstitial '$placementId' returned an unexpected reward: ${result.reward}")
+        val resolvedPlacementId = resolveDemoInterstitialPlacementId(placementId)
+        launchHandled("show interstitial '$resolvedPlacementId'") {
+            when (val result = interstitial.show()) {
+                is AdShowResult.Failed -> Log.w(TAG, "Interstitial '$resolvedPlacementId' failed to show: ${result.error}")
+                AdShowResult.NotReady -> Log.d(TAG, "Interstitial '$resolvedPlacementId' is not ready")
+                AdShowResult.Shown -> Log.d(TAG, "Interstitial '$resolvedPlacementId' was shown")
+                is AdShowResult.Rewarded -> Log.d(TAG, "Interstitial '$resolvedPlacementId' returned an unexpected reward: ${result.reward}")
             }
         }
     }
-
-    private fun interstitial(placementId: String): InterstitialAdController =
-        interstitials.getOrPut(placementId) {
-            manager.interstitial(
-                AdPlacement(
-                    id = placementId,
-                    format = AdFormat.Interstitial,
-                    adUnitIds = AdUnitIds(
-                        android = TestAdIds.ANDROID_INTERSTITIAL,
-                        ios = TestAdIds.IOS_INTERSTITIAL,
-                    ),
-                    strictTestMode = true,
-                ),
-            )
-        }
 
     private fun launchHandled(operation: String, block: suspend () -> Unit) {
         scope.launch {
@@ -99,6 +99,7 @@ private class AndroidAdController(
                 throw cancelled
             } catch (failure: Throwable) {
                 Log.e(TAG, "Failed to $operation", failure)
+                throw failure
             }
         }
     }

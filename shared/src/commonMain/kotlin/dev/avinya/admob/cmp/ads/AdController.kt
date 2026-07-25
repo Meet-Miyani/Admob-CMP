@@ -1,6 +1,25 @@
 package dev.avinya.admob.cmp.ads
 
 /**
+ * Stable, finite placement identifiers supported by the demo app.
+ *
+ * Callers must use these IDs verbatim. Platform adapters cache one controller per registered
+ * ID for the process lifetime, so generated or caller-defined IDs are deliberately rejected.
+ */
+object DemoAdPlacementIds {
+    /** The demo's only interstitial placement. */
+    const val INTERSTITIAL: String = "demo_interstitial"
+}
+
+internal fun resolveDemoInterstitialPlacementId(placementId: String): String {
+    require(placementId == DemoAdPlacementIds.INTERSTITIAL) {
+        "Unsupported demo interstitial placement ID '$placementId'. " +
+            "Use DemoAdPlacementIds.INTERSTITIAL."
+    }
+    return placementId
+}
+
+/**
  * App-level ad abstraction for the demo.
  *
  * The `admob-cmp` library only ships Android and iOS targets, so the shared module cannot
@@ -12,10 +31,20 @@ interface AdController {
     /** Whether real ads are available on the current platform. */
     val adsSupported: Boolean
 
-    /** Begin loading an interstitial for [placementId]. No-op where ads are unsupported. */
+    /**
+     * Begin loading an interstitial registered as [placementId].
+     *
+     * Callers must pass [DemoAdPlacementIds.INTERSTITIAL]; ad-capable platforms reject every
+     * other value so their process-lifetime controller cache stays finite. No-op where ads are
+     * unsupported.
+     */
     fun loadInterstitial(placementId: String)
 
-    /** Show a previously loaded interstitial for [placementId]. No-op where unsupported. */
+    /**
+     * Show a previously loaded interstitial registered as [placementId].
+     *
+     * The same finite-registry contract as [loadInterstitial] applies. No-op where unsupported.
+     */
     fun showInterstitial(placementId: String)
 }
 
