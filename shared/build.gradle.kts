@@ -9,6 +9,8 @@ plugins {
 }
 
 kotlin {
+    applyDefaultHierarchyTemplate()
+
     listOf(
         iosArm64(),
         iosSimulatorArm64()
@@ -52,28 +54,56 @@ kotlin {
     }
     
     sourceSets {
-        androidMain.dependencies {
-            implementation(project(":admob-cmp-compose"))
-            implementation(libs.compose.uiToolingPreview)
-            implementation(libs.compose.uiTooling)
-            implementation(libs.kotlinx.coroutines.android)
+        val commonMain by getting {
+            dependencies {
+                implementation(libs.compose.runtime)
+                implementation(libs.compose.foundation)
+                implementation(libs.compose.material3)
+                implementation(libs.compose.ui)
+                implementation(libs.compose.components.resources)
+                implementation(libs.compose.uiToolingPreview)
+                implementation(libs.androidx.lifecycle.viewmodelCompose)
+                implementation(libs.androidx.lifecycle.runtimeCompose)
+            }
         }
-        iosMain.dependencies {
-            implementation(project(":admob-cmp-compose"))
-            implementation(libs.kotlinx.coroutines.core)
+        val commonTest by getting {
+            dependencies {
+                implementation(libs.kotlin.test)
+            }
         }
-        commonMain.dependencies {
-            implementation(libs.compose.runtime)
-            implementation(libs.compose.foundation)
-            implementation(libs.compose.material3)
-            implementation(libs.compose.ui)
-            implementation(libs.compose.components.resources)
-            implementation(libs.compose.uiToolingPreview)
-            implementation(libs.androidx.lifecycle.viewmodelCompose)
-            implementation(libs.androidx.lifecycle.runtimeCompose)
+
+        val adCapableMain by creating {
+            dependsOn(commonMain)
+            dependencies {
+                implementation(project(":admob-cmp-compose"))
+            }
         }
-        commonTest.dependencies {
-            implementation(libs.kotlin.test)
+        val adCapableTest by creating {
+            dependsOn(commonTest)
+            dependencies {
+                implementation(libs.kotlinx.coroutines.test)
+            }
+        }
+
+        val androidMain by getting {
+            dependsOn(adCapableMain)
+            dependencies {
+                implementation(libs.compose.uiToolingPreview)
+                implementation(libs.compose.uiTooling)
+                implementation(libs.kotlinx.coroutines.android)
+            }
+        }
+        val androidHostTest by getting {
+            dependsOn(adCapableTest)
+        }
+        val iosMain by getting {
+            dependsOn(adCapableMain)
+            dependencies {
+                implementation(libs.kotlinx.coroutines.core)
+            }
+        }
+        val iosTest by getting {
+            dependsOn(adCapableTest)
         }
     }
 }
