@@ -48,7 +48,7 @@ kotlin {
         //  3. admob-cmp-core linker options for GMA/UMP native frameworks + Xcode PrivateFrameworks search path.
         iosTarget.binaries.withType(org.jetbrains.kotlin.gradle.plugin.mpp.TestExecutable::class.java).configureEach {
             freeCompilerArgs += listOf(
-                "-Xoverride-konan-properties=osVersionMin.ios_simulator_arm64=18.0;osVersionMin.ios_arm64=18.0;osVersionMin=18.0;konan.cacheKind=none"
+                "-Xoverride-konan-properties=osVersionMin.ios_simulator_arm64=18.0;osVersionMin.ios_arm64=18.0;osVersionMin=18.0"
             )
 
             @Suppress("UNCHECKED_CAST")
