@@ -25,7 +25,7 @@ kotlin {
     abiValidation { enabled.set(true) }
 
     android {
-        namespace = "avinya.tech.yt.ads.compose"
+        namespace = "dev.avinya.ads.compose"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
         withHostTest { isReturnDefaultValues = true }

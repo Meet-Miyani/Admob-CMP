@@ -1,9 +1,9 @@
 package dev.avinya.admob.cmp.demo
 
-import avinya.tech.yt.ads.AdConfig
-import avinya.tech.yt.ads.AdInitializationHook
-import avinya.tech.yt.ads.AdInitializationPhase
-import avinya.tech.yt.ads.AdManagerStatus
+import dev.avinya.ads.AdConfig
+import dev.avinya.ads.AdInitializationHook
+import dev.avinya.ads.AdInitializationPhase
+import dev.avinya.ads.AdManagerStatus
 
 internal const val DEMO_ANDROID_APP_ID: String =
     "ca-app-pub-3940256099942544~3347511713"

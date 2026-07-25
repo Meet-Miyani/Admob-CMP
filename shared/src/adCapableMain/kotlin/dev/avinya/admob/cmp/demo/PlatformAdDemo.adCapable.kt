@@ -21,11 +21,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import avinya.tech.yt.ads.ConsentMode
-import avinya.tech.yt.ads.LocalAdManager
-import avinya.tech.yt.ads.debug.AdDebugCatalog
-import avinya.tech.yt.ads.debug.AdDebugScreen
-import avinya.tech.yt.ads.rememberAdManager
+import dev.avinya.ads.ConsentMode
+import dev.avinya.ads.LocalAdManager
+import dev.avinya.ads.debug.AdDebugCatalog
+import dev.avinya.ads.debug.AdDebugScreen
+import dev.avinya.ads.rememberAdManager
 
 @Composable
 internal actual fun PlatformAdDemo() {

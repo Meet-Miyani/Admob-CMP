@@ -1,8 +1,8 @@
 package dev.avinya.admob.cmp.demo
 
-import avinya.tech.yt.ads.AdError
-import avinya.tech.yt.ads.AdInitializationPhase
-import avinya.tech.yt.ads.AdManagerStatus
+import dev.avinya.ads.AdError
+import dev.avinya.ads.AdInitializationPhase
+import dev.avinya.ads.AdManagerStatus
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals

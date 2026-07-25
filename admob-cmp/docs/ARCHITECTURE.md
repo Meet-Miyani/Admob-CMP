@@ -4,14 +4,14 @@
 
 ```
 commonMain
-  avinya.tech.yt.ads            public API: AdManager, controllers, AdPlacement,
+  dev.avinya.ads                public API: AdManager, controllers, AdPlacement,
                                 AdConfig, events, errors, consent, diagnostics
-  avinya.tech.yt.ads.internal   FullScreenSlotCore (shared load/show/cache state
+  dev.avinya.ads.internal       FullScreenSlotCore (shared load/show/cache state
                                 machine), AdRetry (capped exponential backoff)
-  avinya.tech.yt.ads.appopen    AppOpenAdCoordinator + expect foreground signal
-  avinya.tech.yt.ads.nativead   NativeAdPool contract, options, media info
-  avinya.tech.yt.ads.nativead.layout   AdLayout DSL + validator + templates
-  avinya.tech.yt.ads.ui         expect composables: BannerAdView, NativeAdView
+  dev.avinya.ads.appopen        AppOpenAdCoordinator + expect foreground signal
+  dev.avinya.ads.nativead       NativeAdPool contract, options, media info
+  dev.avinya.ads.nativead.layout       AdLayout DSL + validator + templates
+  dev.avinya.ads.ui             expect composables: BannerAdView, NativeAdView
 
 androidMain                     AndroidGoogleAdManager + slots/pool/banner over the
                                 GMA Next-Gen SDK; AdMob.manager(context) singleton;

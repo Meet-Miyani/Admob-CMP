@@ -1,7 +1,7 @@
 # admob-cmp — Agent Guide
 
-Compose Multiplatform AdMob SDK. Package `avinya.tech.yt.ads`; Maven artifact
-`tech.avinya.ads:admob-cmp`. Android (GMA Next-Gen, API 26+) + iOS (GMA 13.x,
+Compose Multiplatform AdMob SDK. Package `dev.avinya.ads`; Maven artifact
+`dev.avinya.ads:admob-cmp`. Android (GMA Next-Gen, API 26+) + iOS (GMA 13.x,
 iOS 15+).
 
 ## Entry points

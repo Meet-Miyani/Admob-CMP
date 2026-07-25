@@ -177,7 +177,7 @@ kotlin {
     abiValidation { enabled.set(true) }
 
     android {
-        namespace = "avinya.tech.yt.ads.core"
+        namespace = "dev.avinya.ads.core"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
         withHostTest { isReturnDefaultValues = true }
@@ -193,7 +193,7 @@ kotlin {
         iosTarget.binaries.framework {
             baseName = "AdMobCmp"
             isStatic = true
-            freeCompilerArgs += listOf("-Xbinary=bundleId=avinya.tech.yt.ads")
+            freeCompilerArgs += listOf("-Xbinary=bundleId=dev.avinya.ads")
         }
 
         iosTarget.compilations.getByName("main").cinterops {

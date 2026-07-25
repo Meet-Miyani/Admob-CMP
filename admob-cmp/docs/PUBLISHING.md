@@ -2,10 +2,8 @@
 
 ## Coordinates & policy
 
-- `tech.avinya.ads:admob-cmp` — the namespace is the reverse-DNS of
-  `avinya.tech`, as required by Central Portal verification. (The Kotlin
-  package remains `avinya.tech.yt.ads`; only the Maven group follows the
-  domain.)
+- `dev.avinya.ads:admob-cmp` — Maven publication coordinates under group
+  `dev.avinya.ads` and package `dev.avinya.ads`.
 - Version `0.x.y` while the Android GMA Next-Gen SDK is beta; move to `1.0`
   when it GAs (~July 2026) after a deprecation pass.
 - Plugin: `com.vanniktech.maven.publish` with `SONATYPE_HOST=CENTRAL_PORTAL`
@@ -19,7 +17,7 @@
 ```
 
 Works without signing keys. Produces android, iosArm64, iosSimulatorArm64, and
-KMP-root publications under `~/.m2/repository/tech/avinya/ads/`.
+KMP-root publications under `~/.m2/repository/dev/avinya/ads/`.
 
 ## Maven Central
 
@@ -51,15 +49,15 @@ GMA/UMP binaries, which they have via SPM (see SETUP.md).
 
 **Verified 2026-06-12:** the iOS publications contain the `cinterop-gma` /
 `cinterop-ump` klibs, and a scratch KMP project with only
-`implementation("tech.avinya.ads:admob-cmp:0.1.0")` from `mavenLocal()`
+`implementation("dev.avinya.ads:admob-cmp:0.1.0")` from `mavenLocal()`
 compiled an `iosSimulatorArm64` source against `AdManager`/`AdPlacement`
 successfully. Repeat before each release:
 
 ```bash
 ./gradlew :admob-cmp:publishToMavenLocal
 # then in a scratch KMP project with mavenLocal():
-#   implementation("tech.avinya.ads:admob-cmp:0.1.0")
-#   compile a source referencing avinya.tech.yt.ads.AdManager for iosSimulatorArm64
+#   implementation("dev.avinya.ads:admob-cmp:0.1.0")
+#   compile a source referencing dev.avinya.ads.AdManager for iosSimulatorArm64
 ```
 
 ## Release checklist

@@ -15,7 +15,7 @@ stream. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
 
 ```kotlin
 // commonMain
-implementation("tech.avinya.ads:admob-cmp:0.1.0")
+implementation("dev.avinya.ads:admob-cmp:0.1.0")
 ```
 
 Platform setup (Android manifest entry, iOS SPM packages + Info.plist) is

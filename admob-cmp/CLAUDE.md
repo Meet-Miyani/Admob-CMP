@@ -1,7 +1,7 @@
 # CLAUDE.md — admob-cmp
 
-Compose Multiplatform AdMob SDK. Package `avinya.tech.yt.ads`, artifact
-`tech.avinya.ads:admob-cmp`. Android (GMA Next-Gen, API 26+) + iOS (GMA 13.x,
+Compose Multiplatform AdMob SDK. Package `dev.avinya.ads`, artifact
+`dev.avinya.ads:admob-cmp`. Android (GMA Next-Gen, API 26+) + iOS (GMA 13.x,
 iOS 15+).
 
 **Read [AGENTS.md](AGENTS.md) first** — it is the authoritative API/usage guide
