@@ -285,6 +285,11 @@ public open class AdLayoutScope internal constructor() {
  * Top-level DSL entry point that builds an [AdLayout] tree. Single-child
  * content becomes the root node; multi-child content is wrapped in a
  * full-width [AdContainerNode.Column].
+ *
+ * Each [adLayout] construction recursively validates the tree and computes structural identity.
+ * In Compose components, retain custom layouts using `remember { adLayout { ... } }` or
+ * `remember(key) { adLayout { ... } }` to avoid re-validating and rebuilding platform native views
+ * on every recomposition.
  */
 public fun adLayout(content: AdLayoutBuilder.() -> Unit): AdLayout {
     val scope = AdLayoutBuilder().apply(content)

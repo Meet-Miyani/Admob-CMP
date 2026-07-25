@@ -15,23 +15,25 @@ val placement = AdPlacement(
     maxCacheSize = 5
 )
 
-val feedAdLayout = adLayout {
-    column(modifier = AdModifier.fillMaxWidth()) {
-        media(
-            modifier = AdModifier
-                .fillMaxWidth()
-                .aspectRatio(16f / 9f)
-                .clipRounded(8.dp)
-        )
-        spacer(modifier = AdModifier.height(8.dp))
-        headline(maxLines = 2)
-        body(maxLines = 3)
-        row(spacing = 8.dp) {
-            icon(modifier = AdModifier.size(24.dp))
-            advertiser()
-            adBadge()
+val feedAdLayout = remember {
+    adLayout {
+        column(modifier = AdModifier.fillMaxWidth()) {
+            media(
+                modifier = AdModifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .clipRounded(8.dp)
+            )
+            spacer(modifier = AdModifier.height(8.dp))
+            headline(maxLines = 2)
+            body(maxLines = 3)
+            row(spacing = 8.dp) {
+                icon(modifier = AdModifier.size(24.dp))
+                advertiser()
+                adBadge()
+            }
+            callToAction(modifier = AdModifier.fillMaxWidth())
         }
-        callToAction(modifier = AdModifier.fillMaxWidth())
     }
 }
 
@@ -46,6 +48,12 @@ NativeAdView(
 
 `AdTemplates` ships ready-made layouts (e.g. `AdTemplates.mediaCard`, the
 `NativeAdView` default).
+
+## Layout stability
+
+Each `adLayout { ... }` construction recursively validates the layout tree and computes a structural identity string.
+In Compose applications, retain custom layouts using `remember { adLayout { ... } }` (or
+`remember(layoutVariant) { adLayout { ... } }` for dynamic variants) to prevent unnecessary validation overhead and avoid rebuilding platform native views on recomposition.
 
 ## DSL nodes
 

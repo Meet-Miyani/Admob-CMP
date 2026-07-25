@@ -13,6 +13,10 @@ import dev.avinya.ads.nativead.layout.AdTemplates
  * on dispose automatically. Each [itemKey] gets its own distinct ad,
  * enabling stable list reuse.
  *
+ * Each [AdLayout] construction computes validation and structural identity. Callers defining
+ * custom layouts in Compose should retain them across recomposition using `remember { adLayout { ... } }`
+ * (or `remember(key) { adLayout { ... } }` for keyed reconstruction of dynamic layout variants).
+ *
  * @param placement The native ad placement configuration.
  * @param itemKey Stable key for list reuse — distinct ads per unique key.
  * @param layout The native ad layout (defaults to [AdTemplates.mediaCard]).
