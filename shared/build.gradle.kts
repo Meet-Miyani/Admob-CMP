@@ -53,8 +53,14 @@ kotlin {
     
     sourceSets {
         androidMain.dependencies {
+            implementation(project(":admob-cmp-compose"))
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.compose.uiTooling)
+            implementation(libs.kotlinx.coroutines.android)
+        }
+        iosMain.dependencies {
+            implementation(project(":admob-cmp-compose"))
+            implementation(libs.kotlinx.coroutines.core)
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)
