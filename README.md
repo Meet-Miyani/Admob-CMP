@@ -14,6 +14,13 @@ This is a Kotlin Multiplatform project targeting Android, iOS, Web, Desktop (JVM
 
 ### Running the apps
 
+Android and iOS open directly into the AdMob debug console. The app follows the
+production consent → iOS tracking → one-time SDK initialization sequence, but all
+application and ad-unit IDs are Google's official samples and every placement has
+strict test-mode validation. Before replacing the sample IDs for a release, follow
+[`admob-cmp/docs/SETUP.md`](./admob-cmp/docs/SETUP.md) and run
+`./gradlew :admob-cmp-core:doctorIos`.
+
 Use the run configurations provided by the run widget in your IDE's toolbar. You can also use these commands and options:
 
 - Android app: `./gradlew :androidApp:assembleDebug`
