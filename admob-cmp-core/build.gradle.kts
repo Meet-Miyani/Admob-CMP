@@ -248,7 +248,7 @@ kotlin {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
             implementation(libs.google.ads.mobile.sdk)
-            implementation("org.mockito:mockito-core:5.15.2")
+            implementation(libs.mockito.core)
         }
     }
 }

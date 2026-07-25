@@ -38,15 +38,14 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(project(":admob-cmp-core"))
-            implementation(libs.runtime)
-            implementation(libs.foundation)
-            implementation(libs.ui)
-            implementation(libs.ui.tooling.preview)
+            implementation(libs.compose.runtime)
+            implementation(libs.compose.foundation)
+            implementation(libs.compose.ui)
+            implementation(libs.compose.uiToolingPreview)
             implementation(libs.kotlinx.coroutines.core)
         }
         androidMain.dependencies {
-            implementation(libs.ui.tooling)
-            implementation(libs.androidx.uiTooling)
+            implementation(libs.compose.uiTooling)
             implementation(libs.androidx.activity.compose)
             implementation(libs.google.ads.mobile.sdk)
             implementation(libs.google.user.messaging.platform)

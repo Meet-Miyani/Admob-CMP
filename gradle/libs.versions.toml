@@ -7,19 +7,15 @@ android-compileSdk = "37"
 android-minSdk = "26"
 android-targetSdk = "36"
 androidx-activity = "1.13.0"
-androidx-appcompat = "1.7.1"
-androidx-core = "1.19.0"
-androidx-espresso = "3.7.0"
 androidx-lifecycle = "2.11.0-beta01"
 # admob-cmp uses the pure-AndroidX lifecycle-process (NOT the CMP lifecycle above).
 # Kept separate so the demo app can stay on 2.11.0-beta01 while the module pins 2.10.0.
 androidx-lifecycleProcess = "2.10.0"
-androidx-testExt = "1.3.0"
 composeMultiplatform = "1.11.1"
-junit = "4.13.2"
 kotlin = "2.3.20"
 kotlinx-coroutines = "1.11.0"
 material3 = "1.11.0-alpha07"
+mockito = "5.15.2"
 
 # --- admob-cmp-core (Google Mobile Ads / UMP) ---
 gmaIos = "13.5.0"       # GMA iOS XCFramework (downloaded by admob-cmp-core at build time)
@@ -29,12 +25,6 @@ gmaUmp = "4.0.0"        # Android UMP (also pulled transitively by gmaNextGen)
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
-kotlin-testJunit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
-junit = { module = "junit:junit", version.ref = "junit" }
-androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidx-core" }
-androidx-testExt-junit = { module = "androidx.test.ext:junit", version.ref = "androidx-testExt" }
-androidx-espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "androidx-espresso" }
-androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "androidx-appcompat" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
 compose-uiTooling = { module = "org.jetbrains.compose.ui:ui-tooling", version.ref = "composeMultiplatform" }
 androidx-lifecycle-viewmodelCompose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidx-lifecycle" }
@@ -48,22 +38,16 @@ compose-uiToolingPreview = { module = "org.jetbrains.compose.ui:ui-tooling-previ
 kotlinx-coroutinesSwing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
 
 # --- admob-cmp module aliases (referenced by admob-cmp/build.gradle.kts) ---
-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "composeMultiplatform" }
-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "composeMultiplatform" }
-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "composeMultiplatform" }
-ui-tooling = { module = "org.jetbrains.compose.ui:ui-tooling", version.ref = "composeMultiplatform" }
-ui-tooling-preview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "composeMultiplatform" }
-androidx-uiTooling = { module = "androidx.compose.ui:ui-tooling", version.ref = "composeMultiplatform" }
 androidx-lifecycle-process = { module = "androidx.lifecycle:lifecycle-process", version.ref = "androidx-lifecycleProcess" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
 google-ads-mobile-sdk = { module = "com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk", version.ref = "gmaNextGen" }
 google-user-messaging-platform = { module = "com.google.android.ump:user-messaging-platform", version.ref = "gmaUmp" }
+mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
-androidMultiplatformLibrary = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
 androidKmpLibrary = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
 composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }
 composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
