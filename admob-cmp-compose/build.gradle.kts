@@ -33,19 +33,22 @@ kotlin {
     ).forEach { iosTarget ->
         val targetName = iosTarget.name
 
-        // Set minimum iOS deployment target to 15.0 for all iOS binaries
+        // Set minimum iOS deployment target to 15.0 for non-test iOS binaries
         iosTarget.binaries.all {
-            freeCompilerArgs += listOf(
-                "-Xoverride-konan-properties=osVersionMin.ios_simulator_arm64=15.0;osVersionMin.ios_arm64=15.0;osVersionMin=15.0"
-            )
+            if (this !is org.jetbrains.kotlin.gradle.plugin.mpp.TestExecutable) {
+                freeCompilerArgs += listOf(
+                    "-Xoverride-konan-properties=osVersionMin.ios_simulator_arm64=15.0;osVersionMin.ios_arm64=15.0;osVersionMin=15.0"
+                )
+            }
         }
 
         // Test executables need:
         //  1. osVersionMin ≥ 18.0 to match Xcode 16's iOS 18+ SDK symbols in Compose/Skiko (UIViewLayoutRegion).
-        //  2. admob-cmp-core linker options for GMA/UMP native frameworks.
+        //  2. disableNativeCache = true to prevent Xcode 16 Skiko/Compose UI cache symbol mismatches.
+        //  3. admob-cmp-core linker options for GMA/UMP native frameworks + Xcode PrivateFrameworks search path.
         iosTarget.binaries.withType(org.jetbrains.kotlin.gradle.plugin.mpp.TestExecutable::class.java).configureEach {
             freeCompilerArgs += listOf(
-                "-Xoverride-konan-properties=osVersionMin.ios_simulator_arm64=18.0;osVersionMin.ios_arm64=18.0;osVersionMin=18.0"
+                "-Xoverride-konan-properties=osVersionMin.ios_simulator_arm64=18.0;osVersionMin.ios_arm64=18.0;osVersionMin=18.0;konan.cacheKind=none"
             )
 
             @Suppress("UNCHECKED_CAST")

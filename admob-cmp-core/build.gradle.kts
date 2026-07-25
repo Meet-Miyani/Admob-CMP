@@ -148,11 +148,22 @@ fun admobTestLinkerOpts(targetName: String): List<String> {
         "iosSimulatorArm64" -> "iphonesimulator"
         else -> error("Unknown iOS target: $targetName")
     }
+    val sdkPlatformName = when (targetName) {
+        "iosArm64" -> "iPhoneOS"
+        "iosSimulatorArm64" -> "iPhoneSimulator"
+        else -> error("Unknown iOS target: $targetName")
+    }
     val developerDir = providers.exec {
         commandLine("xcode-select", "-p")
     }.standardOutput.asText.get().trim()
     val swiftCompatLibDir =
         "$developerDir/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$swiftPlatform"
+    val privateFrameworksDir =
+        "$developerDir/Platforms/$sdkPlatformName.platform/Developer/SDKs/$sdkPlatformName.sdk/System/Library/PrivateFrameworks"
+    val extraOpts = mutableListOf<String>()
+    if (File(privateFrameworksDir).exists()) {
+        extraOpts += listOf("-F$privateFrameworksDir")
+    }
     return listOf(
         "-F" + frameworkDir("GoogleMobileAds", targetName).parentFile.absolutePath,
         "-F" + frameworkDir("UserMessagingPlatform", targetName).parentFile.absolutePath,
@@ -163,7 +174,7 @@ fun admobTestLinkerOpts(targetName: String): List<String> {
         // / __swift_FORCE_LOAD_$_swiftCompatibility56.
         "-framework", "JavaScriptCore",
         "-L$swiftCompatLibDir",
-    )
+    ) + extraOpts
 }
 
 // Expose the per-target opts to consuming projects (keyed by Kotlin target name) so a consumer
@@ -192,9 +203,11 @@ kotlin {
         val targetName = iosTarget.name
 
         iosTarget.binaries.all {
-            freeCompilerArgs += listOf(
-                "-Xoverride-konan-properties=osVersionMin.ios_simulator_arm64=15.0;osVersionMin.ios_arm64=15.0;osVersionMin=15.0"
-            )
+            if (this !is org.jetbrains.kotlin.gradle.plugin.mpp.TestExecutable) {
+                freeCompilerArgs += listOf(
+                    "-Xoverride-konan-properties=osVersionMin.ios_simulator_arm64=15.0;osVersionMin.ios_arm64=15.0;osVersionMin=15.0"
+                )
+            }
         }
 
         iosTarget.binaries.framework {
