@@ -354,19 +354,19 @@ jobs:
 - VERSION_NAME=0.1.0
 + VERSION_NAME=0.1.1
   POM_ARTIFACT_ID=admob-cmp
-  ...
 - POM_URL=https://github.com/avinya-tech/admob-cmp
-+ POM_URL=https://github.com/<your-gh-user>/<new-repo>
++ POM_URL=https://github.com/Meet-Miyani/Admob-CMP
+- POM_LICENSE_NAME=Apache License 2.0
 - POM_SCM_URL=https://github.com/avinya-tech/admob-cmp
-+ POM_SCM_URL=https://github.com/<your-gh-user>/<new-repo>
++ POM_SCM_URL=https://github.com/Meet-Miyani/Admob-CMP
 - POM_SCM_CONNECTION=scm:git:https://github.com/avinya-tech/admob-cmp.git
-+ POM_SCM_CONNECTION=scm:git:https://github.com/<your-gh-user>/<new-repo>.git
++ POM_SCM_CONNECTION=scm:git:https://github.com/Meet-Miyani/Admob-CMP.git
 - POM_SCM_DEV_CONNECTION=scm:git:ssh://git@github.com/avinya-tech/admob-cmp.git
-+ POM_SCM_DEV_CONNECTION=scm:git:ssh://git@github.com/<your-gh-user>/<new-repo>.git
++ POM_SCM_DEV_CONNECTION=scm:git:ssh://git@github.com/Meet-Miyani/Admob-CMP.git
 - POM_DEVELOPER_ID=avinya-tech
 - POM_DEVELOPER_NAME=Avinya Tech
-+ POM_DEVELOPER_ID=<your-gh-handle>
-+ POM_DEVELOPER_NAME=<Your Name>
++ POM_DEVELOPER_ID=Meet-Miyani
++ POM_DEVELOPER_NAME=Meet Miyani
 
 # Add (enables GPG signing of release artifacts — Central rejects unsigned):
 + RELEASE_SIGNING_ENABLED=true
