@@ -229,10 +229,20 @@ public typealias FullScreenAdSlot = FullScreenAdController
 public interface InterstitialAdController : FullScreenAdController
 
 /** Full-screen ad controller for rewarded video format. */
-public interface RewardedAdController : FullScreenAdController
+public interface RewardedAdController : FullScreenAdController {
+    public suspend fun show(
+        options: FullScreenAdOptions = placement.fullScreenOptions,
+        onRewardEarned: (AdReward) -> Unit
+    ): AdShowResult
+}
 
 /** Full-screen ad controller for rewarded interstitial format. */
-public interface RewardedInterstitialAdController : FullScreenAdController
+public interface RewardedInterstitialAdController : FullScreenAdController {
+    public suspend fun show(
+        options: FullScreenAdOptions = placement.fullScreenOptions,
+        onRewardEarned: (AdReward) -> Unit
+    ): AdShowResult
+}
 
 /**
  * Full-screen ad controller for app-open format. Shows an ad when the app
@@ -384,9 +394,19 @@ internal open class NoOpFullScreenAdController(override val placement: AdPlaceme
 
 internal class NoOpInterstitialAdController(placement: AdPlacement) : NoOpFullScreenAdController(placement), InterstitialAdController
 
-internal class NoOpRewardedAdController(placement: AdPlacement) : NoOpFullScreenAdController(placement), RewardedAdController
+internal class NoOpRewardedAdController(placement: AdPlacement) : NoOpFullScreenAdController(placement), RewardedAdController {
+    override suspend fun show(
+        options: FullScreenAdOptions,
+        onRewardEarned: (AdReward) -> Unit
+    ): AdShowResult = show(options)
+}
 
-internal class NoOpRewardedInterstitialAdController(placement: AdPlacement) : NoOpFullScreenAdController(placement), RewardedInterstitialAdController
+internal class NoOpRewardedInterstitialAdController(placement: AdPlacement) : NoOpFullScreenAdController(placement), RewardedInterstitialAdController {
+    override suspend fun show(
+        options: FullScreenAdOptions,
+        onRewardEarned: (AdReward) -> Unit
+    ): AdShowResult = show(options)
+}
 
 internal class NoOpAppOpenAdController(placement: AdPlacement) : NoOpFullScreenAdController(placement), AppOpenAdController
 

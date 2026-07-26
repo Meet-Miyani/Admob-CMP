@@ -110,7 +110,7 @@ class FullScreenSlotCoreTest {
                 adRequestBlockedError = unblockedAdRequestError(),
                 clock = tickClock(),
                 onPresentationChanged = { presentationDeltas += it },
-                presentHandler = { _, _ -> terminalResult.await() }
+                presentHandler = { _, _, _ -> terminalResult.await() }
             )
             slot.enqueueLoadResult(AdAttemptResult.Success("ad1"))
 
@@ -175,7 +175,7 @@ class FullScreenSlotCoreTest {
                 globalEvents = testGlobalEvents(),
                 adRequestBlockedError = unblockedAdRequestError(),
                 clock = tickClock(),
-                presentHandler = { _, _ -> terminalResult.await() }
+                presentHandler = { _, _, _ -> terminalResult.await() }
             )
             slot.enqueueLoadResult(AdAttemptResult.Success("ad1"))
             slot.load()
@@ -666,6 +666,92 @@ class FullScreenSlotCoreTest {
             )
 
             assertIs<AdLoadState.Failed>(slot.load())
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun `rewarded presentation delivers reward before dismiss`() = runTest(StandardTestDispatcher()) {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val globalEvents = testGlobalEvents()
+            val placement = testPlacement.copy(format = AdFormat.Rewarded)
+            val slot = FakeFullScreenSlot(
+                placement,
+                globalEvents,
+                unblockedAdRequestError(),
+                tickClock(),
+                presentHandler = { _, _, delivery ->
+                    requireNotNull(delivery).deliver(AdReward(1_000L, "coin"))
+                    AdShowResult.Shown
+                }
+            )
+            slot.enqueueLoadResult(AdAttemptResult.Success("ad1"))
+            slot.load()
+            
+            val callbacks = mutableListOf<AdReward>()
+            val result = slot.showRewardedForTest(testPlacement.fullScreenOptions) { callbacks.add(it) }
+            
+            assertIs<AdShowResult.Shown>(result)
+            assertEquals(1, callbacks.size)
+            assertTrue(globalEvents.replayCache.any { it is AdEvent.RewardEarned })
+            assertTrue(slot.destroyedAds.contains("ad1"))
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun `rewarded presentation delivers reward after dismiss`() = runTest(StandardTestDispatcher()) {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val globalEvents = testGlobalEvents()
+            val placement = testPlacement.copy(format = AdFormat.Rewarded)
+            val slot = FakeFullScreenSlot(
+                placement,
+                globalEvents,
+                unblockedAdRequestError(),
+                tickClock(),
+                presentHandler = { _, _, _ -> AdShowResult.Shown }
+            )
+            slot.enqueueLoadResult(AdAttemptResult.Success("ad1"))
+            slot.load()
+            
+            val callbacks = mutableListOf<AdReward>()
+            val result = slot.showRewardedForTest(testPlacement.fullScreenOptions) { callbacks.add(it) }
+            
+            val delivery = requireNotNull(slot.rewardDelivery)
+            delivery.deliver(AdReward(1_000L, "coin"))
+
+            assertIs<AdShowResult.Shown>(result)
+            assertEquals(1, callbacks.size)
+            assertTrue(globalEvents.replayCache.any { it is AdEvent.RewardEarned })
+            assertTrue(slot.destroyedAds.contains("ad1"))
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun `failed rewarded presentation destroys ad`() = runTest(StandardTestDispatcher()) {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        try {
+            val placement = testPlacement.copy(format = AdFormat.Rewarded)
+            val slot = FakeFullScreenSlot(
+                placement,
+                testGlobalEvents(),
+                unblockedAdRequestError(),
+                tickClock(),
+                presentHandler = { _, _, _ -> AdShowResult.Failed(AdError.message("err")) }
+            )
+            slot.enqueueLoadResult(AdAttemptResult.Success("ad1"))
+            slot.load()
+            
+            val result = slot.showRewardedForTest(testPlacement.fullScreenOptions) {}
+            
+            assertIs<AdShowResult.Failed>(result)
+            assertTrue(slot.destroyedAds.contains("ad1"))
         } finally {
             Dispatchers.resetMain()
         }
