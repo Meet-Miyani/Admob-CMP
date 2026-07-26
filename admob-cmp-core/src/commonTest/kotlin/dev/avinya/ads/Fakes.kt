@@ -113,6 +113,11 @@ internal open class FakeFullScreenSlot(
         destroyedAds.add(ad)
     }
 
+    override fun destroyAfterPresentation(wasShown: Boolean): Boolean = when (placement.format) {
+        AdFormat.Rewarded, AdFormat.RewardedInterstitial -> !wasShown
+        else -> true
+    }
+
     override fun getResponseInfo(ad: String): AdResponseInfo? = null
     var canPresentResult: AdError? = null
     var canPresentInvocations: Int = 0

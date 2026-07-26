@@ -696,7 +696,7 @@ class FullScreenSlotCoreTest {
             assertIs<AdShowResult.Shown>(result)
             assertEquals(1, callbacks.size)
             assertTrue(globalEvents.replayCache.any { it is AdEvent.RewardEarned })
-            assertTrue(slot.destroyedAds.contains("ad1"))
+            assertFalse(slot.destroyedAds.contains("ad1"))
         } finally {
             Dispatchers.resetMain()
         }
@@ -727,7 +727,7 @@ class FullScreenSlotCoreTest {
             assertIs<AdShowResult.Shown>(result)
             assertEquals(1, callbacks.size)
             assertTrue(globalEvents.replayCache.any { it is AdEvent.RewardEarned })
-            assertTrue(slot.destroyedAds.contains("ad1"))
+            assertFalse(slot.destroyedAds.contains("ad1"))
         } finally {
             Dispatchers.resetMain()
         }
