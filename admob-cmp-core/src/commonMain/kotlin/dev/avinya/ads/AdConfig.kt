@@ -1,5 +1,7 @@
 package dev.avinya.ads
 
+import dev.avinya.ads.internal.ownedSnapshot
+
 
 /**
  * Per-platform AdMob **app** IDs (not ad-unit IDs). Required for
@@ -151,7 +153,7 @@ internal data class AdInitializationConfigIdentity(
 internal fun AdConfig.initializationIdentity(platformAppId: String): AdInitializationConfigIdentity =
     AdInitializationConfigIdentity(
         platformAppId = platformAppId,
-        globalRequestConfiguration = effectiveGlobalRequestConfiguration()
+        globalRequestConfiguration = effectiveGlobalRequestConfiguration().ownedSnapshot()
     )
 
 /**
