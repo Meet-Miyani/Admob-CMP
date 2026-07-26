@@ -263,10 +263,15 @@ internal class IosGoogleAdManager : AdManager, FullScreenPresenceAware {
                 }
                 ConsentMode.SkipConsent -> true
             }
-            consentSession.recordCompletedGate(consentMode)
-            _admission.value = consentSession.admission(canRequest)
-            AdLogger.i("iOS consent gate complete. canRequestAds=$canRequest mode=$consentMode")
-            if (!canRequest) {
+            val effectiveCanRequest = withContext(Dispatchers.Main.immediate) {
+                consentSession.recordCompletedGate(consentMode)
+                val current = if (consentMode == ConsentMode.SkipConsent) true else consent.canRequestAds.value
+                val newAdmission = consentSession.admission(current)
+                _admission.value = newAdmission
+                current
+            }
+            AdLogger.i("iOS consent gate complete. canRequestAds=$effectiveCanRequest mode=$consentMode")
+            if (!effectiveCanRequest) {
                 AdLogger.w("iOS initialize deferred because consent does not allow ad requests yet.")
                 val result = AdManagerStatus.ConsentRequired.also { _status.value = it }
                 completeAttempt(attempt, result)

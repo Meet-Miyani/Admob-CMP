@@ -253,11 +253,16 @@ internal class AndroidGoogleAdManager(
                 }
                 ConsentMode.SkipConsent -> true
             }
-            consentSession.recordCompletedGate(consentMode)
-            _admission.value = consentSession.admission(canRequest)
+            val effectiveCanRequest = withContext(Dispatchers.Main.immediate) {
+                consentSession.recordCompletedGate(consentMode)
+                val current = if (consentMode == ConsentMode.SkipConsent) true else consent.canRequestAds.value
+                val newAdmission = consentSession.admission(current)
+                _admission.value = newAdmission
+                current
+            }
 
-            AdLogger.i("Android consent gate complete. canRequestAds=$canRequest mode=$consentMode")
-            if (!canRequest) {
+            AdLogger.i("Android consent gate complete. canRequestAds=$effectiveCanRequest mode=$consentMode")
+            if (!effectiveCanRequest) {
                 AdLogger.w("Android initialize deferred because consent does not allow ad requests yet.")
                 val result = AdManagerStatus.ConsentRequired.also {
                     _status.value = it

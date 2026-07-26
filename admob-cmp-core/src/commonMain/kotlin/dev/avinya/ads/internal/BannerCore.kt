@@ -147,7 +147,7 @@ internal class BannerCore<V : Any, S : Any>(
         val resolved = ResolvedBannerRequest(
             size = platform.resolveSize(sizePolicy, widthDp),
             sizePolicy = sizePolicy,
-            requestOptions = requestOptions
+            requestOptions = requestOptions.ownedSnapshot()
         )
         loadForGeneration(resolved, requiredGeneration, blockedError)
         return _loadState.value
@@ -185,7 +185,7 @@ internal class BannerCore<V : Any, S : Any>(
             registeredRequest = ResolvedBannerRequest(
                 size = platform.resolveSize(sizePolicy, geometry.widthDp),
                 sizePolicy = sizePolicy,
-                requestOptions = requestOptions
+                requestOptions = requestOptions.ownedSnapshot()
             )
         }
     }

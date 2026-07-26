@@ -116,6 +116,37 @@ class BannerCoreTest {
     }
 
     @Test
+    fun mutationAfterLoadOrRegisterDoesNotAffectRetainedRequest() = runTest {
+        val platform = FakeBannerPlatform()
+        val core = core(platform)
+        val keywords = mutableSetOf("one")
+        val options = testRequestOptions().copy(keywords = keywords)
+
+        core.load(BannerGeometry(320), AdSizePolicy.LargeAnchoredAdaptive(), options) { null }
+        keywords.add("two")
+        
+        core.refresh { null }
+        assertEquals(
+            setOf("one"),
+            platform.lastRequestOptions?.keywords,
+            "refresh() must use a snapshot of the request options from load(), not the caller's mutated object"
+        )
+
+        keywords.clear()
+        keywords.add("three")
+        core.registerGeometry(BannerGeometry(320), AdSizePolicy.LargeAnchoredAdaptive(), options)
+        keywords.add("four")
+        
+        platform.lastRequestOptions = null
+        core.refresh { null }
+        assertEquals(
+            setOf("three"),
+            platform.lastRequestOptions?.keywords,
+            "refresh() must use a snapshot of the request options from registerGeometry(), not the caller's mutated object"
+        )
+    }
+
+    @Test
     fun refreshBeforeAnyLoadFails() = runTest {
         val platform = FakeBannerPlatform()
         val core = core(platform)
