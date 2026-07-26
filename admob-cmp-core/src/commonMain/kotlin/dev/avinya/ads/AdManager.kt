@@ -2,6 +2,7 @@ package dev.avinya.ads
 
 import dev.avinya.ads.internal.emitOrLogDrop
 import dev.avinya.ads.internal.FullScreenPresentationArbiter
+import dev.avinya.ads.internal.NoOpControllerRegistry
 import dev.avinya.ads.nativead.NativeAdOptions
 import dev.avinya.ads.nativead.NativeAdToken
 import dev.avinya.ads.nativead.NativeMediaInfo
@@ -308,13 +309,15 @@ public object NoOpAdManager : AdManager {
     override val diagnostics: AdDiagnostics = NoOpAdDiagnostics
     override val tracking: AdTrackingController = NoOpTrackingController
 
+    private val controllers = NoOpControllerRegistry()
+
     override suspend fun initialize(config: AdConfig, consentMode: ConsentMode): AdManagerStatus = status.value
-    override fun banner(placement: AdPlacement): BannerAdController = NoOpBannerAdController(placement)
-    override fun nativeAd(placement: AdPlacement): NativeAdPool = NoOpNativeAdPool(placement)
-    override fun interstitial(placement: AdPlacement): InterstitialAdController = NoOpInterstitialAdController(placement)
-    override fun rewarded(placement: AdPlacement): RewardedAdController = NoOpRewardedAdController(placement)
-    override fun rewardedInterstitial(placement: AdPlacement): RewardedInterstitialAdController = NoOpRewardedInterstitialAdController(placement)
-    override fun appOpen(placement: AdPlacement): AppOpenAdController = NoOpAppOpenAdController(placement)
+    override fun banner(placement: AdPlacement): BannerAdController = controllers.banner(placement)
+    override fun nativeAd(placement: AdPlacement): NativeAdPool = controllers.nativeAd(placement)
+    override fun interstitial(placement: AdPlacement): InterstitialAdController = controllers.interstitial(placement)
+    override fun rewarded(placement: AdPlacement): RewardedAdController = controllers.rewarded(placement)
+    override fun rewardedInterstitial(placement: AdPlacement): RewardedInterstitialAdController = controllers.rewardedInterstitial(placement)
+    override fun appOpen(placement: AdPlacement): AppOpenAdController = controllers.appOpen(placement)
 }
 
 private object NoOpConsentController : ConsentController {
