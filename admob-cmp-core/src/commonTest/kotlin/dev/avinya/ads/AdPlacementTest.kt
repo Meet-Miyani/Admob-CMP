@@ -3,6 +3,7 @@ package dev.avinya.ads
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 class AdPlacementTest {
@@ -71,5 +72,46 @@ class AdPlacementTest {
         val upper = BannerRefreshPolicy.SdkManaged(120.seconds)
         assertEquals(30.seconds, (lower as BannerRefreshPolicy.SdkManaged).interval)
         assertEquals(120.seconds, (upper as BannerRefreshPolicy.SdkManaged).interval)
+    }
+
+    @Test
+    fun `cache policy rejects zero without waiting for placement construction`() {
+        assertFailsWith<IllegalArgumentException> { AdCachePolicy(maxSize = 0) }
+    }
+
+    @Test
+    fun `expiration policy rejects non finite and non positive TTLs`() {
+        assertFailsWith<IllegalArgumentException> {
+            AdExpirationPolicy(fullScreenTtl = Duration.ZERO)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            AdExpirationPolicy(appOpenTtl = Duration.INFINITE)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            AdExpirationPolicy(nativeTtl = (-1).seconds)
+        }
+    }
+
+    @Test
+    fun `retry policy validates delays ordering and multiplier`() {
+        assertFailsWith<IllegalArgumentException> {
+            AdRetryPolicy(initialDelay = Duration.ZERO)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            AdRetryPolicy(initialDelay = 5.seconds, maxDelay = 4.seconds)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            AdRetryPolicy(backoffMultiplier = Double.NaN)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            AdRetryPolicy(backoffMultiplier = 0.99)
+        }
+    }
+
+    @Test
+    fun `banner sizes reject invalid dimensions`() {
+        assertFailsWith<IllegalArgumentException> { AdSizePolicy.Fixed(0, 50) }
+        assertFailsWith<IllegalArgumentException> { AdSizePolicy.Fixed(320, -1) }
+        assertFailsWith<IllegalArgumentException> { AdSizePolicy.InlineAdaptive(0) }
     }
 }

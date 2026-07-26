@@ -23,11 +23,11 @@ public data class AdTimeoutPolicy(
     val presentationHandOffTimeout: Duration = 10.seconds
 ) {
     init {
-        require(loadTimeout.isPositive()) {
-            "AdTimeoutPolicy.loadTimeout must be positive, was $loadTimeout"
+        require(loadTimeout.isFinite() && loadTimeout.isPositive()) {
+            "AdTimeoutPolicy.loadTimeout must be finite and positive, was $loadTimeout"
         }
-        require(presentationHandOffTimeout.isPositive()) {
-            "AdTimeoutPolicy.presentationHandOffTimeout must be positive, was $presentationHandOffTimeout"
+        require(presentationHandOffTimeout.isFinite() && presentationHandOffTimeout.isPositive()) {
+            "AdTimeoutPolicy.presentationHandOffTimeout must be finite and positive, was $presentationHandOffTimeout"
         }
     }
 }

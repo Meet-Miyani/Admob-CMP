@@ -37,6 +37,9 @@ public data class ServerSideVerificationOptions(
  */
 public data class AdReward(val amountMicros: Long, val type: String) {
     /** The amount as a whole number, or null if it is fractional. */
-    public fun wholeAmountOrNull(): Int? =
-        if (amountMicros % 1_000_000L == 0L) (amountMicros / 1_000_000L).toInt() else null
+    public fun wholeAmountOrNull(): Int? {
+        if (amountMicros % 1_000_000L != 0L) return null
+        val whole = amountMicros / 1_000_000L
+        return whole.takeIf { it in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() }?.toInt()
+    }
 }
