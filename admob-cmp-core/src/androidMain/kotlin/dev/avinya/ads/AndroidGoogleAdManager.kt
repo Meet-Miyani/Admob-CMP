@@ -242,16 +242,10 @@ internal class AndroidGoogleAdManager(
             // rely on the previous session's cached state. Once this manager reaches
             // Ready, equivalent calls are handled above and must not regress status or
             // rerun consent, hooks, or the process-wide GMA singleton.
-            val canRequest = when (consentMode) {
-                ConsentMode.GatherBeforeInitialize -> {
-                    consent.gatherConsent(config)
-                    consent.canRequestAds.value
-                }
-                ConsentMode.InitializeOnlyIfAlreadyAllowed -> {
-                    consent.requestConsentInfoUpdate(config)
-                    consent.canRequestAds.value
-                }
-                ConsentMode.SkipConsent -> true
+            when (consentMode) {
+                ConsentMode.GatherBeforeInitialize -> consent.gatherConsent(config)
+                ConsentMode.InitializeOnlyIfAlreadyAllowed -> consent.requestConsentInfoUpdate(config)
+                ConsentMode.SkipConsent -> Unit
             }
             val effectiveCanRequest = withContext(Dispatchers.Main.immediate) {
                 consentSession.recordCompletedGate(consentMode)
