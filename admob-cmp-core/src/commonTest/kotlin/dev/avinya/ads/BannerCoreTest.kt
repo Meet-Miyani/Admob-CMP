@@ -134,14 +134,17 @@ class BannerCoreTest {
 
         keywords.clear()
         keywords.add("three")
-        core.registerGeometry(BannerGeometry(320), AdSizePolicy.LargeAnchoredAdaptive(), options)
+
+        val platform2 = FakeBannerPlatform()
+        val core2 = core(platform2)
+        core2.registerGeometry(BannerGeometry(320), AdSizePolicy.LargeAnchoredAdaptive(), options)
         keywords.add("four")
-        
-        platform.lastRequestOptions = null
-        core.refresh { null }
+
+        core2.refresh { null }
+
         assertEquals(
             setOf("three"),
-            platform.lastRequestOptions?.keywords,
+            platform2.lastRequestOptions?.keywords,
             "refresh() must use a snapshot of the request options from registerGeometry(), not the caller's mutated object"
         )
     }

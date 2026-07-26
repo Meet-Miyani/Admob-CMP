@@ -129,6 +129,8 @@ internal class AndroidRewardedSlot(
         onRewardEarned: (AdReward) -> Unit
     ): AdShowResult = showRewarded(options, onRewardEarned)
 
+    override fun destroyAfterPresentation(wasShown: Boolean): Boolean = !wasShown
+
     override suspend fun loadAd(requestOptions: AdRequestOptions): AdAttemptResult<RewardedAd> =
         withContext(Dispatchers.Main.immediate) {
             suspendCancellableCoroutine { continuation ->
@@ -185,6 +187,8 @@ internal class AndroidRewardedInterstitialSlot(
         options: FullScreenAdOptions,
         onRewardEarned: (AdReward) -> Unit
     ): AdShowResult = showRewarded(options, onRewardEarned)
+
+    override fun destroyAfterPresentation(wasShown: Boolean): Boolean = !wasShown
 
     override suspend fun loadAd(requestOptions: AdRequestOptions): AdAttemptResult<RewardedInterstitialAd> =
         withContext(Dispatchers.Main.immediate) {
@@ -314,7 +318,6 @@ private suspend fun <T : Ad> FullScreenSlotCore<T>.showRewarded(
     suspendCancellableCoroutine<AdShowResult> { continuation ->
         continuation.invokeOnCancellation { presentation.closeIfCoreOwned() }
         if (!continuation.isActive) return@suspendCancellableCoroutine
-        var reward: AdReward? = null
         val callback = object : RewardedAdEventCallback {
             override fun onAdShowedFullScreenContent() = emit(AdEvent.OpenedFullScreen(placement.id))
             override fun onAdImpression() = emit(AdEvent.Impression(placement.id))
