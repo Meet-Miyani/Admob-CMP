@@ -5,7 +5,7 @@
 ```toml
 # libs.versions.toml
 [libraries]
-admob-cmp = { group = "dev.avinya.ads", name = "admob-cmp", version = "1.0.0" }
+admob-cmp = { group = "dev.avinya.ads", name = "admob-cmp", version = "1.0.2" }
 ```
 
 ```kotlin
@@ -91,8 +91,7 @@ for this library.
    add to `OTHER_LDFLAGS`: `-framework JavaScriptCore` (GMA needs it and nothing
    else triggers autolinking).
 4. (Optional but recommended) App Tracking Transparency: add
-   `NSUserTrackingUsageDescription` and request ATT before gathering consent if
-   you want IDFA-personalized ads.
+   `NSUserTrackingUsageDescription` if you want IDFA-personalized ads.
 
 Verify the whole setup with:
 

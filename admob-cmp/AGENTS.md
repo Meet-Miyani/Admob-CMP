@@ -47,7 +47,6 @@ scope.launch {
     ad.load()                                  // suspend; AdLoadState back
     when (val r = ad.show()) {                 // suspends until dismissed
         is AdShowResult.Shown -> Unit
-        is AdShowResult.Rewarded -> grant(r.reward.amountMicros, r.reward.type)  // rewarded formats; wholeAmountOrNull() for the common integer case
         is AdShowResult.NotReady -> Unit       // load() first
         is AdShowResult.Failed -> log(r.error)
     }
