@@ -25,6 +25,8 @@ class BannerCoreTest {
         }
         var lastRequestOptions: AdRequestOptions? = null
         var lastSize: Int? = null
+        val loadedPolicies = mutableListOf<AdSizePolicy>()
+        val loadedOptions = mutableListOf<AdRequestOptions>()
 
         /** Runs between loadBanner being entered and it returning — lets a test detach mid-load. */
         var beforeReturn: (suspend () -> Unit)? = null
@@ -42,9 +44,12 @@ class BannerCoreTest {
         override fun responseInfo(banner: FakeBanner): AdResponseInfo? = null
         override suspend fun loadBanner(
             size: Int,
+            sizePolicy: AdSizePolicy,
             requestOptions: AdRequestOptions,
             requiredGeneration: Long
         ): AdAttemptResult<FakeBanner> {
+            loadedPolicies += sizePolicy
+            loadedOptions += requestOptions
             lastSize = size
             lastRequestOptions = requestOptions
             beforeReturn?.invoke()
@@ -255,5 +260,28 @@ class BannerCoreTest {
         // Unbounded, this leaves loadState at Loading forever — and BannerAdView's refresh
         // loop awaits `loadState !is Loading`, so refresh dies silently for the placement.
         assertTrue(state is AdLoadState.Failed, "a banner load with no callback must fail on timeout")
+    }
+
+    @Test
+    fun `per call collapsible policy reaches platform load`() = runTest {
+        val policy = AdSizePolicy.LargeAnchoredAdaptive(CollapsiblePlacement.Top)
+        val platform = FakeBannerPlatform()
+        val core = core(platform)
+
+        core.load(BannerGeometry(320), policy, AdRequestOptions()) { null }
+
+        assertEquals(listOf<AdSizePolicy>(policy), platform.loadedPolicies)
+    }
+
+    @Test
+    fun `refresh replays per call collapsible policy`() = runTest {
+        val policy = AdSizePolicy.LargeAnchoredAdaptive(CollapsiblePlacement.Bottom)
+        val platform = FakeBannerPlatform()
+        val core = core(platform)
+
+        core.load(BannerGeometry(320), policy, AdRequestOptions()) { null }
+        core.refresh { null }
+
+        assertEquals(listOf<AdSizePolicy>(policy, policy), platform.loadedPolicies)
     }
 }

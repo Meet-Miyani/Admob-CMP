@@ -82,6 +82,7 @@ internal class AndroidBannerAdController internal constructor(
 
     override suspend fun loadBanner(
         size: AdSize,
+        sizePolicy: AdSizePolicy,
         requestOptions: AdRequestOptions,
         requiredGeneration: Long
     ): AdAttemptResult<AndroidLoadedBanner> = withContext(Dispatchers.Main.immediate) {
@@ -93,7 +94,7 @@ internal class AndroidBannerAdController internal constructor(
                 )
                 return@suspendCancellableCoroutine
             }
-            val mergedOptions = requestOptions.withCollapsible(placement.bannerSizePolicy)
+            val mergedOptions = requestOptions.withCollapsible(sizePolicy)
             val request = BannerAdRequest.Builder(placement.androidAdUnitId, size)
                 .applyOptions(mergedOptions)
                 .build()
