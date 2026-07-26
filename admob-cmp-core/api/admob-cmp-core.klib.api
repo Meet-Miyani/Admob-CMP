@@ -6,6 +6,10 @@
 // - Show declarations: true
 
 // Library unique name: <AdmobCMP:admob-cmp-core>
+open annotation class dev.avinya.ads/InternalAdMobCmpApi : kotlin/Annotation { // dev.avinya.ads/InternalAdMobCmpApi|null[0]
+    constructor <init>() // dev.avinya.ads/InternalAdMobCmpApi.<init>|<init>(){}[0]
+}
+
 final enum class dev.avinya.ads.nativead/AdChoicesPlacement : kotlin/Enum<dev.avinya.ads.nativead/AdChoicesPlacement> { // dev.avinya.ads.nativead/AdChoicesPlacement|null[0]
     enum entry BottomLeft // dev.avinya.ads.nativead/AdChoicesPlacement.BottomLeft|null[0]
     enum entry BottomRight // dev.avinya.ads.nativead/AdChoicesPlacement.BottomRight|null[0]
@@ -300,9 +304,13 @@ abstract interface dev.avinya.ads/NativeAdPool { // dev.avinya.ads/NativeAdPool|
     abstract suspend fun preload(kotlin/Int = ..., dev.avinya.ads/AdRequestOptions = ..., dev.avinya.ads.nativead/NativeAdOptions = ...): dev.avinya.ads/AdLoadState // dev.avinya.ads/NativeAdPool.preload|preload(kotlin.Int;dev.avinya.ads.AdRequestOptions;dev.avinya.ads.nativead.NativeAdOptions){}[0]
 }
 
-abstract interface dev.avinya.ads/RewardedAdController : dev.avinya.ads/FullScreenAdController // dev.avinya.ads/RewardedAdController|null[0]
+abstract interface dev.avinya.ads/RewardedAdController : dev.avinya.ads/FullScreenAdController { // dev.avinya.ads/RewardedAdController|null[0]
+    abstract suspend fun show(dev.avinya.ads/FullScreenAdOptions = ..., kotlin/Function1<dev.avinya.ads/AdReward, kotlin/Unit>): dev.avinya.ads/AdShowResult // dev.avinya.ads/RewardedAdController.show|show(dev.avinya.ads.FullScreenAdOptions;kotlin.Function1<dev.avinya.ads.AdReward,kotlin.Unit>){}[0]
+}
 
-abstract interface dev.avinya.ads/RewardedInterstitialAdController : dev.avinya.ads/FullScreenAdController // dev.avinya.ads/RewardedInterstitialAdController|null[0]
+abstract interface dev.avinya.ads/RewardedInterstitialAdController : dev.avinya.ads/FullScreenAdController { // dev.avinya.ads/RewardedInterstitialAdController|null[0]
+    abstract suspend fun show(dev.avinya.ads/FullScreenAdOptions = ..., kotlin/Function1<dev.avinya.ads/AdReward, kotlin/Unit>): dev.avinya.ads/AdShowResult // dev.avinya.ads/RewardedInterstitialAdController.show|show(dev.avinya.ads.FullScreenAdOptions;kotlin.Function1<dev.avinya.ads.AdReward,kotlin.Unit>){}[0]
+}
 
 sealed interface dev.avinya.ads/AdEvent { // dev.avinya.ads/AdEvent|null[0]
     abstract val placementId // dev.avinya.ads/AdEvent.placementId|{}placementId[0]
@@ -625,19 +633,6 @@ sealed interface dev.avinya.ads/AdShowResult { // dev.avinya.ads/AdShowResult|nu
         final fun equals(kotlin/Any?): kotlin/Boolean // dev.avinya.ads/AdShowResult.Failed.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // dev.avinya.ads/AdShowResult.Failed.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // dev.avinya.ads/AdShowResult.Failed.toString|toString(){}[0]
-    }
-
-    final class Rewarded : dev.avinya.ads/AdShowResult { // dev.avinya.ads/AdShowResult.Rewarded|null[0]
-        constructor <init>(dev.avinya.ads/AdReward) // dev.avinya.ads/AdShowResult.Rewarded.<init>|<init>(dev.avinya.ads.AdReward){}[0]
-
-        final val reward // dev.avinya.ads/AdShowResult.Rewarded.reward|{}reward[0]
-            final fun <get-reward>(): dev.avinya.ads/AdReward // dev.avinya.ads/AdShowResult.Rewarded.reward.<get-reward>|<get-reward>(){}[0]
-
-        final fun component1(): dev.avinya.ads/AdReward // dev.avinya.ads/AdShowResult.Rewarded.component1|component1(){}[0]
-        final fun copy(dev.avinya.ads/AdReward = ...): dev.avinya.ads/AdShowResult.Rewarded // dev.avinya.ads/AdShowResult.Rewarded.copy|copy(dev.avinya.ads.AdReward){}[0]
-        final fun equals(kotlin/Any?): kotlin/Boolean // dev.avinya.ads/AdShowResult.Rewarded.equals|equals(kotlin.Any?){}[0]
-        final fun hashCode(): kotlin/Int // dev.avinya.ads/AdShowResult.Rewarded.hashCode|hashCode(){}[0]
-        final fun toString(): kotlin/String // dev.avinya.ads/AdShowResult.Rewarded.toString|toString(){}[0]
     }
 
     final object NotReady : dev.avinya.ads/AdShowResult { // dev.avinya.ads/AdShowResult.NotReady|null[0]
