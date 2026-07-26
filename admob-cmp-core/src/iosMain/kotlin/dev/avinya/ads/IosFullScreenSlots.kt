@@ -219,7 +219,6 @@ internal class IosRewardedSlot(
                         // 0.5/2.5 reward is preserved exactly rather than rounded to 1/3).
                         val earned = AdReward(adReward.amount.toValueMicros(), adReward.type)
                         rewardDelivery?.deliver(earned)
-                        emit(AdEvent.RewardEarned(placement.id, earned))
                     }
                 }
             }
@@ -333,7 +332,6 @@ internal class IosRewardedInterstitialSlot(
                         // 0.5/2.5 reward is preserved exactly rather than rounded to 1/3).
                         val earned = AdReward(adReward.amount.toValueMicros(), adReward.type)
                         rewardDelivery?.deliver(earned)
-                        emit(AdEvent.RewardEarned(placement.id, earned))
                     }
                 }
             }
