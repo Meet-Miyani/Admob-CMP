@@ -174,20 +174,25 @@ private fun AdView.destroyOnMain() {
     }
 }
 
+@InternalAdMobCmpApi
 public fun BannerAdController.currentAndroidBannerAd(): BannerAd? =
     (this as? AndroidBannerAdController)?.currentAd()
 
+@InternalAdMobCmpApi
 public fun BannerAdController.currentAndroidBannerView(): AdView? =
     (this as? AndroidBannerAdController)?.currentView()
 
+@InternalAdMobCmpApi
 public fun BannerAdController.attachAndroidBanner(): Unit {
     (this as? AndroidBannerAdController)?.attach()
 }
 
+@InternalAdMobCmpApi
 public fun BannerAdController.detachAndroidBanner(): Unit {
     (this as? AndroidBannerAdController)?.detach()
 }
 
+@InternalAdMobCmpApi
 public fun BannerAdController.registerAndroidBannerGeometry(
     geometry: BannerGeometry,
     sizePolicy: AdSizePolicy,

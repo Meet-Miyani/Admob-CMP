@@ -1,5 +1,7 @@
+@file:OptIn(InternalAdMobCmpApi::class)
 package dev.avinya.ads.ui
 
+import dev.avinya.ads.InternalAdMobCmpApi
 import android.app.Activity
 import android.view.Gravity
 import android.view.View
@@ -60,6 +62,8 @@ public actual fun BannerAdView(placement: AdPlacement, modifier: Modifier, width
         mutableStateOf<BannerAd?>(null)
     }
 
+    val currentOnEvent = rememberCurrentEventCallback(onEvent)
+
     LaunchedEffect(controller) {
         // collect, not collectLatest: collectLatest cancels the in-flight onEvent when a
         // new event arrives, so a rapid Impression -> Click silently dropped the impression.
@@ -68,7 +72,7 @@ public actual fun BannerAdView(placement: AdPlacement, modifier: Modifier, width
         // This is NOT the per-view event duplication finding (P1-8) — that needs an
         // ad-instance identifier on the event model and is owned by sub-project G. This is a
         // local misuse of collectLatest in this composable.
-        controller.events.collect(onEvent)
+        controller.events.collect(currentOnEvent)
     }
 
     // The controller owns the loaded ad; the composable mirrors it into state so both

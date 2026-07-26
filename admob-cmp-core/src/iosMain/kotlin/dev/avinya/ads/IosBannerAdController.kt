@@ -206,17 +206,21 @@ internal class BannerDelegate(
     override fun bannerViewDidRecordClick(bannerView: GADBannerView) { onClicked() }
 }
 
+@InternalAdMobCmpApi
 public fun BannerAdController.currentIosBannerView(): GADBannerView? =
     (this as? IosBannerAdController)?.currentView()
 
+@InternalAdMobCmpApi
 public fun BannerAdController.attachIosBanner(): Unit {
     (this as? IosBannerAdController)?.attach()
 }
 
+@InternalAdMobCmpApi
 public fun BannerAdController.detachIosBanner(): Unit {
     (this as? IosBannerAdController)?.detach()
 }
 
+@InternalAdMobCmpApi
 public fun BannerAdController.registerIosBannerGeometry(
     geometry: BannerGeometry,
     sizePolicy: AdSizePolicy,

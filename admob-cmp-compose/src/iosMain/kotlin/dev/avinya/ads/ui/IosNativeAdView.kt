@@ -1,5 +1,7 @@
+@file:OptIn(InternalAdMobCmpApi::class)
 package dev.avinya.ads.ui
 
+import dev.avinya.ads.InternalAdMobCmpApi
 import GoogleMobileAds.GADNativeAdView
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -84,6 +86,8 @@ public actual fun NativeAdView(
         mutableDoubleStateOf(1.0)
     }
 
+    val currentOnEvent = rememberCurrentEventCallback(onEvent)
+
     LaunchedEffect(pool) {
         // collect, not collectLatest: collectLatest cancels the in-flight onEvent when a
         // new event arrives, so a rapid Impression -> Click silently dropped the impression.
@@ -106,7 +110,7 @@ public actual fun NativeAdView(
                 }
                 instanceId == null || instanceId == token?.tokenId
             }
-            .collect(onEvent)
+            .collect(currentOnEvent)
     }
 
     val availableAds by pool.availableAds.collectAsState()

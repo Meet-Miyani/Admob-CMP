@@ -6,6 +6,7 @@
 
 package dev.avinya.ads.nativead
 
+import dev.avinya.ads.InternalAdMobCmpApi
 import GoogleMobileAds.GADAdChoicesPosition
 import GoogleMobileAds.GADAdLoader
 import GoogleMobileAds.GADAdLoaderAdTypeNative
@@ -441,6 +442,7 @@ internal class NativeAdDelegate(
     override fun nativeAdDidDismissScreen(nativeAd: GADNativeAd) {}
 }
 
+@InternalAdMobCmpApi
 public fun NativeAdPool.peekIosNativeAd(token: NativeAdToken): GADNativeAd? =
     (this as? IosNativeAdPool)?.peek(token)
 
