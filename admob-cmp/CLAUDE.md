@@ -91,7 +91,7 @@ AGENTS.md, not this file.
     describe it as one.
 
 11. **ATT precedes the first iOS request.** UMP consent, then
-    `tracking.requestAuthorization()`, then `initialize()`. Requesting earlier permanently
+    `tracking.requestAuthorization()`, then `initialize(config, ConsentMode.InitializeOnlyIfAlreadyAllowed)`. Requesting earlier permanently
     forfeits the IDFA for those requests.
 
 12. **The public ABI is frozen as of sub-project O.** Every breaking change identified by

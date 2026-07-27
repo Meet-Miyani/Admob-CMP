@@ -28,7 +28,6 @@ scope.launch {
 scope.launch {
     when (val result = interstitial.show()) {
         is AdShowResult.Shown -> println("shown and dismissed")
-        is AdShowResult.Rewarded -> Unit // not produced by interstitials
         is AdShowResult.NotReady -> println("call load() first")
         is AdShowResult.Failed -> println("show failed: ${result.error}")
     }
@@ -37,32 +36,24 @@ scope.launch {
 
 ## Rewarded / rewarded interstitial
 
-The reward arrives in the `show()` result — no listener needed:
-
 ```kotlin
-val rewarded = remember(adManager) {
-    adManager.rewarded(
-        AdPlacement(
-            id = "rewarded_main",
-            format = AdFormat.Rewarded,
-            androidAdUnitId = TestAdIds.ANDROID_REWARDED,
-            iosAdUnitId = TestAdIds.IOS_REWARDED
-        )
-    )
-}
-
-scope.launch {
-    rewarded.load()
-    when (val result = rewarded.show()) {
-        is AdShowResult.Rewarded -> grantReward(result.reward.amountMicros, result.reward.type)
-        is AdShowResult.Shown -> println("dismissed before earning")
-        is AdShowResult.NotReady, is AdShowResult.Failed -> Unit
+val result = adManager.rewarded(rewardedPlacement).show(
+    onRewardEarned = { reward ->
+        grantClientRewardOnce(reward.amountMicros, reward.type)
     }
+)
+
+when (result) {
+    AdShowResult.Shown -> Unit
+    AdShowResult.NotReady -> showRetryUi()
+    is AdShowResult.Failed -> showAdError(result.error)
 }
 ```
 
-`AdEvent.RewardEarned` is also emitted on the event stream at the moment the
-reward is earned (before dismissal), if you prefer event-driven handling.
+- the callback may run after `show()` returns;
+- do not also grant from `AdEvent.RewardEarned`;
+- events are telemetry/observation;
+- use server-side verification as the authoritative path for valuable rewards.
 
 Server-side verification:
 

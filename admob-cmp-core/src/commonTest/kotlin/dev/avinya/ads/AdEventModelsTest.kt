@@ -97,7 +97,11 @@ class AdEventModelsTest {
     fun `AdShowResult subclasses work correctly`() {
         assertEquals(AdShowResult.Shown::class, AdShowResult.Shown::class)
         assertEquals(AdShowResult.NotReady::class, AdShowResult.NotReady::class)
-        assertEquals(AdShowResult.Rewarded(AdReward(10_000_000L, "coin"))::class, AdShowResult.Rewarded::class)
         assertEquals(AdShowResult.Failed(AdError.message("e"))::class, AdShowResult.Failed::class)
     }
+
+    private suspend fun showRewardedWithCallback(
+        controller: RewardedAdController,
+        rewards: MutableList<AdReward>
+    ): AdShowResult = controller.show(onRewardEarned = rewards::add)
 }

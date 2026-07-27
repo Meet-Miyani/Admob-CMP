@@ -97,6 +97,7 @@ internal class IosBannerAdController internal constructor(
 
     override suspend fun loadBanner(
         size: CValue<GADAdSize>,
+        sizePolicy: AdSizePolicy,
         requestOptions: AdRequestOptions,
         requiredGeneration: Long
     ): AdAttemptResult<IosLoadedBanner> = withContext(Dispatchers.Main.immediate) {
@@ -143,7 +144,7 @@ internal class IosBannerAdController internal constructor(
                             emit(AdEvent.Paid(placement.id, PaidEvent(placement.id, adValue, strongBanner.responseInfo?.toCommon())))
                         }
                     }
-                    banner.loadRequest(requestOptions.withCollapsible(placement.bannerSizePolicy).toGADRequest())
+                    banner.loadRequest(requestOptions.withCollapsible(sizePolicy).toGADRequest())
                 } else {
                     teardownBanner(banner)
                     continuation.resume(AdAttemptResult.Failure(AdError.message("Banner load was cleared.")))
@@ -205,17 +206,21 @@ internal class BannerDelegate(
     override fun bannerViewDidRecordClick(bannerView: GADBannerView) { onClicked() }
 }
 
+@InternalAdMobCmpApi
 public fun BannerAdController.currentIosBannerView(): GADBannerView? =
     (this as? IosBannerAdController)?.currentView()
 
+@InternalAdMobCmpApi
 public fun BannerAdController.attachIosBanner(): Unit {
     (this as? IosBannerAdController)?.attach()
 }
 
+@InternalAdMobCmpApi
 public fun BannerAdController.detachIosBanner(): Unit {
     (this as? IosBannerAdController)?.detach()
 }
 
+@InternalAdMobCmpApi
 public fun BannerAdController.registerIosBannerGeometry(
     geometry: BannerGeometry,
     sizePolicy: AdSizePolicy,

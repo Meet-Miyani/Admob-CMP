@@ -12,6 +12,8 @@ import GoogleMobileAds.GADMobileAds
 import dev.avinya.ads.internal.AdRequestAdmission
 import dev.avinya.ads.internal.FullScreenPresentationArbiter
 import dev.avinya.ads.internal.deriveAdmission
+import dev.avinya.ads.internal.ConsentSessionState
+import dev.avinya.ads.internal.ownedSnapshot
 import dev.avinya.ads.nativead.IosNativeAdPool
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -91,9 +93,11 @@ internal class IosGoogleAdManager : AdManager, FullScreenPresenceAware {
 
     override val status: StateFlow<AdManagerStatus> = _status
     override val events: SharedFlow<AdEvent> = _events
-    override val consent: ConsentController = IosConsentController { config ->
-        initialize(config, ConsentMode.SkipConsent)
-    }
+    private val consentSession = ConsentSessionState()
+    override val consent: ConsentController = IosConsentController(resume@{ config ->
+        val mode = consentSession.modeForPrivacyOptionsResume() ?: return@resume
+        initialize(config, mode)
+    })
     private val iosDiagnostics = IosAdDiagnostics()
     override val diagnostics: AdDiagnostics = iosDiagnostics
     override val tracking: AdTrackingController = IosTrackingController
@@ -140,8 +144,6 @@ internal class IosGoogleAdManager : AdManager, FullScreenPresenceAware {
     // Live admission state — see the Android twin. Replaces the sticky
     // consentGateSatisfied latch so revocation immediately closes the gate.
     private val _admission = MutableStateFlow(AdRequestAdmission.NotGathered)
-    private var activeConsentMode: ConsentMode? = null
-    private var consentGathered = false
 
     // iOS nativeInitializationScope is already Dispatchers.Main; this scope is kept
     // separate anyway so the collector's lifetime is independent of initialization.
@@ -150,8 +152,7 @@ internal class IosGoogleAdManager : AdManager, FullScreenPresenceAware {
     init {
         admissionScope.launch {
             consent.canRequestAds.collectLatest { canRequest ->
-                val mode = activeConsentMode ?: return@collectLatest
-                val next = deriveAdmission(mode, canRequest, consentGathered)
+                val next = consentSession.admission(canRequest)
                 val previous = _admission.value
                 if (previous == next) return@collectLatest
                 _admission.value = next
@@ -163,7 +164,6 @@ internal class IosGoogleAdManager : AdManager, FullScreenPresenceAware {
         }
     }
 
-    private var initialized = false
     private var appliedConfigIdentity: AdInitializationConfigIdentity? = null
     private var appliedTerminalStatus: AdManagerStatus? = null
 
@@ -171,7 +171,8 @@ internal class IosGoogleAdManager : AdManager, FullScreenPresenceAware {
         config: AdConfig,
         consentMode: ConsentMode
     ): AdManagerStatus {
-        val requestedIdentity = config.initializationIdentity(config.iosAppId)
+        val ownedConfig = config.ownedSnapshot()
+        val requestedIdentity = ownedConfig.initializationIdentity(ownedConfig.iosAppId)
         while (true) {
             var leadsAttempt = false
             var nativeCompletion: Deferred<NativeInitializationResult>? = null
@@ -201,7 +202,7 @@ internal class IosGoogleAdManager : AdManager, FullScreenPresenceAware {
             }
             val admittedAttempt = checkNotNull(attempt)
             if (leadsAttempt) {
-                return runInitializationAttempt(admittedAttempt, config, consentMode)
+                return runInitializationAttempt(admittedAttempt, ownedConfig, consentMode)
             }
 
             val equivalentAttempt =
@@ -227,7 +228,7 @@ internal class IosGoogleAdManager : AdManager, FullScreenPresenceAware {
         config: AdConfig,
         consentMode: ConsentMode
     ): AdManagerStatus {
-        AdLogger.i("iOS initialize requested. consentMode=$consentMode initialized=$initialized")
+        AdLogger.i("iOS initialize requested. consentMode=$consentMode")
         config.testModeWarningOrNull()?.let(AdLogger::w)
         val previousStatus = _status.value
         _status.value = AdManagerStatus.Initializing
@@ -251,22 +252,20 @@ internal class IosGoogleAdManager : AdManager, FullScreenPresenceAware {
             // rely on cached state. Once this manager reaches Ready, equivalent calls
             // are handled above and must not regress status or rerun consent, hooks,
             // or the process-wide GMA singleton.
-            val canRequest = when (consentMode) {
-                ConsentMode.GatherBeforeInitialize -> {
-                    consent.gatherConsent(config)
-                    consent.canRequestAds.value
-                }
-                ConsentMode.InitializeOnlyIfAlreadyAllowed -> {
-                    consent.requestConsentInfoUpdate(config)
-                    consent.canRequestAds.value
-                }
-                ConsentMode.SkipConsent -> true
+            when (consentMode) {
+                ConsentMode.GatherBeforeInitialize -> consent.gatherConsent(config)
+                ConsentMode.InitializeOnlyIfAlreadyAllowed -> consent.requestConsentInfoUpdate(config)
+                ConsentMode.SkipConsent -> Unit
             }
-            activeConsentMode = consentMode
-            consentGathered = true
-            _admission.value = deriveAdmission(consentMode, canRequest, consentGathered = true)
-            AdLogger.i("iOS consent gate complete. canRequestAds=$canRequest mode=$consentMode")
-            if (!canRequest) {
+            val effectiveCanRequest = withContext(Dispatchers.Main.immediate) {
+                consentSession.recordCompletedGate(consentMode)
+                val current = if (consentMode == ConsentMode.SkipConsent) true else consent.canRequestAds.value
+                val newAdmission = consentSession.admission(current)
+                _admission.value = newAdmission
+                current
+            }
+            AdLogger.i("iOS consent gate complete. canRequestAds=$effectiveCanRequest mode=$consentMode")
+            if (!effectiveCanRequest) {
                 AdLogger.w("iOS initialize deferred because consent does not allow ad requests yet.")
                 val result = AdManagerStatus.ConsentRequired.also { _status.value = it }
                 completeAttempt(attempt, result)
@@ -440,7 +439,6 @@ internal class IosGoogleAdManager : AdManager, FullScreenPresenceAware {
         }
 
     private fun publishAppliedTerminalLocked(terminal: AdManagerStatus): AdManagerStatus {
-        initialized = terminal == AdManagerStatus.Ready
         _status.value = terminal
         return terminal
     }
@@ -475,7 +473,7 @@ internal class IosGoogleAdManager : AdManager, FullScreenPresenceAware {
 
     private fun adRequestBlockedError(): AdError? = when {
         !_admission.value.permitsRequests -> AdError.consentRequired()
-        !initialized || _status.value != AdManagerStatus.Ready -> AdError.sdkNotReady()
+        _status.value != AdManagerStatus.Ready -> AdError.sdkNotReady()
         else -> null
     }
 
@@ -504,63 +502,69 @@ internal class IosGoogleAdManager : AdManager, FullScreenPresenceAware {
     }
 
     override fun banner(placement: AdPlacement): BannerAdController = registry {
-        require(placement.format == AdFormat.Banner) {
-            "AdPlacement '${placement.id}' has format ${placement.format} but was passed to a Banner factory. " +
+        val ownedPlacement = placement.ownedSnapshot()
+        require(ownedPlacement.format == AdFormat.Banner) {
+            "AdPlacement '${ownedPlacement.id}' has format ${ownedPlacement.format} but was passed to a Banner factory. " +
                 "The factory function and placement.format must agree."
         }
-        checkPlacementCollision(placement)
-        banners.getOrPut(placement.id) {
-            AdLogger.d("iOS banner controller created. placement=${placement.id}")
-            IosBannerAdController(placement, _events, ::adRequestBlockedError)
+        checkPlacementCollision(ownedPlacement)
+        banners.getOrPut(ownedPlacement.id) {
+            AdLogger.d("iOS banner controller created. placement=${ownedPlacement.id}")
+            IosBannerAdController(ownedPlacement, _events, ::adRequestBlockedError)
         }
     }
 
     override fun nativeAd(placement: AdPlacement): NativeAdPool = registry {
-        require(placement.format == AdFormat.Native) {
-            "AdPlacement '${placement.id}' has format ${placement.format} but was passed to a Native factory. " +
+        val ownedPlacement = placement.ownedSnapshot()
+        require(ownedPlacement.format == AdFormat.Native) {
+            "AdPlacement '${ownedPlacement.id}' has format ${ownedPlacement.format} but was passed to a Native factory. " +
                 "The factory function and placement.format must agree."
         }
-        checkPlacementCollision(placement)
-        nativePools.getOrPut(placement.id) {
-            AdLogger.d("iOS native pool created. placement=${placement.id} iosAdUnit=${placement.iosAdUnitId} maxCache=${placement.cachePolicy.maxSize}")
-            IosNativeAdPool(placement, _events, ::adRequestBlockedError)
+        checkPlacementCollision(ownedPlacement)
+        nativePools.getOrPut(ownedPlacement.id) {
+            AdLogger.d("iOS native pool created. placement=${ownedPlacement.id} iosAdUnit=${ownedPlacement.iosAdUnitId} maxCache=${ownedPlacement.cachePolicy.maxSize}")
+            IosNativeAdPool(ownedPlacement, _events, ::adRequestBlockedError)
         }
     }
 
     override fun interstitial(placement: AdPlacement): InterstitialAdController = registry {
-        require(placement.format == AdFormat.Interstitial) {
-            "AdPlacement '${placement.id}' has format ${placement.format} but was passed to an Interstitial factory. " +
+        val ownedPlacement = placement.ownedSnapshot()
+        require(ownedPlacement.format == AdFormat.Interstitial) {
+            "AdPlacement '${ownedPlacement.id}' has format ${ownedPlacement.format} but was passed to an Interstitial factory. " +
                 "The factory function and placement.format must agree."
         }
-        checkPlacementCollision(placement)
-        slots.getOrPut(AdSlotKey(placement.id, placement.format)) { IosInterstitialSlot(placement, _events, ::adRequestBlockedError, ::onPresentationChanged, fullScreenArbiter) } as InterstitialAdController
+        checkPlacementCollision(ownedPlacement)
+        slots.getOrPut(AdSlotKey(ownedPlacement.id, ownedPlacement.format)) { IosInterstitialSlot(ownedPlacement, _events, ::adRequestBlockedError, ::onPresentationChanged, fullScreenArbiter) } as InterstitialAdController
     }
 
     override fun rewarded(placement: AdPlacement): RewardedAdController = registry {
-        require(placement.format == AdFormat.Rewarded) {
-            "AdPlacement '${placement.id}' has format ${placement.format} but was passed to a Rewarded factory. " +
+        val ownedPlacement = placement.ownedSnapshot()
+        require(ownedPlacement.format == AdFormat.Rewarded) {
+            "AdPlacement '${ownedPlacement.id}' has format ${ownedPlacement.format} but was passed to a Rewarded factory. " +
                 "The factory function and placement.format must agree."
         }
-        checkPlacementCollision(placement)
-        slots.getOrPut(AdSlotKey(placement.id, placement.format)) { IosRewardedSlot(placement, _events, ::adRequestBlockedError, ::onPresentationChanged, fullScreenArbiter) } as RewardedAdController
+        checkPlacementCollision(ownedPlacement)
+        slots.getOrPut(AdSlotKey(ownedPlacement.id, ownedPlacement.format)) { IosRewardedSlot(ownedPlacement, _events, ::adRequestBlockedError, ::onPresentationChanged, fullScreenArbiter) } as RewardedAdController
     }
 
     override fun rewardedInterstitial(placement: AdPlacement): RewardedInterstitialAdController = registry {
-        require(placement.format == AdFormat.RewardedInterstitial) {
-            "AdPlacement '${placement.id}' has format ${placement.format} but was passed to a RewardedInterstitial factory. " +
+        val ownedPlacement = placement.ownedSnapshot()
+        require(ownedPlacement.format == AdFormat.RewardedInterstitial) {
+            "AdPlacement '${ownedPlacement.id}' has format ${ownedPlacement.format} but was passed to a RewardedInterstitial factory. " +
                 "The factory function and placement.format must agree."
         }
-        checkPlacementCollision(placement)
-        slots.getOrPut(AdSlotKey(placement.id, placement.format)) { IosRewardedInterstitialSlot(placement, _events, ::adRequestBlockedError, ::onPresentationChanged, fullScreenArbiter) } as RewardedInterstitialAdController
+        checkPlacementCollision(ownedPlacement)
+        slots.getOrPut(AdSlotKey(ownedPlacement.id, ownedPlacement.format)) { IosRewardedInterstitialSlot(ownedPlacement, _events, ::adRequestBlockedError, ::onPresentationChanged, fullScreenArbiter) } as RewardedInterstitialAdController
     }
 
     override fun appOpen(placement: AdPlacement): AppOpenAdController = registry {
-        require(placement.format == AdFormat.AppOpen) {
-            "AdPlacement '${placement.id}' has format ${placement.format} but was passed to an AppOpen factory. " +
+        val ownedPlacement = placement.ownedSnapshot()
+        require(ownedPlacement.format == AdFormat.AppOpen) {
+            "AdPlacement '${ownedPlacement.id}' has format ${ownedPlacement.format} but was passed to an AppOpen factory. " +
                 "The factory function and placement.format must agree."
         }
-        checkPlacementCollision(placement)
-        slots.getOrPut(AdSlotKey(placement.id, placement.format)) { IosAppOpenSlot(placement, _events, ::adRequestBlockedError, ::onPresentationChanged, fullScreenArbiter) } as AppOpenAdController
+        checkPlacementCollision(ownedPlacement)
+        slots.getOrPut(AdSlotKey(ownedPlacement.id, ownedPlacement.format)) { IosAppOpenSlot(ownedPlacement, _events, ::adRequestBlockedError, ::onPresentationChanged, fullScreenArbiter) } as AppOpenAdController
     }
 }
 

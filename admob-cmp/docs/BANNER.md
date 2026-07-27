@@ -78,12 +78,12 @@ AdPlacement(
 | Policy | Behavior |
 |---|---|
 | `AdServerManaged` (default) | No client timer; configure refresh in the AdMob UI |
-| `SdkManaged(interval)` | Client-side reload every `interval` (30s–120s enforced), only while the app is foregrounded/STARTED; skips a cycle if a load is in flight |
-| `Manual` | No automatic load at all — call `adManager.banner(placement).refresh()` yourself. `refresh()` reuses the size the composable measured (so compose `BannerAdView` at least once); without a prior composition it falls back to the screen width. |
+| `SdkManaged(interval)` | Client-side reload every `interval` (30s–120s enforced), only while the app is foregrounded/STARTED; waits for an in-flight load to settle |
+| `Manual` | No automatic load at all — call `adManager.banner(placement).refresh()` yourself. `refresh()` reuses the size the composable measured (so compose `BannerAdView` at least once). |
 
 ## Headless use
 
 You can drive banners without the composable via
-`adManager.banner(placement)` (`load(sizePolicy, requestOptions)`, `refresh()`,
+`adManager.banner(placement)` (`load(geometry, sizePolicy, requestOptions)`, `refresh()`,
 `loadState`, `events`, `clear()`), but you are then responsible for hosting the
-platform view.
+platform view. A null geometry uses best-effort activity/key-window width and fails when no width is resolvable.

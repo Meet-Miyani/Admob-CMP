@@ -156,6 +156,12 @@ public data class AdRequestOptions(
     val skipUninitializedAdapters: Boolean = false
 )
 
+private fun requireFinitePositive(name: String, value: Duration) {
+    require(value.isFinite() && value.isPositive()) {
+        "$name must be finite and positive, was $value"
+    }
+}
+
 /**
  * Caching policy for ad formats that support multiple cached ads (native,
  * full-screen). Cache is FIFO; ads are evicted when [maxSize] is exceeded
@@ -168,7 +174,11 @@ public data class AdCachePolicy(
     val expirationPolicy: AdExpirationPolicy = AdExpirationPolicy(),
     /** If true, preload a new ad after the current one is shown. */
     val reloadAfterShow: Boolean = false
-)
+) {
+    init {
+        require(maxSize >= 1) { "AdCachePolicy.maxSize must be at least 1." }
+    }
+}
 
 /**
  * Time-to-live policy for cached ads. Defaults: full-screen 1 hour,
@@ -181,7 +191,13 @@ public data class AdExpirationPolicy(
     val appOpenTtl: Duration = 4.hours,
     /** TTL for cached native ads. Default 1h. */
     val nativeTtl: Duration = 1.hours
-)
+) {
+    init {
+        requireFinitePositive("AdExpirationPolicy.fullScreenTtl", fullScreenTtl)
+        requireFinitePositive("AdExpirationPolicy.appOpenTtl", appOpenTtl)
+        requireFinitePositive("AdExpirationPolicy.nativeTtl", nativeTtl)
+    }
+}
 
 /**
  * Capped exponential-backoff retry policy for ad load failures. Only
@@ -199,7 +215,15 @@ public data class AdRetryPolicy(
     val backoffMultiplier: Double = 2.0
 ) {
     init {
-        require(maxAttempts >= 1) { "maxAttempts must be at least 1." }
+        require(maxAttempts >= 1) { "AdRetryPolicy.maxAttempts must be at least 1." }
+        requireFinitePositive("AdRetryPolicy.initialDelay", initialDelay)
+        requireFinitePositive("AdRetryPolicy.maxDelay", maxDelay)
+        require(maxDelay >= initialDelay) {
+            "AdRetryPolicy.maxDelay must be greater than or equal to initialDelay."
+        }
+        require(backoffMultiplier.isFinite() && backoffMultiplier >= 1.0) {
+            "AdRetryPolicy.backoffMultiplier must be finite and at least 1.0."
+        }
     }
 }
 
@@ -211,9 +235,19 @@ public sealed interface AdSizePolicy {
     /** Larger anchored adaptive banner (up to 120dp). */
     public data class LargeAnchoredAdaptive(val collapsible: CollapsiblePlacement? = null) : AdSizePolicy
     /** Inline adaptive banner with an optional maximum height. */
-    public data class InlineAdaptive(val maxHeightDp: Int? = null) : AdSizePolicy
+    public data class InlineAdaptive(val maxHeightDp: Int? = null) : AdSizePolicy {
+        init {
+            if (maxHeightDp != null) {
+                require(maxHeightDp > 0) { "InlineAdaptive maxHeightDp must be positive if specified." }
+            }
+        }
+    }
     /** Fixed-size banner with explicit width and height in dp. */
-    public data class Fixed(val widthDp: Int, val heightDp: Int) : AdSizePolicy
+    public data class Fixed(val widthDp: Int, val heightDp: Int) : AdSizePolicy {
+        init {
+            require(widthDp > 0 && heightDp > 0) { "Fixed widthDp and heightDp must be positive." }
+        }
+    }
     /** Fluid banner that fills available width with no fixed height. */
     public data object Fluid : AdSizePolicy
 }

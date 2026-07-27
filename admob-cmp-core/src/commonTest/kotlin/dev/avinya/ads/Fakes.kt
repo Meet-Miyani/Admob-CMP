@@ -3,6 +3,7 @@ package dev.avinya.ads
 import dev.avinya.ads.internal.FullScreenPresentationArbiter
 import dev.avinya.ads.internal.FullScreenPresentationHandle
 import dev.avinya.ads.internal.FullScreenSlotCore
+import dev.avinya.ads.internal.RewardDelivery
 import dev.avinya.ads.nativead.NativeAdOptions
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -25,7 +26,7 @@ internal open class FakeFullScreenSlot(
     private val scriptedLoads: MutableList<AdAttemptResult<String>> = mutableListOf(),
     private val scriptedShows: MutableList<AdShowResult> = mutableListOf(),
     private val onPresentationChanged: (Int) -> Unit = {},
-    private val presentHandler: (suspend (String, FullScreenAdOptions) -> AdShowResult)? = null,
+    private val presentHandler: (suspend (String, FullScreenAdOptions, RewardDelivery?) -> AdShowResult)? = null,
     // Lets a test suspend mid-load (e.g. to clear() while loadAd is in flight) instead of
     // returning synchronously from the scripted queue.
     private val loadHandler: (suspend (AdRequestOptions) -> AdAttemptResult<String>)? = null,
@@ -60,6 +61,7 @@ internal open class FakeFullScreenSlot(
     val destroyedAds = mutableListOf<String>()
     val loadCalls = mutableListOf<AdRequestOptions>()
     var presentCallCount = 0
+    var rewardDelivery: RewardDelivery? = null
 
     fun enqueueLoadResult(result: AdAttemptResult<String>) {
         scriptedLoads.add(result)
@@ -79,8 +81,10 @@ internal open class FakeFullScreenSlot(
     override suspend fun presentAd(
         loaded: String,
         options: FullScreenAdOptions,
-        presentation: FullScreenPresentationHandle
+        presentation: FullScreenPresentationHandle,
+        rewardDelivery: RewardDelivery?
     ): AdShowResult {
+        this.rewardDelivery = rewardDelivery
         presentedAds.add(loaded)
         presentCallCount++
         if (stallBeforeHandOff) suspendForeverUntilCancelled()
@@ -93,15 +97,25 @@ internal open class FakeFullScreenSlot(
             onPresentationHandOff.invoke(presentation)
             return suspendForeverUntilCancelled()
         }
-        val result = presentHandler?.invoke(loaded, options)
+        val result = presentHandler?.invoke(loaded, options, rewardDelivery)
             ?: scriptedShows.removeFirstOrNull()
             ?: AdShowResult.Shown
-        presentation.close(result is AdShowResult.Shown || result is AdShowResult.Rewarded)
+        presentation.close(result is AdShowResult.Shown)
         return result
     }
 
+    suspend fun showRewardedForTest(
+        options: FullScreenAdOptions,
+        onRewardEarned: (AdReward) -> Unit
+    ): AdShowResult = super.showRewarded(options, onRewardEarned)
+
     override fun destroyAd(ad: String) {
         destroyedAds.add(ad)
+    }
+
+    override fun destroyAfterPresentation(wasShown: Boolean): Boolean = when (placement.format) {
+        AdFormat.Rewarded, AdFormat.RewardedInterstitial -> !wasShown
+        else -> true
     }
 
     override fun getResponseInfo(ad: String): AdResponseInfo? = null

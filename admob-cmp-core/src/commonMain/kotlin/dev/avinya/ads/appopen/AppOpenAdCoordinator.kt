@@ -227,7 +227,7 @@ public class AppOpenAdCoordinator internal constructor(
             // it, and it is not reentrant. See releaseProbeToken().
             showAdmissionLock.withLock { releaseProbeToken() }
             val result = controller.show()
-            if (result is AdShowResult.Shown || result is AdShowResult.Rewarded) {
+            if (result is AdShowResult.Shown) {
                 showAdmissionLock.withLock {
                     lastShowInstant = clock()
                 }

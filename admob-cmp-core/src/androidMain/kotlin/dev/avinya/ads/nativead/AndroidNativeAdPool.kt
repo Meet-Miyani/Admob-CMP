@@ -1,5 +1,6 @@
 package dev.avinya.ads.nativead
 
+import dev.avinya.ads.InternalAdMobCmpApi
 import dev.avinya.ads.AdAttemptResult
 import dev.avinya.ads.AdError
 import dev.avinya.ads.AdEvent
@@ -211,5 +212,6 @@ internal class AndroidNativeAdPool internal constructor(
     }
 }
 
+@InternalAdMobCmpApi
 public fun NativeAdPool.peekAndroidNativeAd(token: NativeAdToken): NativeAd? =
     (this as? AndroidNativeAdPool)?.peek(token)

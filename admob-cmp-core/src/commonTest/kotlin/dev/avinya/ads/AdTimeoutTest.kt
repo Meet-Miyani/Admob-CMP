@@ -3,6 +3,7 @@ package dev.avinya.ads
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 class AdTimeoutTest {
@@ -25,5 +26,15 @@ class AdTimeoutTest {
     @Test
     fun placementCarriesTheDefaultPolicy() {
         assertEquals(AdTimeoutPolicy(), testPlacement.timeoutPolicy)
+    }
+
+    @Test
+    fun `timeouts must be finite`() {
+        assertFailsWith<IllegalArgumentException> {
+            AdTimeoutPolicy(loadTimeout = Duration.INFINITE)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            AdTimeoutPolicy(presentationHandOffTimeout = Duration.INFINITE)
+        }
     }
 }

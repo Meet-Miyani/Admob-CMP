@@ -47,7 +47,6 @@ scope.launch {
     ad.load()                                  // suspend; AdLoadState back
     when (val r = ad.show()) {                 // suspends until dismissed
         is AdShowResult.Shown -> Unit
-        is AdShowResult.Rewarded -> grant(r.reward.amountMicros, r.reward.type)  // rewarded formats; wholeAmountOrNull() for the common integer case
         is AdShowResult.NotReady -> Unit       // load() first
         is AdShowResult.Failed -> log(r.error)
     }
@@ -224,7 +223,7 @@ Call order matters — UMP consent first, then ATT, then your first ad request:
 ```kotlin
 adManager.consent.gatherConsent(config)
 adManager.tracking.requestAuthorization()
-adManager.initialize(config)
+adManager.initialize(config, ConsentMode.InitializeOnlyIfAlreadyAllowed)
 ```
 
 Requesting ads before ATT resolves permanently forfeits the IDFA for those requests.

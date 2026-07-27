@@ -6,6 +6,7 @@ import android.os.Looper
 import dev.avinya.ads.internal.FullScreenPresentationArbiter
 import dev.avinya.ads.internal.FullScreenPresentationHandle
 import dev.avinya.ads.internal.FullScreenSlotCore
+import dev.avinya.ads.internal.RewardDelivery
 import com.google.android.libraries.ads.mobile.sdk.appopen.AppOpenAd
 import com.google.android.libraries.ads.mobile.sdk.appopen.AppOpenAdEventCallback
 import com.google.android.libraries.ads.mobile.sdk.common.Ad
@@ -62,7 +63,8 @@ internal class AndroidInterstitialSlot(
     override suspend fun presentAd(
         loaded: InterstitialAd,
         options: FullScreenAdOptions,
-        presentation: FullScreenPresentationHandle
+        presentation: FullScreenPresentationHandle,
+        rewardDelivery: RewardDelivery?
     ): AdShowResult = withContext(Dispatchers.Main.immediate) {
         val activity = activityProvider()
             ?: return@withContext AdShowResult.Failed(AdError.message("No current Android Activity."))
@@ -122,6 +124,13 @@ internal class AndroidRewardedSlot(
     arbiter = arbiter
 ), RewardedAdController {
 
+    override suspend fun show(
+        options: FullScreenAdOptions,
+        onRewardEarned: (AdReward) -> Unit
+    ): AdShowResult = showRewarded(options, onRewardEarned)
+
+    override fun destroyAfterPresentation(wasShown: Boolean): Boolean = !wasShown
+
     override suspend fun loadAd(requestOptions: AdRequestOptions): AdAttemptResult<RewardedAd> =
         withContext(Dispatchers.Main.immediate) {
             suspendCancellableCoroutine { continuation ->
@@ -140,10 +149,11 @@ internal class AndroidRewardedSlot(
     override suspend fun presentAd(
         loaded: RewardedAd,
         options: FullScreenAdOptions,
-        presentation: FullScreenPresentationHandle
+        presentation: FullScreenPresentationHandle,
+        rewardDelivery: RewardDelivery?
     ): AdShowResult {
         val activity = activityProvider() ?: return AdShowResult.Failed(AdError.message("No current Android Activity."))
-        return showRewarded(loaded, options, presentation) { ad, listener -> ad.show(activity, listener) }
+        return showRewarded(loaded, options, presentation, rewardDelivery) { ad, listener -> ad.show(activity, listener) }
     }
 
 
@@ -173,6 +183,13 @@ internal class AndroidRewardedInterstitialSlot(
     arbiter = arbiter
 ), RewardedInterstitialAdController {
 
+    override suspend fun show(
+        options: FullScreenAdOptions,
+        onRewardEarned: (AdReward) -> Unit
+    ): AdShowResult = showRewarded(options, onRewardEarned)
+
+    override fun destroyAfterPresentation(wasShown: Boolean): Boolean = !wasShown
+
     override suspend fun loadAd(requestOptions: AdRequestOptions): AdAttemptResult<RewardedInterstitialAd> =
         withContext(Dispatchers.Main.immediate) {
             suspendCancellableCoroutine { continuation ->
@@ -191,10 +208,11 @@ internal class AndroidRewardedInterstitialSlot(
     override suspend fun presentAd(
         loaded: RewardedInterstitialAd,
         options: FullScreenAdOptions,
-        presentation: FullScreenPresentationHandle
+        presentation: FullScreenPresentationHandle,
+        rewardDelivery: RewardDelivery?
     ): AdShowResult {
         val activity = activityProvider() ?: return AdShowResult.Failed(AdError.message("No current Android Activity."))
-        return showRewarded(loaded, options, presentation) { ad, listener -> ad.show(activity, listener) }
+        return showRewarded(loaded, options, presentation, rewardDelivery) { ad, listener -> ad.show(activity, listener) }
     }
 
 
@@ -245,7 +263,8 @@ internal class AndroidAppOpenSlot(
     override suspend fun presentAd(
         loaded: AppOpenAd,
         options: FullScreenAdOptions,
-        presentation: FullScreenPresentationHandle
+        presentation: FullScreenPresentationHandle,
+        rewardDelivery: RewardDelivery?
     ): AdShowResult = withContext(Dispatchers.Main.immediate) {
         val activity = activityProvider()
             ?: return@withContext AdShowResult.Failed(AdError.message("No current Android Activity."))
@@ -293,12 +312,12 @@ private suspend fun <T : Ad> FullScreenSlotCore<T>.showRewarded(
     loaded: T,
     options: FullScreenAdOptions,
     presentation: FullScreenPresentationHandle,
+    rewardDelivery: RewardDelivery?,
     show: (T, OnUserEarnedRewardListener) -> Unit
 ): AdShowResult = withContext(Dispatchers.Main.immediate) {
     suspendCancellableCoroutine<AdShowResult> { continuation ->
         continuation.invokeOnCancellation { presentation.closeIfCoreOwned() }
         if (!continuation.isActive) return@suspendCancellableCoroutine
-        var reward: AdReward? = null
         val callback = object : RewardedAdEventCallback {
             override fun onAdShowedFullScreenContent() = emit(AdEvent.OpenedFullScreen(placement.id))
             override fun onAdImpression() = emit(AdEvent.Impression(placement.id))
@@ -310,7 +329,7 @@ private suspend fun <T : Ad> FullScreenSlotCore<T>.showRewarded(
                 if (presentation.close(wasShown = true)) {
                     emit(AdEvent.ClosedFullScreen(placement.id))
                     if (continuation.isActive) {
-                        continuation.resume(reward?.let(AdShowResult::Rewarded) ?: AdShowResult.Shown)
+                        continuation.resume(AdShowResult.Shown)
                     }
                 }
             }
@@ -354,8 +373,8 @@ private suspend fun <T : Ad> FullScreenSlotCore<T>.showRewarded(
                 override fun onUserEarnedReward(rewardItem: RewardItem) {
                     // GMA's Android RewardItem.amount is a plain Int (no fractional rewards on
                     // this platform), so the micros conversion is exact.
-                    reward = AdReward(rewardItem.amount.toLong() * 1_000_000L, rewardItem.type)
-                    emit(AdEvent.RewardEarned(placement.id, reward))
+                    val reward = AdReward(rewardItem.amount.toLong() * 1_000_000L, rewardItem.type)
+                    rewardDelivery?.deliver(reward)
                 }
             })
         }

@@ -12,6 +12,7 @@ import GoogleMobileAds.GADResponseInfo
 import dev.avinya.ads.internal.FullScreenPresentationArbiter
 import dev.avinya.ads.internal.FullScreenPresentationHandle
 import dev.avinya.ads.internal.FullScreenSlotCore
+import dev.avinya.ads.internal.RewardDelivery
 import kotlin.coroutines.resume
 import kotlin.time.Duration
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -68,7 +69,8 @@ internal class IosInterstitialSlot(
     override suspend fun presentAd(
         loaded: GADInterstitialAd,
         options: FullScreenAdOptions,
-        presentation: FullScreenPresentationHandle
+        presentation: FullScreenPresentationHandle,
+        rewardDelivery: RewardDelivery?
     ): AdShowResult = withContext(Dispatchers.Main.immediate) {
         val rootVC = topViewController()
             ?: return@withContext AdShowResult.Failed(AdError.message("No root view controller."))
@@ -80,15 +82,19 @@ internal class IosInterstitialSlot(
             val delegate = FullScreenDelegate(
                 onOpened = { emit(AdEvent.OpenedFullScreen(placement.id)) },
                 onClosed = {
-                    if (presentation.close(wasShown = true)) {
-                        emit(AdEvent.ClosedFullScreen(placement.id))
-                        if (continuation.isActive) continuation.resume(AdShowResult.Shown)
+                    delegates.terminal(loaded) {
+                        if (presentation.close(wasShown = true)) {
+                            emit(AdEvent.ClosedFullScreen(placement.id))
+                            if (continuation.isActive) continuation.resume(AdShowResult.Shown)
+                        }
                     }
                 },
                 onFailedToShow = { error ->
-                    if (presentation.close(wasShown = false)) {
-                        emit(AdEvent.ShowFailed(placement.id, error))
-                        if (continuation.isActive) continuation.resume(AdShowResult.Failed(error))
+                    delegates.terminal(loaded) {
+                        if (presentation.close(wasShown = false)) {
+                            emit(AdEvent.ShowFailed(placement.id, error))
+                            if (continuation.isActive) continuation.resume(AdShowResult.Failed(error))
+                        }
                     }
                 },
                 onImpression = { emit(AdEvent.Impression(placement.id)) },
@@ -130,6 +136,13 @@ internal class IosRewardedSlot(
 ), RewardedAdController {
     private val delegates = FullScreenDelegateStore<GADRewardedAd>()
 
+    override suspend fun show(
+        options: FullScreenAdOptions,
+        onRewardEarned: (AdReward) -> Unit
+    ): AdShowResult = showRewarded(options, onRewardEarned)
+
+    override fun destroyAfterPresentation(wasShown: Boolean): Boolean = !wasShown
+
     override suspend fun loadAd(requestOptions: AdRequestOptions): AdAttemptResult<GADRewardedAd> =
         withContext(Dispatchers.Main.immediate) {
             suspendCancellableCoroutine { continuation ->
@@ -159,7 +172,8 @@ internal class IosRewardedSlot(
     override suspend fun presentAd(
         loaded: GADRewardedAd,
         options: FullScreenAdOptions,
-        presentation: FullScreenPresentationHandle
+        presentation: FullScreenPresentationHandle,
+        rewardDelivery: RewardDelivery?
     ): AdShowResult = withContext(Dispatchers.Main.immediate) {
         val rootVC = topViewController()
             ?: return@withContext AdShowResult.Failed(AdError.message("No root view controller."))
@@ -169,21 +183,22 @@ internal class IosRewardedSlot(
             // wins, this delegate stays retained until the SDK terminal callback closes it.
             continuation.invokeOnCancellation { presentation.closeIfCoreOwned() }
             if (!continuation.isActive) return@suspendCancellableCoroutine
-            var reward: AdReward? = null
             val delegate = FullScreenDelegate(
                 onOpened = { emit(AdEvent.OpenedFullScreen(placement.id)) },
                 onClosed = {
-                    if (presentation.close(wasShown = true)) {
-                        emit(AdEvent.ClosedFullScreen(placement.id))
-                        if (continuation.isActive) {
-                            continuation.resume(reward?.let(AdShowResult::Rewarded) ?: AdShowResult.Shown)
+                    delegates.terminal(loaded) {
+                        if (presentation.close(wasShown = true)) {
+                            emit(AdEvent.ClosedFullScreen(placement.id))
+                            if (continuation.isActive) continuation.resume(AdShowResult.Shown)
                         }
                     }
                 },
                 onFailedToShow = { error ->
-                    if (presentation.close(wasShown = false)) {
-                        emit(AdEvent.ShowFailed(placement.id, error))
-                        if (continuation.isActive) continuation.resume(AdShowResult.Failed(error))
+                    delegates.terminal(loaded) {
+                        if (presentation.close(wasShown = false)) {
+                            emit(AdEvent.ShowFailed(placement.id, error))
+                            if (continuation.isActive) continuation.resume(AdShowResult.Failed(error))
+                        }
                     }
                 },
                 onImpression = { emit(AdEvent.Impression(placement.id)) },
@@ -203,8 +218,7 @@ internal class IosRewardedSlot(
                         // the exact-decimal pattern for paid values; reuse it here so a mediated
                         // 0.5/2.5 reward is preserved exactly rather than rounded to 1/3).
                         val earned = AdReward(adReward.amount.toValueMicros(), adReward.type)
-                        reward = earned
-                        emit(AdEvent.RewardEarned(placement.id, earned))
+                        rewardDelivery?.deliver(earned)
                     }
                 }
             }
@@ -235,6 +249,13 @@ internal class IosRewardedInterstitialSlot(
 ), RewardedInterstitialAdController {
     private val delegates = FullScreenDelegateStore<GADRewardedInterstitialAd>()
 
+    override suspend fun show(
+        options: FullScreenAdOptions,
+        onRewardEarned: (AdReward) -> Unit
+    ): AdShowResult = showRewarded(options, onRewardEarned)
+
+    override fun destroyAfterPresentation(wasShown: Boolean): Boolean = !wasShown
+
     override suspend fun loadAd(requestOptions: AdRequestOptions): AdAttemptResult<GADRewardedInterstitialAd> =
         withContext(Dispatchers.Main.immediate) {
             suspendCancellableCoroutine { continuation ->
@@ -264,7 +285,8 @@ internal class IosRewardedInterstitialSlot(
     override suspend fun presentAd(
         loaded: GADRewardedInterstitialAd,
         options: FullScreenAdOptions,
-        presentation: FullScreenPresentationHandle
+        presentation: FullScreenPresentationHandle,
+        rewardDelivery: RewardDelivery?
     ): AdShowResult = withContext(Dispatchers.Main.immediate) {
         val rootVC = topViewController()
             ?: return@withContext AdShowResult.Failed(AdError.message("No root view controller."))
@@ -274,21 +296,22 @@ internal class IosRewardedInterstitialSlot(
             // wins, this delegate stays retained until the SDK terminal callback closes it.
             continuation.invokeOnCancellation { presentation.closeIfCoreOwned() }
             if (!continuation.isActive) return@suspendCancellableCoroutine
-            var reward: AdReward? = null
             val delegate = FullScreenDelegate(
                 onOpened = { emit(AdEvent.OpenedFullScreen(placement.id)) },
                 onClosed = {
-                    if (presentation.close(wasShown = true)) {
-                        emit(AdEvent.ClosedFullScreen(placement.id))
-                        if (continuation.isActive) {
-                            continuation.resume(reward?.let(AdShowResult::Rewarded) ?: AdShowResult.Shown)
+                    delegates.terminal(loaded) {
+                        if (presentation.close(wasShown = true)) {
+                            emit(AdEvent.ClosedFullScreen(placement.id))
+                            if (continuation.isActive) continuation.resume(AdShowResult.Shown)
                         }
                     }
                 },
                 onFailedToShow = { error ->
-                    if (presentation.close(wasShown = false)) {
-                        emit(AdEvent.ShowFailed(placement.id, error))
-                        if (continuation.isActive) continuation.resume(AdShowResult.Failed(error))
+                    delegates.terminal(loaded) {
+                        if (presentation.close(wasShown = false)) {
+                            emit(AdEvent.ShowFailed(placement.id, error))
+                            if (continuation.isActive) continuation.resume(AdShowResult.Failed(error))
+                        }
                     }
                 },
                 onImpression = { emit(AdEvent.Impression(placement.id)) },
@@ -308,8 +331,7 @@ internal class IosRewardedInterstitialSlot(
                         // the exact-decimal pattern for paid values; reuse it here so a mediated
                         // 0.5/2.5 reward is preserved exactly rather than rounded to 1/3).
                         val earned = AdReward(adReward.amount.toValueMicros(), adReward.type)
-                        reward = earned
-                        emit(AdEvent.RewardEarned(placement.id, earned))
+                        rewardDelivery?.deliver(earned)
                     }
                 }
             }
@@ -371,7 +393,8 @@ internal class IosAppOpenSlot(
     override suspend fun presentAd(
         loaded: GADAppOpenAd,
         options: FullScreenAdOptions,
-        presentation: FullScreenPresentationHandle
+        presentation: FullScreenPresentationHandle,
+        rewardDelivery: RewardDelivery?
     ): AdShowResult = withContext(Dispatchers.Main.immediate) {
         val rootVC = topViewController()
             ?: return@withContext AdShowResult.Failed(AdError.message("No root view controller."))
@@ -383,15 +406,19 @@ internal class IosAppOpenSlot(
             val delegate = FullScreenDelegate(
                 onOpened = { emit(AdEvent.OpenedFullScreen(placement.id)) },
                 onClosed = {
-                    if (presentation.close(wasShown = true)) {
-                        emit(AdEvent.ClosedFullScreen(placement.id))
-                        if (continuation.isActive) continuation.resume(AdShowResult.Shown)
+                    delegates.terminal(loaded) {
+                        if (presentation.close(wasShown = true)) {
+                            emit(AdEvent.ClosedFullScreen(placement.id))
+                            if (continuation.isActive) continuation.resume(AdShowResult.Shown)
+                        }
                     }
                 },
                 onFailedToShow = { error ->
-                    if (presentation.close(wasShown = false)) {
-                        emit(AdEvent.ShowFailed(placement.id, error))
-                        if (continuation.isActive) continuation.resume(AdShowResult.Failed(error))
+                    delegates.terminal(loaded) {
+                        if (presentation.close(wasShown = false)) {
+                            emit(AdEvent.ShowFailed(placement.id, error))
+                            if (continuation.isActive) continuation.resume(AdShowResult.Failed(error))
+                        }
                     }
                 },
                 onImpression = { emit(AdEvent.Impression(placement.id)) },
@@ -447,7 +474,7 @@ internal class FullScreenDelegate(
 }
 
 /** GMA full-screen delegates are weak; retain each delegate with the exact ad it belongs to. */
-private class FullScreenDelegateStore<AdT : Any> {
+internal class FullScreenDelegateStore<AdT : Any> {
     private val lock = NSRecursiveLock()
     private val entries = mutableListOf<Entry<AdT>>()
 
@@ -458,6 +485,18 @@ private class FullScreenDelegateStore<AdT : Any> {
 
     fun release(ad: AdT) = locked {
         entries.removeAll { it.ad === ad }
+    }
+
+    internal fun contains(ad: AdT): Boolean = locked {
+        entries.any { it.ad === ad }
+    }
+
+    internal fun terminal(ad: AdT, block: () -> Unit) {
+        try {
+            block()
+        } finally {
+            release(ad)
+        }
     }
 
     private inline fun <T> locked(block: () -> T): T {

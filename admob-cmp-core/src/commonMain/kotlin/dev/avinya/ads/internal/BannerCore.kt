@@ -62,6 +62,7 @@ internal interface BannerPlatform<V : Any, S : Any> {
      */
     suspend fun loadBanner(
         size: S,
+        sizePolicy: AdSizePolicy,
         requestOptions: AdRequestOptions,
         requiredGeneration: Long
     ): AdAttemptResult<V>
@@ -146,7 +147,7 @@ internal class BannerCore<V : Any, S : Any>(
         val resolved = ResolvedBannerRequest(
             size = platform.resolveSize(sizePolicy, widthDp),
             sizePolicy = sizePolicy,
-            requestOptions = requestOptions
+            requestOptions = requestOptions.ownedSnapshot()
         )
         loadForGeneration(resolved, requiredGeneration, blockedError)
         return _loadState.value
@@ -184,7 +185,7 @@ internal class BannerCore<V : Any, S : Any>(
             registeredRequest = ResolvedBannerRequest(
                 size = platform.resolveSize(sizePolicy, geometry.widthDp),
                 sizePolicy = sizePolicy,
-                requestOptions = requestOptions
+                requestOptions = requestOptions.ownedSnapshot()
             )
         }
     }
@@ -223,7 +224,12 @@ internal class BannerCore<V : Any, S : Any>(
                     if (!isCurrentGeneration(requiredGeneration)) {
                         AdAttemptResult.Failure(AdError.message("Banner load was cleared."))
                     } else {
-                        platform.loadBanner(resolved.size, resolved.requestOptions, requiredGeneration)
+                        platform.loadBanner(
+                            resolved.size,
+                            resolved.sizePolicy,
+                            resolved.requestOptions,
+                            requiredGeneration
+                        )
                     }
                 }
             } ?: AdAttemptResult.Failure(

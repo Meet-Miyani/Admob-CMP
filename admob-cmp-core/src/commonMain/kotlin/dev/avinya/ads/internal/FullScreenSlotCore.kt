@@ -9,6 +9,8 @@ import dev.avinya.ads.AdLoadState
 import dev.avinya.ads.AdPlacement
 import dev.avinya.ads.AdRequestOptions
 import dev.avinya.ads.AdResponseInfo
+import dev.avinya.ads.AdReward
+import dev.avinya.ads.AdFormat
 import dev.avinya.ads.AdShowResult
 import dev.avinya.ads.FullScreenAdController
 import dev.avinya.ads.FullScreenAdOptions
@@ -137,11 +139,14 @@ internal abstract class FullScreenSlotCore<AdT : Any>(
     protected abstract suspend fun presentAd(
         loaded: AdT,
         options: FullScreenAdOptions,
-        presentation: FullScreenPresentationHandle
+        presentation: FullScreenPresentationHandle,
+        rewardDelivery: RewardDelivery?
     ): AdShowResult
     protected abstract fun destroyAd(ad: AdT)
     protected abstract fun getResponseInfo(ad: AdT): AdResponseInfo?
     protected abstract fun canPresent(): AdError?
+
+    protected open fun destroyAfterPresentation(wasShown: Boolean): Boolean = true
 
     protected open fun onAdLoaded(ad: AdT, requestOptions: AdRequestOptions) {}
 
@@ -283,7 +288,25 @@ internal abstract class FullScreenSlotCore<AdT : Any>(
         completion.result
     }
 
-    override suspend fun show(options: FullScreenAdOptions): AdShowResult {
+    final override suspend fun show(options: FullScreenAdOptions): AdShowResult =
+        showInternal(options, onRewardEarned = null)
+
+    protected suspend fun showRewarded(
+        options: FullScreenAdOptions,
+        onRewardEarned: (AdReward) -> Unit
+    ): AdShowResult = showInternal(options, onRewardEarned)
+
+    private suspend fun showInternal(
+        options: FullScreenAdOptions,
+        onRewardEarned: ((AdReward) -> Unit)?
+    ): AdShowResult {
+        val rewardDelivery = when (placement.format) {
+            AdFormat.Rewarded,
+            AdFormat.RewardedInterstitial -> RewardDelivery(onRewardEarned) { reward ->
+                emit(AdEvent.RewardEarned(placement.id, reward))
+            }
+            else -> null
+        }
         val now = clock()
         val cacheTtl = ttl()
         // canPresent() reaches UIKit on iOS (topViewController() walks connectedScenes /
@@ -307,7 +330,7 @@ internal abstract class FullScreenSlotCore<AdT : Any>(
         return try {
             val timedOutBeforeHandOff = AtomicBoolean(false)
             val result = coroutineScope {
-                val presentJob = async { presentAd(loaded, options, handle) }
+                val presentJob = async { presentAd(loaded, options, handle, rewardDelivery) }
                 // Runs BESIDE the presentation. Acts only while the handle is still
                 // CORE_OWNED — the platform never reached the SDK call. Once
                 // tryHandOffToCallbacks() has succeeded the SDK owns the presentation and the
@@ -351,7 +374,7 @@ internal abstract class FullScreenSlotCore<AdT : Any>(
             // the ShowFailed event for exactly the failure mode this watchdog exists to
             // handle. OR-ing in the flag restores P1-12's emission guarantee without
             // double-emitting for any other path (the flag is only ever true in this one race).
-            val closedByCore = handle.close(result is AdShowResult.Shown || result is AdShowResult.Rewarded)
+            val closedByCore = handle.close(result is AdShowResult.Shown)
             // P1-12: a returned Failed used to produce no event at all — only preparation
             // errors and THROWN exceptions emitted ShowFailed — so a presentation that failed
             // before its SDK callbacks were installed (Activity / rootViewController
@@ -605,7 +628,7 @@ internal abstract class FullScreenSlotCore<AdT : Any>(
             // parallel release mechanism exists or should be added.
             arbiter.release(token)
             activePresentation.compareAndSet(handle, null)
-            safelyDestroyAd(ad)
+            if (destroyAfterPresentation(wasShown)) safelyDestroyAd(ad)
             if (wasShown && placement.cachePolicy.reloadAfterShow) scheduleReload(generation)
         }
         activePresentation.store(handle)
