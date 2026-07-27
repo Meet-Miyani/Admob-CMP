@@ -118,6 +118,10 @@ LaunchedEffect(Unit) {
         AdConfig(
             androidAppId = TestAdIds.ANDROID_APP_ID, // replace with your app ids
             iosAppId = TestAdIds.IOS_APP_ID,
+            initializationHooks = listOf(
+                // Runs after the UMP gate and before native GMA initialization
+                { adManager.tracking.requestAuthorization() }
+            ),
             testMode = true
         )
     )
@@ -128,19 +132,19 @@ LaunchedEffect(Unit) {
 > registered test devices / debug geography — never ship a production build with
 > test mode on.
 
-`gatherConsentAndInitialize(config)` runs the UMP consent flow and then starts
-Mobile Ads. For other consent strategies call `initialize` directly:
+`gatherConsentAndInitialize(config)` runs the UMP consent flow, invokes any `initializationHooks`, and then starts
+Mobile Ads. For manual control over consent and tracking (such as requesting ATT explicitly after UMP), use this exact order:
 
 ```kotlin
-adManager.initialize(config, ConsentMode.GatherBeforeInitialize)   // default flow
+adManager.consent.gatherConsent(config)
+adManager.tracking.requestAuthorization()
 adManager.initialize(config, ConsentMode.InitializeOnlyIfAlreadyAllowed)
-adManager.initialize(config, ConsentMode.SkipConsent)              // you own compliance
 ```
 
 | `ConsentMode` | Behavior |
 |---|---|
 | `GatherBeforeInitialize` | Request consent info, present the UMP form if required, then init. Recommended. |
-| `InitializeOnlyIfAlreadyAllowed` | No form; init only if consent already permits requests, else status `ConsentRequired`. |
+| `InitializeOnlyIfAlreadyAllowed` | No form; init only if consent already permits requests, else status `ConsentRequired`. Do not use `SkipConsent` here, as it ignores future UMP revocation. |
 | `SkipConsent` | Bypass UMP entirely. |
 
 Every ad request is gated: before initialization succeeds (and consent allows
