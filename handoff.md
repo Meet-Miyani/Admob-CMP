@@ -488,7 +488,7 @@ after the N/O work. Exact numbers will differ; the invariant is **0 failures, AB
   `umpIosHeadersSha256`). The build **fails closed** on mismatch. Bump only after downloading
   and hashing the real archive.
 - **ATT precedes the first iOS request** — UMP consent, then `tracking.requestAuthorization()`,
-  then `initialize()`.
+  then `initialize(config, ConsentMode.InitializeOnlyIfAlreadyAllowed)`.
 - **Ad-filtering DNS** (e.g. AdGuard `private_dns`) blocks real ad fetches with
   `ERR_CONNECTION_REFUSED` to `googleads.g.doubleclick.net` — irrelevant to CI unit tests,
   relevant only if you run the on-device sandbox.

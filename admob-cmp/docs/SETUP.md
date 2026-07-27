@@ -121,7 +121,7 @@ LaunchedEffect(Unit) {
             initializationHooks = listOf(
                 // Runs after the UMP gate and before native GMA initialization
                 object : AdInitializationHook {
-                    override fun onInitializationPhase(phase: AdInitializationPhase) {
+                    override suspend fun onPhase(phase: AdInitializationPhase, config: AdConfig) {
                         if (phase == AdInitializationPhase.BeforeMobileAdsInitialize) {
                             adManager.tracking.requestAuthorization()
                         }
