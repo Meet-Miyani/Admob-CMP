@@ -195,8 +195,9 @@ public interface BannerAdController {
 /**
  * Controls a full-screen ad format (interstitial, rewarded, rewarded
  * interstitial, or app-open). Full-screen ads are single-use: [show]
- * destroys the ad after dismissal. Cache and TTL are managed by
- * [AdCachePolicy].
+ * consumes the ad. Successfully presented rewarded ads deliberately remain
+ * callback-owned after dismissal so a mediated reward callback may arrive later.
+ * Cache and TTL are managed by [AdCachePolicy].
  */
 public interface FullScreenAdController {
     /** The placement this controller is bound to. */

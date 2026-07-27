@@ -689,10 +689,10 @@ class FullScreenSlotCoreTest {
             )
             slot.enqueueLoadResult(AdAttemptResult.Success("ad1"))
             slot.load()
-            
+
             val callbacks = mutableListOf<AdReward>()
             val result = slot.showRewardedForTest(testPlacement.fullScreenOptions) { callbacks.add(it) }
-            
+
             assertIs<AdShowResult.Shown>(result)
             assertEquals(1, callbacks.size)
             assertTrue(globalEvents.replayCache.any { it is AdEvent.RewardEarned })
@@ -717,10 +717,10 @@ class FullScreenSlotCoreTest {
             )
             slot.enqueueLoadResult(AdAttemptResult.Success("ad1"))
             slot.load()
-            
+
             val callbacks = mutableListOf<AdReward>()
             val result = slot.showRewardedForTest(testPlacement.fullScreenOptions) { callbacks.add(it) }
-            
+
             val delivery = requireNotNull(slot.rewardDelivery)
             delivery.deliver(AdReward(1_000L, "coin"))
 
@@ -747,9 +747,9 @@ class FullScreenSlotCoreTest {
             )
             slot.enqueueLoadResult(AdAttemptResult.Success("ad1"))
             slot.load()
-            
+
             val result = slot.showRewardedForTest(testPlacement.fullScreenOptions) {}
-            
+
             assertIs<AdShowResult.Failed>(result)
             assertTrue(slot.destroyedAds.contains("ad1"))
         } finally {

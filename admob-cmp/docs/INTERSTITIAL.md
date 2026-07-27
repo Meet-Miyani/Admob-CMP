@@ -36,6 +36,7 @@ scope.launch {
 
 ## Rewarded / rewarded interstitial
 
+```kotlin
 val result = adManager.rewarded(rewardedPlacement).show(
     onRewardEarned = { reward ->
         grantClientRewardOnce(reward.amountMicros, reward.type)
@@ -47,6 +48,7 @@ when (result) {
     AdShowResult.NotReady -> showRetryUi()
     is AdShowResult.Failed -> showAdError(result.error)
 }
+```
 
 - the callback may run after `show()` returns;
 - do not also grant from `AdEvent.RewardEarned`;

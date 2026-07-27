@@ -19,13 +19,13 @@ class RememberEventCallbackTest {
     fun `stable callback invokes latest recomposed lambda`() = runTest {
         val first = mutableListOf<AdEvent>()
         val second = mutableListOf<AdEvent>()
-        
+
         fun addFirst(e: AdEvent) { first.add(e) }
         fun addSecond(e: AdEvent) { second.add(e) }
-        
+
         val callback = mutableStateOf<(AdEvent) -> Unit>(::addFirst)
         lateinit var dispatch: (AdEvent) -> Unit
-        
+
         val recomposer = Recomposer(coroutineContext)
         val composition = Composition(UnitApplier(), recomposer)
         val runner = launch { recomposer.runRecomposeAndApplyChanges() }

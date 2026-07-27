@@ -124,7 +124,7 @@ class BannerCoreTest {
 
         core.load(BannerGeometry(320), AdSizePolicy.LargeAnchoredAdaptive(), options) { null }
         keywords.add("two")
-        
+
         core.refresh { null }
         assertEquals(
             setOf("one"),

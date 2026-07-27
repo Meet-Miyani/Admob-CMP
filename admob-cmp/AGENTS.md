@@ -223,7 +223,7 @@ Call order matters — UMP consent first, then ATT, then your first ad request:
 ```kotlin
 adManager.consent.gatherConsent(config)
 adManager.tracking.requestAuthorization()
-adManager.initialize(config)
+adManager.initialize(config, ConsentMode.InitializeOnlyIfAlreadyAllowed)
 ```
 
 Requesting ads before ATT resolves permanently forfeits the IDFA for those requests.

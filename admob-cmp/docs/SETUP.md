@@ -120,7 +120,13 @@ LaunchedEffect(Unit) {
             iosAppId = TestAdIds.IOS_APP_ID,
             initializationHooks = listOf(
                 // Runs after the UMP gate and before native GMA initialization
-                { adManager.tracking.requestAuthorization() }
+                object : AdInitializationHook {
+                    override fun onInitializationPhase(phase: AdInitializationPhase) {
+                        if (phase == AdInitializationPhase.BeforeMobileAdsInitialize) {
+                            adManager.tracking.requestAuthorization()
+                        }
+                    }
+                }
             ),
             testMode = true
         )
