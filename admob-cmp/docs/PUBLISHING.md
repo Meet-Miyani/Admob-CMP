@@ -30,9 +30,24 @@ export ORG_GRADLE_PROJECT_signingInMemoryKeyPassword=...
 ./scripts/publish-maven-central.sh   # = ./gradlew publishToMavenCentral
 ```
 
-This uploads all three modules into a Central Portal staging deployment and
+This uploads the main library modules into a Central Portal staging deployment and
 does **not** auto-release it. Inspect the deployment and signatures in
 Central Portal, then publish it manually.
+
+### Publishing the Gradle plugin
+
+The Gradle plugin is a **separate included build** (`admob-cmp-gradle-plugin`) and is *not*
+covered by the root `publishToMavenCentral`. Both commands are required, and the plugin's
+`VERSION_NAME` in `admob-cmp-gradle-plugin/gradle.properties` must be bumped in lockstep
+with the root `gradle.properties`:
+
+```bash
+./gradlew publishToMavenCentral
+```
+
+```bash
+./gradlew -p admob-cmp-gradle-plugin publishToMavenCentral
+```
 
 ## API stability workflow
 
@@ -71,6 +86,6 @@ Repeat before each release:
 3. Both facade POM dependency-scope checks are green.
 4. The Android app and iOS Xcode consumer build successfully.
 5. Local publication plus `-PadmobCmpConsumePublished=true` compiles Android and iOS.
-6. `./gradlew publishToMavenCentral --dry-run` schedules all three modules.
+6. `./gradlew publishToMavenCentral --dry-run` and `./gradlew -p admob-cmp-gradle-plugin publishToMavenCentral --dry-run` schedule all modules.
 7. Confirm the `dev.avinya` namespace is verified in Central Portal.
-8. Run `publish-maven-central.sh`, inspect the staging deployment, then release manually.
+8. Run both publication commands (`publishToMavenCentral` for library and plugin), inspect the staging deployment, then release manually.
