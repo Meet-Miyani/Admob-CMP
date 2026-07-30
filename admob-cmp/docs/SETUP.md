@@ -99,12 +99,38 @@ Verify the whole setup with:
 ./gradlew :admob-cmp-core:doctorIos     # report-only diagnostic
 ```
 
+### Kotlin/Native test executables
+
+Your app links Google's frameworks through SPM (step 1 above). Your **tests** do not.
+
+`./gradlew :yourModule:iosSimulatorArm64Test` makes the Kotlin/Native compiler link a
+standalone executable with no Xcode, no `.xcodeproj`, and no SPM anywhere in the
+picture. Every symbol must resolve at that link — including the `GAD*`/`UMP*` classes
+these bindings reference. This applies even if **none of your tests touch ads**: the
+test binary contains your module's whole main compilation, so any production code
+calling `rememberAdManager`, `NativeAdView`, or the consent APIs brings those
+references along.
+
+The supported fix is the Gradle plugin, which downloads the matching XCFrameworks and
+applies the linker options to test binaries only:
+
+```kotlin
+plugins {
+    id("dev.avinya.ads.admob-cmp") version "<version>"
+}
+```
+
+A `FakeAdManager` does not help — the requirement comes from the bindings being present
+in the link, not from anyone calling them. (For faking ad *behaviour* in tests, the SDK
+ships `NoOpAdManager`.)
+
 ### Troubleshooting: iOS linker errors
 
 | Symptom (at app link time) | Cause | Fix |
 |---|---|---|
-| `Undefined symbol: _OBJC_CLASS_$_GADMobileAds` | GoogleMobileAds SPM package not added | Add the GMA SPM package (step 1) |
-| `Undefined symbol: _OBJC_CLASS_$_UMPConsentInformation` | UMP SPM package not added | Add the UMP SPM package (step 1) |
+| `Undefined symbol: _OBJC_CLASS_$_GAD*` **during an Xcode/app build** | GoogleMobileAds SPM package not added | Add the GMA SPM package (step 1) |
+| `Undefined symbol: _OBJC_CLASS_$_UMP*` **during an Xcode/app build** | UMP SPM package not added | Add the UMP SPM package (step 1) |
+| `Undefined symbol: _OBJC_CLASS_$_GAD*`/`_UMP*` **during `:linkDebugTestIos…`** | A Kotlin/Native test executable cannot use SPM | Apply the `dev.avinya.ads.admob-cmp` Gradle plugin — see [Kotlin/Native test executables](#kotlinnative-test-executables). Adding an SPM package will **not** fix this. |
 | `Undefined symbol: _OBJC_CLASS_$_JSContext` | JavaScriptCore not linked | Add `-framework JavaScriptCore` to `OTHER_LDFLAGS` (step 3) |
 | `Undefined symbol: GADCurrentOrientation...` / new-API symbols | SPM GMA major version older than the bound headers | Bump the GMA SPM package to 13.x |
 
