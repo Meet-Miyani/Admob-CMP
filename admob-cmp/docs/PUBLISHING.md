@@ -22,6 +22,15 @@ publications under `~/.m2/repository/dev/avinya/ads/`.
 
 ## Maven Central
 
+**Publishing the GitHub release is what triggers CI to publish.** `.github/workflows/publish.yml`
+runs on `release: [published]`; the `workflow_dispatch` trigger exists only to retry a run that
+failed, so you do not have to delete and recreate a release. Do **not** dispatch manually after
+publishing a release — each run creates its own pair of staging deployments, and you would then
+have four to reconcile instead of two. A `concurrency` group serialises runs so two uploads can
+never overlap, but it cannot merge the duplicates; drop the extra pair in Central Portal.
+
+To publish from a local machine instead:
+
 ```bash
 export ORG_GRADLE_PROJECT_mavenCentralUsername=...   # Central Portal token user
 export ORG_GRADLE_PROJECT_mavenCentralPassword=...   # token password
