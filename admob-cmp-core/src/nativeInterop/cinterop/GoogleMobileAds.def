@@ -1,2 +1,3 @@
 language = Objective-C
 modules = GoogleMobileAds
+userSetupHint = admob-cmp ships Google Mobile Ads BINDINGS only, never Google's binaries. An iOS APP link gets them from the GoogleMobileAds Swift package (Xcode > Add Package Dependencies, 13.7.0+). A Kotlin/Native TEST executable has no Xcode, so it must link them itself - apply the dev.avinya.ads.admob-cmp Gradle plugin, or see https://github.com/Meet-Miyani/Admob-CMP/blob/master/admob-cmp/docs/SETUP.md#kotlinnative-test-executables
