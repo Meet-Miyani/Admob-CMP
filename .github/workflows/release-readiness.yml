@@ -28,6 +28,9 @@ jobs:
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v6
 
+      - name: Build and test the Gradle plugin
+        run: ./gradlew -p admob-cmp-gradle-plugin build --no-configuration-cache
+
       - name: Test Android hosts and verify stable API/POMs
         run: |
           ./gradlew \
@@ -65,13 +68,15 @@ jobs:
             --no-configuration-cache
 
       - name: Publish all SDK modules locally
-        run: ./gradlew publishToMavenLocal -PsignAllPublications=false --no-configuration-cache
+        run: |
+          ./gradlew publishToMavenLocal -PsignAllPublications=false --no-configuration-cache
+          ./gradlew -p admob-cmp-gradle-plugin publishToMavenLocal -PsignAllPublications=false --no-configuration-cache
 
-      - name: Compile Android and iOS using only the published facade
+      - name: Build and TEST using only the published facade
         run: |
           ./gradlew \
             :shared:compileAndroidMain \
-            :shared:compileKotlinIosSimulatorArm64 \
+            :shared:iosSimulatorArm64Test \
             -PadmobCmpConsumePublished=true \
             --refresh-dependencies \
             --no-configuration-cache
