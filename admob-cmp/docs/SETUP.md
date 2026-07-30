@@ -5,7 +5,7 @@
 ```toml
 # libs.versions.toml
 [libraries]
-admob-cmp = { group = "dev.avinya.ads", name = "admob-cmp", version = "1.0.2" }
+admob-cmp = { group = "dev.avinya.ads", name = "admob-cmp", version = "1.1.0" }
 ```
 
 ```kotlin

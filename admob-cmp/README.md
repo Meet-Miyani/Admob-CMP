@@ -15,7 +15,7 @@ stream. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
 
 ```kotlin
 // commonMain
-implementation("dev.avinya.ads:admob-cmp:1.0.2")
+implementation("dev.avinya.ads:admob-cmp:1.1.0")
 ```
 
 If your project runs Kotlin/Native tests (`:yourModule:iosSimulatorArm64Test`), also apply
@@ -40,6 +40,7 @@ compatible compiler.
 
 | admob-cmp | Kotlin | Compose Multiplatform | Android minSdk | iOS deployment target |
 |---|---|---|---|---|
+| 1.1.0 | 2.3.20 | 1.11.1 | 26 | 15.0 |
 | 1.0.2 | 2.3.20 | 1.11.1 | 26 | 15.0 |
 | 1.0.0 | 2.3.20 | 1.11.1 | 26 | 15.0 |
 

@@ -43,8 +43,8 @@ sees "not presenting" while an ad the SDK still owns is actually on screen.
 ## iOS binding model (bindings-only — locked decision)
 
 The iOS implementation compiles against the official GMA/UMP XCFrameworks via
-Kotlin/Native **cinterop**. Gradle downloads the zips
-(`build/ios-frameworks/`, version-stamped cache) purely for headers; the
+Kotlin/Native **cinterop**. The `dev.avinya.ads.admob-cmp` Gradle plugin downloads
+the zips (`build/admob-cmp-ios-frameworks/`, version-stamped cache) purely for headers; the
 published klib contains *bindings*, never Google's binaries. The consuming app
 links GMA/UMP itself via SPM.
 
