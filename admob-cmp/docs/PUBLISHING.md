@@ -27,27 +27,30 @@ export ORG_GRADLE_PROJECT_mavenCentralUsername=...   # Central Portal token user
 export ORG_GRADLE_PROJECT_mavenCentralPassword=...   # token password
 export ORG_GRADLE_PROJECT_signingInMemoryKey=...     # ASCII-armored GPG key
 export ORG_GRADLE_PROJECT_signingInMemoryKeyPassword=...
-./scripts/publish-maven-central.sh   # = ./gradlew publishToMavenCentral
+./scripts/publish-maven-central.sh   # library + Gradle plugin
 ```
 
-This uploads the main library modules into a Central Portal staging deployment and
-does **not** auto-release it. Inspect the deployment and signatures in
-Central Portal, then publish it manually.
+The script asserts that the library and plugin `VERSION_NAME`s match, then runs both
+publications. Neither auto-releases. Inspect the deployments and signatures in Central
+Portal, then publish them manually.
 
-### Publishing the Gradle plugin
+### Two deployments, both required
 
-The Gradle plugin is a **separate included build** (`admob-cmp-gradle-plugin`) and is *not*
-covered by the root `publishToMavenCentral`. Both commands are required, and the plugin's
-`VERSION_NAME` in `admob-cmp-gradle-plugin/gradle.properties` must be bumped in lockstep
-with the root `gradle.properties`:
+The Gradle plugin is a **separate included build** (`admob-cmp-gradle-plugin`), so it is
+*not* covered by the root `publishToMavenCentral`. The script runs both:
 
 ```bash
 ./gradlew publishToMavenCentral
-```
-
-```bash
 ./gradlew -p admob-cmp-gradle-plugin publishToMavenCentral
 ```
+
+Because these are two separate Gradle builds, they produce **two staging deployments** in
+Central Portal. Release both. Publishing the library alone ships a release whose README,
+SETUP.md, and cinterop `userSetupHint` all instruct consumers to apply a plugin that does
+not exist on Maven Central.
+
+The plugin's `VERSION_NAME` in `admob-cmp-gradle-plugin/gradle.properties` must be bumped in
+lockstep with the root `gradle.properties`; the script refuses to publish a mismatched pair.
 
 ## API stability workflow
 
@@ -88,4 +91,4 @@ Repeat before each release:
 5. Local publication plus `-PadmobCmpConsumePublished=true` compiles Android and iOS.
 6. `./gradlew publishToMavenCentral --dry-run` and `./gradlew -p admob-cmp-gradle-plugin publishToMavenCentral --dry-run` schedule all modules.
 7. Confirm the `dev.avinya` namespace is verified in Central Portal.
-8. Run both publication commands (`publishToMavenCentral` for library and plugin), inspect the staging deployment, then release manually.
+8. Run `./scripts/publish-maven-central.sh`, inspect **both** staging deployments (library and plugin), then release each manually.
