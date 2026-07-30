@@ -6,6 +6,7 @@ val consumePublishedAdmobCmp =
         .getOrElse(false)
 
 pluginManagement {
+    includeBuild("admob-cmp-gradle-plugin")
     repositories {
         google {
             mavenContent {
