@@ -8,6 +8,14 @@ on:
 permissions:
   contents: read
 
+# Publishing the GitHub release already triggers this workflow; workflow_dispatch is
+# the retry path when that run fails. Running both produces duplicate Central Portal
+# staging deployments, so serialise rather than letting two uploads overlap.
+# cancel-in-progress stays false: never abort a run that may be mid-upload.
+concurrency:
+  group: publish-maven-central
+  cancel-in-progress: false
+
 jobs:
   publish:
     name: Publish to Maven Central
