@@ -3,15 +3,13 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.extraProperties
 
 plugins {
+    id("dev.avinya.ads.admob-cmp")
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidKmpLibrary)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.mavenPublish)
 }
-
-// Ensure :admob-cmp-core is evaluated first so its admobCmpTestLinkerOpts extra property is available.
-evaluationDependsOn(":admob-cmp-core")
 
 kotlin {
     explicitApi()
@@ -45,15 +43,10 @@ kotlin {
         // Test executables need:
         //  1. osVersionMin ≥ 18.0 to match Xcode 16's iOS 18+ SDK symbols in Compose/Skiko (UIViewLayoutRegion).
         //  2. disableNativeCache = true to prevent Xcode 16 Skiko/Compose UI cache symbol mismatches.
-        //  3. admob-cmp-core linker options for GMA/UMP native frameworks + Xcode PrivateFrameworks search path.
         iosTarget.binaries.withType(org.jetbrains.kotlin.gradle.plugin.mpp.TestExecutable::class.java).configureEach {
             freeCompilerArgs += listOf(
                 "-Xoverride-konan-properties=osVersionMin.ios_simulator_arm64=18.0;osVersionMin.ios_arm64=18.0;osVersionMin=18.0"
             )
-
-            @Suppress("UNCHECKED_CAST")
-            val testLinkerOpts = project(":admob-cmp-core").extraProperties.get("admobCmpTestLinkerOpts") as (String) -> List<String>
-            linkerOpts(testLinkerOpts(targetName))
         }
     }
 
