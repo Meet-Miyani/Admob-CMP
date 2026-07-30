@@ -6,7 +6,17 @@ val consumePublishedAdmobCmp =
         .getOrElse(false)
 
 pluginManagement {
+    includeBuild("admob-cmp-gradle-plugin")
     repositories {
+        val consumePublished = providers.gradleProperty("admobCmpConsumePublished")
+            .map(String::toBoolean)
+            .getOrElse(false)
+        if (consumePublished) {
+            exclusiveContent {
+                forRepository { mavenLocal() }
+                filter { includeGroup("dev.avinya.ads") }
+            }
+        }
         google {
             mavenContent {
                 includeGroupAndSubgroups("androidx")

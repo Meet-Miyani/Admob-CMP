@@ -286,6 +286,7 @@ Android has no ATT; `adManager.tracking` is a no-op there, always reporting
   and `:admob-cmp:testAndroidHostTest`.
 - API surface: `explicitApi()` + KGP ABI validation — after any public change
   run `./gradlew :admob-cmp:updateKotlinAbi` and commit `api/admob-cmp.klib.api`.
-- iOS bindings: cinterop against downloaded XCFrameworks
-  (`build/ios-frameworks/`, version-stamped). Bindings-only distribution —
-  NEVER add `staticLibraries` to the `.def` files.
+- iOS bindings: cinterop against XCFrameworks downloaded by the
+  `dev.avinya.ads.admob-cmp` Gradle plugin (`build/admob-cmp-ios-frameworks/`,
+  version-stamped). Bindings-only distribution — NEVER add `staticLibraries`
+  to the `.def` files.

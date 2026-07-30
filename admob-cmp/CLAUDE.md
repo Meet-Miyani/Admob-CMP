@@ -32,9 +32,12 @@ AGENTS.md, not this file.
   `enabled` defaults to false — an empty `abiValidation {}` block leaves both
   `updateKotlinAbi` and `checkKotlinAbi` silently SKIPPED, so keep the explicit
   `enabled.set(true)` and the `@OptIn(ExperimentalAbiValidation::class)`.
-- iOS bindings are cinterop against XCFrameworks downloaded to
-  `build/ios-frameworks/` (version-stamped). Bindings-only distribution —
-  **never** add `staticLibraries` to the `.def` files.
+- iOS bindings are cinterop against XCFrameworks downloaded by the
+  `dev.avinya.ads.admob-cmp` Gradle plugin (included build) to
+  `build/admob-cmp-ios-frameworks/` (version-stamped via a marker file). The
+  download/checksum/linker logic lives in the plugin, **not** in
+  `admob-cmp-core/build.gradle.kts` — don't reintroduce it there. Bindings-only
+  distribution — **never** add `staticLibraries` to the `.def` files.
 
 ## Hard invariants when editing
 

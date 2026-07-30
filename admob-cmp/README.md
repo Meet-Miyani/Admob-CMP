@@ -15,8 +15,19 @@ stream. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
 
 ```kotlin
 // commonMain
-implementation("dev.avinya.ads:admob-cmp:1.0.2")
+implementation("dev.avinya.ads:admob-cmp:1.1.0")
 ```
+
+If your project runs Kotlin/Native tests (`:yourModule:iosSimulatorArm64Test`), also apply
+the Gradle plugin — without it the test link fails on `Undefined symbols … _OBJC_CLASS_$_GAD*`:
+
+```kotlin
+plugins {
+    id("dev.avinya.ads.admob-cmp") version "1.1.0"
+}
+```
+
+See [docs/SETUP.md](docs/SETUP.md#kotlinnative-test-executables).
 
 Platform setup (Android manifest entry, iOS SPM packages + Info.plist) is
 required — follow [docs/SETUP.md](docs/SETUP.md).
@@ -29,6 +40,7 @@ compatible compiler.
 
 | admob-cmp | Kotlin | Compose Multiplatform | Android minSdk | iOS deployment target |
 |---|---|---|---|---|
+| 1.1.0 | 2.3.20 | 1.11.1 | 26 | 15.0 |
 | 1.0.2 | 2.3.20 | 1.11.1 | 26 | 15.0 |
 | 1.0.0 | 2.3.20 | 1.11.1 | 26 | 15.0 |
 
@@ -104,7 +116,7 @@ Integrating with an AI coding agent? Point it at [AGENTS.md](AGENTS.md).
 ./gradlew :admob-cmp:testAndroidHostTest     # common tests (JVM runner)
 ./gradlew :admob-cmp:checkKotlinAbi          # public API surface check
 ./gradlew :admob-cmp:updateKotlinAbi         # regenerate api/ dump after API changes
-./gradlew :admob-cmp-core:doctorIos          # diagnose iOS consumer integration
+./gradlew doctorIos          # diagnose iOS consumer integration
 ```
 
 ## License

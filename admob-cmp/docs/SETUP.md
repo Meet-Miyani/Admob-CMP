@@ -5,7 +5,7 @@
 ```toml
 # libs.versions.toml
 [libraries]
-admob-cmp = { group = "dev.avinya.ads", name = "admob-cmp", version = "1.0.2" }
+admob-cmp = { group = "dev.avinya.ads", name = "admob-cmp", version = "1.1.0" }
 ```
 
 ```kotlin
@@ -96,7 +96,7 @@ for this library.
 Verify the whole setup with:
 
 ```bash
-./gradlew :admob-cmp-core:doctorIos     # report-only diagnostic
+./gradlew doctorIos     # report-only diagnostic (requires the plugin, below)
 ```
 
 ### Kotlin/Native test executables
@@ -116,9 +116,26 @@ applies the linker options to test binaries only:
 
 ```kotlin
 plugins {
-    id("dev.avinya.ads.admob-cmp") version "<version>"
+    id("dev.avinya.ads.admob-cmp") version "1.1.0"
 }
 ```
+
+The plugin needs `mavenCentral()` in your settings' plugin repositories:
+
+```kotlin
+// settings.gradle.kts
+pluginManagement {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+```
+
+It touches **test binaries only** — your app framework still resolves GoogleMobileAds
+from the SPM packages in step 1, exactly as before. Applying it also gives you
+`./gradlew doctorIos`, a report-only check of your SPM products, `Info.plist`, and
+framework cache.
 
 A `FakeAdManager` does not help — the requirement comes from the bindings being present
 in the link, not from anyone calling them. (For faking ad *behaviour* in tests, the SDK
