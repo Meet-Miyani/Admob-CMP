@@ -1,25 +1,123 @@
 ---
-// docs-site/src/components/diagrams/PlatformMatrix.astro
-//
-// PLACEHOLDER. Plan 4 (visual system) replaces this body with the real
-// theme-aware diagram. The file name and the zero-prop contract are fixed by
-// Plan 3 and must not change — 24 content pages import it as <PlatformMatrix />.
-//
-// Plan 3's final audit (Task 27) fails if this placeholder is still present,
-// so a stub can never ship to ads.avinya.dev.
+import DiagramFigure from './DiagramFigure.astro';
 ---
 
-<figure class="diagram-placeholder" data-diagram="PlatformMatrix">
-  <p>Diagram <code>PlatformMatrix</code> is not authored yet.</p>
-</figure>
+<DiagramFigure id="platform-matrix" minWidth={680}>
+  <table class="dg-table">
+    <caption>Ad formats</caption>
+    <thead>
+      <tr>
+        <th scope="col">Format</th>
+        <th scope="col">Android — GMA Next-Gen, API 26+</th>
+        <th scope="col">iOS — GMA 13.x, iOS 15+</th>
+        <th scope="col">Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th scope="row">Banner</th>
+        <td><span class="dg-mark" aria-hidden="true">✔</span> Supported</td>
+        <td><span class="dg-mark" aria-hidden="true">✔</span> Supported</td>
+        <td>Anchored adaptive, inline adaptive, fixed and fluid; collapsible on both platforms</td>
+      </tr>
+      <tr>
+        <th scope="row">Interstitial</th>
+        <td><span class="dg-mark" aria-hidden="true">✔</span> Supported</td>
+        <td><span class="dg-mark" aria-hidden="true">✔</span> Supported</td>
+        <td>TTL'd FIFO cache, 1 hour</td>
+      </tr>
+      <tr>
+        <th scope="row">Rewarded</th>
+        <td><span class="dg-mark" aria-hidden="true">✔</span> Supported</td>
+        <td><span class="dg-mark" aria-hidden="true">✔</span> Supported</td>
+        <td>RewardEarned event</td>
+      </tr>
+      <tr>
+        <th scope="row">Rewarded interstitial</th>
+        <td><span class="dg-mark" aria-hidden="true">✔</span> Supported</td>
+        <td><span class="dg-mark" aria-hidden="true">✔</span> Supported</td>
+        <td>Same controller shape as Rewarded</td>
+      </tr>
+      <tr>
+        <th scope="row">App-open</th>
+        <td><span class="dg-mark" aria-hidden="true">✔</span> Supported</td>
+        <td><span class="dg-mark" aria-hidden="true">✔</span> Supported</td>
+        <td>AppOpenAdCoordinator, cooldowns, blocking; cache TTL 4 hours</td>
+      </tr>
+      <tr>
+        <th scope="row">Native</th>
+        <td><span class="dg-mark" aria-hidden="true">✔</span> Supported</td>
+        <td><span class="dg-mark" aria-hidden="true">✔</span> Supported</td>
+        <td>adLayout DSL and pooling on both; iOS renders through UIKit</td>
+      </tr>
+    </tbody>
+  </table>
 
-<style>
-  .diagram-placeholder {
-    margin: 1.5rem 0;
-    padding: 1rem;
-    border: 2px dashed var(--sl-color-gray-4);
-    border-radius: 0.5rem;
-    text-align: center;
-    color: var(--sl-color-gray-3);
-  }
-</style>
+  <table class="dg-table">
+    <caption>Cross-cutting capabilities</caption>
+    <thead>
+      <tr>
+        <th scope="col">Capability</th>
+        <th scope="col">Android</th>
+        <th scope="col">iOS</th>
+        <th scope="col">Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th scope="row">UMP consent and privacy-options form</th>
+        <td><span class="dg-mark" aria-hidden="true">✔</span> Supported</td>
+        <td><span class="dg-mark" aria-hidden="true">✔</span> Supported</td>
+        <td>canRequestAds gates every request on both platforms</td>
+      </tr>
+      <tr>
+        <th scope="row">App Tracking Transparency</th>
+        <td><span class="dg-mark" aria-hidden="true">—</span> Not applicable</td>
+        <td><span class="dg-mark" aria-hidden="true">✔</span> Supported</td>
+        <td>
+          Android has no ATT: adManager.tracking always reports
+          AdTrackingAuthorization.NotApplicable, and the AD_ID manifest permission governs the
+          advertising id there instead
+        </td>
+      </tr>
+      <tr>
+        <th scope="row">Mediation adapters</th>
+        <td><span class="dg-mark" aria-hidden="true">✔</span> Supported</td>
+        <td><span class="dg-mark" aria-hidden="true">✔</span> Supported</td>
+        <td>No adapters are bundled; add the ones you need</td>
+      </tr>
+      <tr>
+        <th scope="row">Paid and revenue events</th>
+        <td><span class="dg-mark" aria-hidden="true">✔</span> Supported</td>
+        <td><span class="dg-mark" aria-hidden="true">✔</span> Supported</td>
+        <td>AdEvent.Paid carries AdValue and response info</td>
+      </tr>
+      <tr>
+        <th scope="row">Native video events</th>
+        <td><span class="dg-mark" aria-hidden="true">✖</span> Not available</td>
+        <td><span class="dg-mark" aria-hidden="true">✔</span> Supported — five events</td>
+        <td>
+          iOS emits VideoStarted, VideoPlayed, VideoPaused, VideoEnded and VideoMuted through
+          GADVideoControllerDelegate. The Android GMA Next-Gen SDK exposes no equivalent callback
+          surface on NativeAd, so Android emits none. This is an upstream SDK gap, not an admob-cmp
+          omission — do not rely on native video events for cross-platform logic.
+        </td>
+      </tr>
+      <tr>
+        <th scope="row">
+          immersiveMode, customClickGesture, publisherProvidedId, categoryExclusions,
+          skipUninitializedAdapters
+        </th>
+        <td><span class="dg-mark" aria-hidden="true">✔</span> Supported</td>
+        <td><span class="dg-mark" aria-hidden="true">✖</span> Silently ignored</td>
+        <td>Android-only request options</td>
+      </tr>
+      <tr>
+        <th scope="row">customTargeting, placementId</th>
+        <td><span class="dg-mark" aria-hidden="true">✔</span> Supported</td>
+        <td><span class="dg-mark" aria-hidden="true">✔</span> Supported</td>
+        <td>Mapped on both platforms; placementId maps to placementID on iOS</td>
+      </tr>
+    </tbody>
+  </table>
+</DiagramFigure>
