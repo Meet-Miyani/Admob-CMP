@@ -1,53 +1,229 @@
-This is a Kotlin Multiplatform project targeting Android, iOS, Web, Desktop (JVM).
+![AdMob CMP Header Banner](.github/readme-header.png)
 
-* [/iosApp](./iosApp/iosApp) contains an iOS application. Even if you’re sharing your UI with Compose Multiplatform,
-  you need this entry point for your iOS app. This is also where you should add SwiftUI code for your project.
+# AdMob CMP — Compose Multiplatform AdMob SDK for Android and iOS
 
-* [/shared](./shared/src) is for code that will be shared across your Compose Multiplatform applications.
-  It contains several subfolders:
-  - [commonMain](./shared/src/commonMain/kotlin) is for code that’s common for all targets.
-  - Other folders are for Kotlin code that will be compiled for only the platform indicated in the folder name.
-    For example, if you want to use Apple’s CoreCrypto for the iOS part of your Kotlin app,
-    the [iosMain](./shared/src/iosMain/kotlin) folder would be the right place for such calls.
-    Similarly, if you want to edit the Desktop (JVM) specific part, the [jvmMain](./shared/src/jvmMain/kotlin)
-    folder is the appropriate location.
+[![Maven Central](https://img.shields.io/maven-central/v/dev.avinya.ads/admob-cmp?label=Maven%20Central)](https://central.sonatype.com/artifact/dev.avinya.ads/admob-cmp)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.3.20-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
+[![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20iOS-3DDC84)](#compatibility)
 
-### Running the apps
+One Kotlin API for **AdMob on Compose Multiplatform**. Write your ad code once in `commonMain` and get banner, interstitial, rewarded, rewarded interstitial, app-open, and native ads on both Android and iOS. AdMob CMP wraps the Google Mobile Ads Next-Gen SDK on Android and the Google Mobile Ads iOS SDK, keeps AdMob's own vocabulary (`AdValue`, `ResponseInfo`, adaptive banner sizes, UMP consent states, native asset names), and replaces the listener-style surface with suspend functions, `StateFlow` state, and one sealed `AdEvent` stream. UMP consent, iOS App Tracking Transparency ordering, paid/revenue events, and mediation are built into the initialization flow rather than bolted on.
 
-Android and iOS open directly into the AdMob debug console. The app follows the
-production consent → iOS tracking → one-time SDK initialization sequence, but all
-application and ad-unit IDs are Google's official samples and every placement has
-strict test-mode validation. Before replacing the sample IDs for a release, follow
-[`admob-cmp/docs/SETUP.md`](./admob-cmp/docs/SETUP.md) and run
-`./gradlew :admob-cmp-core:doctorIos`.
+> **Brand, repository, coordinate.** The library is branded **AdMob CMP**, the repository is **`admob-compose-multiplatform`**, and the Maven coordinate is **`dev.avinya.ads:admob-cmp`**. The coordinate has not changed across any release and will not change.
 
-Use the run configurations provided by the run widget in your IDE's toolbar. You can also use these commands and options:
+**Documentation: [ads.avinya.dev](https://ads.avinya.dev)** · [Quickstart](https://ads.avinya.dev/start/quickstart/) · [Installation](https://ads.avinya.dev/start/installation/) · [iOS setup](https://ads.avinya.dev/start/ios-setup/) · [Troubleshooting](https://ads.avinya.dev/reference/troubleshooting/)
 
-- Android app: `./gradlew :androidApp:assembleDebug`
-- Desktop app:
-  - Hot reload: `./gradlew :desktopApp:hotRun --auto`
-  - Standard run: `./gradlew :desktopApp:run`
-- Web app:
-  - Wasm target (faster, modern browsers): `./gradlew :webApp:wasmJsBrowserDevelopmentRun`
-  - JS target (slower, supports older browsers): `./gradlew :webApp:jsBrowserDevelopmentRun`
-- iOS app: open the [/iosApp](./iosApp) directory in Xcode and run it from there. Note: Compose Multiplatform requires **Xcode 26** (and the iOS 26 SDK) due to `UIViewLayoutRegion` linkage.
+## Install
 
-### Running tests
+```kotlin
+// commonMain
+implementation("dev.avinya.ads:admob-cmp:1.1.0")
+```
 
-Use the run button in your IDE's editor gutter, or run tests using Gradle tasks:
+If your project runs Kotlin/Native tests (`:yourModule:iosSimulatorArm64Test`), also apply the Gradle plugin. Without it the test link fails with `Undefined symbols … _OBJC_CLASS_$_GAD*`, because a Kotlin/Native test executable has no Xcode to resolve the Swift packages for it:
 
-- Android tests: `./gradlew :shared:testAndroidHostTest`
-- Desktop tests: `./gradlew :shared:jvmTest`
-- Web tests:
-  - Wasm target: `./gradlew :shared:wasmJsTest`
-  - JS target: `./gradlew :shared:jsTest`
-- iOS tests: `./gradlew :shared:iosSimulatorArm64Test`
+```kotlin
+plugins {
+    id("dev.avinya.ads.admob-cmp") version "1.1.0"
+}
+```
+
+Platform setup — the Android manifest entry, and on iOS the two Swift packages plus `Info.plist` keys — is required. Follow [`admob-cmp/docs/SETUP.md`](admob-cmp/docs/SETUP.md), then verify with `./gradlew :admob-cmp-core:doctorIos`.
+
+## Ad formats
+
+All six formats, on both platforms, from one `commonMain` API.
+
+| Format | `AdFormat` | Controller (from `AdManager`) | Composable | Test ad units |
+|---|---|---|---|---|
+| Banner (incl. collapsible) | `AdFormat.Banner` | `banner(placement)` | `BannerAdView(placement)` | `TestAdIds.ANDROID_BANNER` / `IOS_BANNER` |
+| Interstitial | `AdFormat.Interstitial` | `interstitial(placement)` | — | `ANDROID_INTERSTITIAL` / `IOS_INTERSTITIAL` |
+| Rewarded | `AdFormat.Rewarded` | `rewarded(placement)` | — | `ANDROID_REWARDED` / `IOS_REWARDED` |
+| Rewarded interstitial | `AdFormat.RewardedInterstitial` | `rewardedInterstitial(placement)` | — | `ANDROID_REWARDED_INTERSTITIAL` / `IOS_REWARDED_INTERSTITIAL` |
+| App-open | `AdFormat.AppOpen` | `appOpen(placement)` + `AppOpenAdCoordinator` | — | `ANDROID_APP_OPEN` / `IOS_APP_OPEN` |
+| Native | `AdFormat.Native` | `nativeAd(placement)` (a pool) | `NativeAdView(placement, itemKey, layout)` | `ANDROID_NATIVE` / `IOS_NATIVE` |
+
+## 30-second quickstart
+
+This runs against Google's official sample ad units, so it is safe to paste as-is.
+
+```kotlin
+@Composable
+fun App() {
+    val adManager = rememberAdManager()
+
+    LaunchedEffect(Unit) {
+        adManager.gatherConsentAndInitialize(
+            AdConfig(
+                androidAppId = TestAdIds.ANDROID_APP_ID,
+                iosAppId = TestAdIds.IOS_APP_ID,
+                testMode = true
+            )
+        )
+    }
+
+    val placement = remember {
+        AdPlacement(
+            id = "main_interstitial",
+            format = AdFormat.Interstitial,
+            androidAdUnitId = TestAdIds.ANDROID_INTERSTITIAL,
+            iosAdUnitId = TestAdIds.IOS_INTERSTITIAL,
+            strictTestMode = true
+        )
+    }
+    val interstitial = remember(adManager) { adManager.interstitial(placement) }
+    val scope = rememberCoroutineScope()
+
+    Button(onClick = {
+        scope.launch {
+            interstitial.load()
+            interstitial.show()
+        }
+    }) { Text("Show ad") }
+}
+```
+
+`gatherConsentAndInitialize` runs the whole production sequence for you: UMP consent, then App Tracking Transparency on iOS, then the one-time SDK initialization. Gate ad-dependent UI on `adManager.status.collectAsState()` reaching `AdManagerStatus.Ready`.
+
+A banner is one composable — it measures its own container and supplies the width, so adaptive sizing is correct even in iPad split view and Slide Over:
+
+```kotlin
+BannerAdView(
+    placement = AdPlacement(
+        id = "home_banner",
+        format = AdFormat.Banner,
+        androidAdUnitId = TestAdIds.ANDROID_BANNER,
+        iosAdUnitId = TestAdIds.IOS_BANNER
+    ),
+    modifier = Modifier.fillMaxWidth()
+)
+```
+
+Native ads are laid out with a declarative DSL and served from a pool, so a feed reuses one placement id across every row and the pool serves a distinct ad per `itemKey`:
+
+```kotlin
+val nativePlacement = remember {
+    AdPlacement(
+        id = "feed_native",
+        format = AdFormat.Native,
+        androidAdUnitId = TestAdIds.ANDROID_NATIVE,
+        iosAdUnitId = TestAdIds.IOS_NATIVE,
+        maxCacheSize = 3
+    )
+}
+
+val layout = remember {
+    adLayout {
+        column(modifier = AdModifier.fillMaxWidth()) {
+            media(modifier = AdModifier.fillMaxWidth().aspectRatio(16f / 9f))
+            headline(maxLines = 2)
+            body(maxLines = 3)
+            row(spacing = 8.dp) { icon(modifier = AdModifier.size(24.dp)); advertiser(); adBadge() }
+            callToAction(modifier = AdModifier.fillMaxWidth())
+        }
+    }
+}
+
+NativeAdView(placement = nativePlacement, itemKey = "feed_3", layout = layout)
+```
+
+Use a static, finite placement id. Never generate one per row (`"feed_item_$index"`) — controllers are cached per id for the manager's lifetime.
+
+## Why AdMob CMP
+
+- **Six formats, not four.** Native ads and app-open ads are supported on both platforms, with a layout DSL and a real pool.
+- **Consent is part of initialization.** UMP modes, the privacy options form, and `canRequestAds` are first-class, and the iOS consent → ATT → initialize ordering is enforced rather than documented and hoped for.
+- **The iOS test link actually works.** The `dev.avinya.ads.admob-cmp` Gradle plugin links Google Mobile Ads and UMP into Kotlin/Native test executables, which is the difference between `:iosSimulatorArm64Test` passing and failing with `Undefined symbols … _OBJC_CLASS_$_GAD*`.
+- **Revenue and mediation are exposed.** Paid events carry `AdValue` and `ResponseInfo`; mediation adapters get initialization hooks.
+- **Test safety fails closed.** `AdPlacement.strictTestMode` throws at construction if a placement points at a production ad unit — turn it on in debug builds.
+- **The public ABI is frozen** and enforced in CI by Kotlin ABI validation, so upgrades do not silently break you.
+
+## Compatibility
+
+`admob-cmp` publishes Kotlin/Native klibs plus cinterop klibs. Klibs are not binary-compatible across arbitrary Kotlin versions, so consumers must build with a compatible compiler.
+
+| admob-cmp | Kotlin | Compose Multiplatform | Android `minSdk` | iOS deployment target |
+|---|---|---|---|---|
+| 1.1.0 | 2.3.20 | 1.11.1 | 26 | 15.0 |
+| 1.0.2 | 2.3.20 | 1.11.1 | 26 | 15.0 |
+| 1.0.0 | 2.3.20 | 1.11.1 | 26 | 15.0 |
+
+Underlying Google SDKs bound by 1.1.0:
+
+| SDK | Version |
+|---|---|
+| Google Mobile Ads, Android (Next-Gen) | 1.3.0 |
+| Google Mobile Ads, iOS | 13.7.0 |
+| User Messaging Platform, Android | 4.0.0 |
+| User Messaging Platform, iOS | 3.1.0 |
+
+**Kotlin:** the module is compiled with 2.3.20. Consumers on a different Kotlin *minor* version may fail to resolve the klib. Patch versions are generally safe.
+
+**Compose Multiplatform:** required only if you use the composable surface (`BannerAdView`, `NativeAdView`, `rememberAdManager`). The controller API in `dev.avinya.ads:admob-cmp-core` has no Compose dependency.
+
+**Consumption model:** the SDK is consumable from Kotlin Multiplatform / Gradle projects only — it compiles into the consumer's umbrella framework. A pure-Swift iOS app cannot adopt it without a Kotlin Multiplatform shim.
+
+**Published artifacts:** `dev.avinya.ads:admob-cmp` is the facade and is what you should depend on. It brings in `dev.avinya.ads:admob-cmp-core` (Compose-free) and `dev.avinya.ads:admob-cmp-compose` (the composables). `dev.avinya.ads:admob-cmp-gradle-plugin` is the Kotlin/Native test-linking plugin, applied by its `dev.avinya.ads.admob-cmp` plugin id.
+
+## Documentation
+
+Full guides, diagrams, and the generated API reference live at **[ads.avinya.dev](https://ads.avinya.dev)**. The in-repo sources:
+
+- [Setup & initialization](admob-cmp/docs/SETUP.md) — dependency, Android and iOS platform setup, init, troubleshooting
+- [Banner ads](admob-cmp/docs/BANNER.md) — adaptive sizes, collapsible, refresh policies, geometry
+- [Interstitial & rewarded](admob-cmp/docs/INTERSTITIAL.md) — load/show, caching, retry
+- [Native ads](admob-cmp/docs/NATIVE.md) — layout DSL, pooling, media info
+- [App-open ads](admob-cmp/docs/APP_OPEN.md) — `AppOpenAdCoordinator`, cooldowns, blocking
+- [Consent & privacy](admob-cmp/docs/CONSENT.md) — UMP modes, privacy options form
+- [Mediation](admob-cmp/docs/MEDIATION.md) — adapters, initialization hooks
+- [Architecture](admob-cmp/docs/ARCHITECTURE.md) — module map, threading, caching, decisions
+- [Publishing](admob-cmp/docs/PUBLISHING.md) — maintainer guide
+
+Integrating with an AI coding agent? Point it at [`admob-cmp/AGENTS.md`](admob-cmp/AGENTS.md) — it is the authoritative, condensed API and usage guide.
+
+## Repository layout
+
+This repository is the SDK plus a Kotlin Multiplatform demo that exercises it.
+
+| Module | What it is |
+|---|---|
+| `admob-cmp/` | The published facade artifact — depends on core and compose |
+| `admob-cmp-core/` | Compose-free Kotlin Multiplatform core: `AdManager`, consent, full-screen orchestration, banner and native pools, iOS cinterop bindings |
+| `admob-cmp-compose/` | Compose Multiplatform UI: `BannerAdView`, `NativeAdView`, the native-ad layout DSL, the debug console, `rememberAdManager` |
+| `admob-cmp-gradle-plugin/` | Links Google Mobile Ads and UMP into Kotlin/Native test executables |
+| `shared/`, `androidApp/`, `iosApp/`, `desktopApp/`, `webApp/` | The demo application. Ads render on the Android and iOS targets; desktop and web build without the ad surface. |
+
+## Running the demo
+
+Android and iOS open directly into the AdMob debug console, which exercises every format against Google's official sample ad units with `strictTestMode` validation on every placement.
+
+```bash
+./gradlew :androidApp:assembleDebug          # Android
+./gradlew :desktopApp:run                    # Desktop (no ads)
+./gradlew :webApp:wasmJsBrowserDevelopmentRun # Web (no ads)
+```
+
+For iOS, open [`iosApp/`](iosApp) in Xcode and run. Compose Multiplatform requires **Xcode 26** (and the iOS 26 SDK) because of `UIViewLayoutRegion` linkage.
+
+Tests:
+
+```bash
+./gradlew :admob-cmp-core:testAndroidHostTest        # JVM + Android-layer unit tests
+./gradlew :admob-cmp-core:iosSimulatorArm64Test      # iOS unit tests
+./gradlew :admob-cmp-core:checkKotlinAbi             # public API surface check
+./gradlew :admob-cmp-core:doctorIos                  # diagnose iOS consumer integration
+```
+
+## Contributing
+
+Issues and pull requests are welcome. Questions, integration help, and feature ideas belong in [Discussions](https://github.com/Meet-Miyani/admob-compose-multiplatform/discussions).
+
+The public ABI is frozen. Additive changes are fine; any breaking change needs a written migration plan. After any public API change, run `./gradlew :admob-cmp-core:updateKotlinAbi` and commit the regenerated `api/*.klib.api` dump, or CI will fail.
+
+## License
+
+[Apache License 2.0](LICENSE).
 
 ---
 
-Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html),
-[Compose Multiplatform](https://github.com/JetBrains/compose-multiplatform/#compose-multiplatform),
-[Kotlin/Wasm](https://kotl.in/wasm/)…
-
-We would appreciate your feedback on Compose/Web and Kotlin/Wasm in the public Slack channel [#compose-web](https://slack-chats.kotlinlang.org/c/compose-web).
-If you face any issues, please report them on [YouTrack](https://youtrack.jetbrains.com/newIssue?project=CMP).
+Not affiliated with or endorsed by Google. AdMob and Google Mobile Ads are trademarks of Google LLC.
