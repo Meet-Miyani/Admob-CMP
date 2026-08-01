@@ -361,3 +361,68 @@ describe('landing components do not import PNGs directly', () => {
     expect(offenders, `landing files import .png directly: ${offenders.join(', ')}`).toEqual([]);
   });
 });
+
+const formatListPath = fileURLToPath(
+  new URL('../src/components/landing/FormatList.astro', import.meta.url)
+);
+
+describe('FormatList.astro contracts', () => {
+  const source = readFileSync(formatListPath, 'utf8');
+
+  it('exists as an Astro component', () => {
+    expect(existsSync(formatListPath)).toBe(true);
+  });
+
+  it('resolves the Screenshot component via guarded import.meta.glob, not a static import', () => {
+    expect(source).toMatch(/import\.meta\.glob[\s\S]*?['"]\.\.\/Screenshot\.astro['"]/);
+    const staticImportRe =
+      /^[ \t]*import\s+(?:\*\s+as\s+\w+|\{[^}]*\}|[\w$]+)\s+from\s+['"]\.\.\/Screenshot\.astro['"]/m;
+    expect(
+      source.match(staticImportRe),
+      'FormatList.astro must not static-import Screenshot.astro — use import.meta.glob'
+    ).toBeNull();
+  });
+
+  it('import.meta.glob is configured with eager: true so the default export is available at build time', () => {
+    const globBlock = source.match(/import\.meta\.glob[\s\S]*?\)/);
+    expect(globBlock, 'import.meta.glob call must be present').not.toBeNull();
+    expect(globBlock![0]).toMatch(/eager\s*:\s*true/);
+  });
+
+  it('reads the default export with optional chaining so the absent-component path is graceful', () => {
+    expect(source).toMatch(/screenshotModules\[['\"]\.\.\/Screenshot\.astro['\"]\]\?\.default/);
+  });
+
+  it('iterates the imported `formats` array directly, without sort or reorder', () => {
+    expect(source).toMatch(/formats\.map\(/);
+    expect(source).not.toMatch(/\.sort\s*\(/);
+  });
+
+  it('does not filter the formats array down to a subset', () => {
+    expect(source).not.toMatch(/formats\.(?:filter|slice)\s*\(/);
+  });
+
+  it('renders the API identifier inside <code class="admob-font-mono">', () => {
+    expect(source).toMatch(/<code[^>]*class="[^"]*\badmob-font-mono\b[^"]*"[^>]*>\s*\{format\.api\}\s*<\/code>/);
+  });
+
+  it('renders a <h3> with a link to the format href so the fragment is preserved', () => {
+    expect(source).toMatch(/<h3>\s*<a\s+href=\{format\.href\}>/);
+  });
+
+  it('renders exactly one <ol class="landing-formats">', () => {
+    const matches = source.match(/<ol\s+class="landing-formats"/g) ?? [];
+    expect(matches).toHaveLength(1);
+  });
+
+  it('section label is sentence case: no uppercase mono eyebrows in the component', () => {
+    expect(source).not.toMatch(/\btext-transform\s*:\s*uppercase\b/i);
+    const allCapsLabelRe = />\s*SUPPORTED\s+FORMATS\s*</;
+    expect(source.match(allCapsLabelRe), 'section label must not be all-caps').toBeNull();
+  });
+
+  it('does not render a placeholder screenshot element when the data record has no screenshot', () => {
+    const placeholderRe = /<img[^>]*placeholder/;
+    expect(source.match(placeholderRe), 'no <img placeholder> allowed').toBeNull();
+  });
+});

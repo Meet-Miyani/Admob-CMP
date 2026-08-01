@@ -1,0 +1,40 @@
+---
+import { formats } from '../../data/landing';
+
+const screenshotModules = import.meta.glob<{ default: any }>(
+  '../Screenshot.astro',
+  { eager: true }
+);
+const ScreenshotComponent = screenshotModules['../Screenshot.astro']?.default;
+---
+
+<section class="landing-section">
+  <h2>Supported formats</h2>
+  <ol class="landing-formats">
+    {formats.map((format) => {
+      const hasScreenshot =
+        Boolean(ScreenshotComponent) && format.screenshot !== null;
+      const itemClass = hasScreenshot
+        ? 'landing-format landing-format--with-screenshot'
+        : 'landing-format';
+      return (
+        <li class={itemClass}>
+          {hasScreenshot && format.screenshot ? (
+            <div class="landing-format__screenshot">
+              <ScreenshotComponent
+                name={format.screenshot}
+                crop={format.crop}
+                alt={`${format.name} ad on a phone`}
+              />
+            </div>
+          ) : null}
+          <h3>
+            <a href={format.href}>{format.name}</a>
+          </h3>
+          <p>{format.blurb}</p>
+          <code class="admob-font-mono landing-format__api">{format.api}</code>
+        </li>
+      );
+    })}
+  </ol>
+</section>
