@@ -11,6 +11,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
+    "diagrams:prose": "node scripts/generate-diagram-prose.mjs",
     "test": "vitest run",
     "verify": "node scripts/verify-build.mjs",
     "check:theme": "node scripts/check-theme.mjs",
