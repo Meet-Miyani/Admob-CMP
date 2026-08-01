@@ -136,3 +136,17 @@
     grid-column: auto;
   }
 }
+
+.landing-capabilities {
+  margin-block: var(--landing-section-gap);
+}
+
+.landing-capabilities__footnote {
+  margin-top: 0.75rem;
+  font-size: 0.9em;
+  color: var(--admob-slate);
+}
+
+.landing-capabilities__footnote a {
+  color: var(--admob-accent-text);
+}

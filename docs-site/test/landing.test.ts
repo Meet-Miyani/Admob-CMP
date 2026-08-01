@@ -438,3 +438,153 @@ describe('FormatList.astro contracts', () => {
     );
   });
 });
+
+const capabilityMatrixPath = fileURLToPath(
+  new URL('../src/components/landing/CapabilityMatrix.astro', import.meta.url)
+);
+const indexMdxPath = fileURLToPath(
+  new URL('../src/content/docs/index.mdx', import.meta.url)
+);
+
+describe('CapabilityMatrix.astro contracts', () => {
+  const source = readFileSync(capabilityMatrixPath, 'utf8');
+
+  it('exists as an Astro component', () => {
+    expect(existsSync(capabilityMatrixPath)).toBe(true);
+  });
+
+  it('imports capabilities, capabilityVerifiedOn, and basicAdsRepo from the data module', () => {
+    expect(source).toMatch(
+      /import\s*\{[^}]*\bcapabilities\b[^}]*\}\s*from\s*['"]\.\.\/\.\.\/data\/landing(?:\.ts)?['"]/
+    );
+    expect(source).toMatch(
+      /import\s*\{[^}]*\bcapabilityVerifiedOn\b[^}]*\}\s*from\s*['"]\.\.\/\.\.\/data\/landing(?:\.ts)?['"]/
+    );
+    expect(source).toMatch(
+      /import\s*\{[^}]*\bbasicAdsRepo\b[^}]*\}\s*from\s*['"]\.\.\/\.\.\/data\/landing(?:\.ts)?['"]/
+    );
+  });
+
+  it('wraps the table in a focusable, labelled, .table-scroll--wide region', () => {
+    const wrapperRe =
+      /<div[\s\S]*?class="table-scroll table-scroll--wide"[\s\S]*?tabindex="0"[\s\S]*?role="region"[\s\S]*?aria-label=\{ariaLabel\}[\s\S]*?>/;
+    expect(source).toMatch(wrapperRe);
+  });
+
+  it('aria-label mentions basic-ads and the verified date', () => {
+    expect(source).toMatch(/aria-label=\{ariaLabel\}/);
+    const labelBinding = source.match(/const\s+ariaLabel\s*=\s*[`'"`]([^`'"`]+)[`'"`]/);
+    expect(labelBinding, 'ariaLabel is a literal string template').not.toBeNull();
+    const label = labelBinding![1];
+    expect(label).toMatch(/basic-ads/i);
+    expect(label).toContain('${capabilityVerifiedOn}');
+  });
+
+  it('renders a <thead> with three column headers in the canonical order', () => {
+    expect(source).toMatch(/<thead>/);
+    expect(source).toMatch(/<th\s+scope="col">Capability<\/th>/);
+    expect(source).toMatch(/<th\s+scope="col">AdMob CMP<\/th>/);
+    expect(source).toMatch(/<th\s+scope="col">basic-ads<\/th>/);
+  });
+
+  it('iterates the imported `capabilities` array, not a hard-coded set of rows', () => {
+    expect(source).toMatch(/capabilities\.map\(/);
+    const firstRowFirstCell = (capabilities[0] as { capability: string }).capability;
+    const lastRowFirstCell = (capabilities[capabilities.length - 1] as { capability: string })
+      .capability;
+    expect(firstRowFirstCell).toBe('Banner ads');
+    expect(lastRowFirstCell).toBe('Maven Central publication');
+    expect(source).toMatch(/<th\s+scope="row">\{row\.capability\}<\/th>/);
+    expect(source).toMatch(/<td>\{row\.admobCmp\}<\/td>/);
+    expect(source).toMatch(/<td>\{row\.basicAds\}<\/td>/);
+  });
+
+  it('renders exactly 14 rows from the canonical capabilities array', () => {
+    expect(capabilities).toHaveLength(14);
+    expect(source).not.toMatch(/<\s*tr\s*>[\s\S]{0,200}<\s*td\s*>\s*Yes\s*<\s*\/\s*td\s*>/);
+  });
+
+  it('footnotes the comparison with the verified date and a neutral "Not documented" definition', () => {
+    expect(source).toMatch(/class="landing-capabilities__footnote"/);
+    expect(source).toMatch(/\{capabilityVerifiedOn\}/);
+    const footnote = source.match(
+      /class="landing-capabilities__footnote"[^>]*>([\s\S]*?)<\/p>/
+    );
+    expect(footnote, 'footnote paragraph is present').not.toBeNull();
+    const text = footnote![1].replace(/\s+/g, ' ');
+    expect(text).toMatch(/Not documented/);
+    expect(text).toMatch(/public documentation does not describe/i);
+    expect(text).toMatch(/older and larger/i);
+    expect(text).toMatch(/earlier publisher|API reference/i);
+    expect(text).toMatch(/open an issue/i);
+    expect(text).toContain('capabilityVerifiedOn');
+  });
+
+  it('rejects marketing or evaluative language in the footnote', () => {
+    const denylist = [
+      'best',
+      'leading',
+      'superior',
+      'only',
+      'incredible',
+      'powerful',
+      'amazing',
+      'fastest',
+      'easiest',
+      'revolutionary',
+      'ultimate',
+    ];
+    const footnote = source.match(
+      /class="landing-capabilities__footnote"[^>]*>([\s\S]*?)<\/p>/
+    );
+    expect(footnote, 'footnote paragraph is present').not.toBeNull();
+    const text = footnote![1].replace(/\s+/g, ' ').toLowerCase();
+    for (const word of denylist) {
+      const re = new RegExp(`\\b${word}\\b`, 'i');
+      expect(re.test(text), `footnote must not contain '${word}'`).toBe(false);
+    }
+  });
+
+  it('uses sentence-case headings and no uppercase mono eyebrows', () => {
+    const allCapsHeadingRe = />\s*CAPABILITY\s+COMPARISON\s*</;
+    expect(source.match(allCapsHeadingRe), 'component h2 must not be all-caps').toBeNull();
+    expect(source).toMatch(/<h2>Capability comparison<\/h2>/);
+  });
+});
+
+describe('index.mdx quickstart and iOS note', () => {
+  const source = readFileSync(indexMdxPath, 'utf8');
+
+  it('imports the CapabilityMatrix component', () => {
+    expect(source).toMatch(
+      /import\s+CapabilityMatrix\s+from\s+['"]\.\.\/\.\.\/components\/landing\/CapabilityMatrix\.astro['"]/
+    );
+  });
+
+  it('renders the CapabilityMatrix component', () => {
+    expect(source).toMatch(/<CapabilityMatrix\s*\/>/);
+  });
+
+  it('keeps the install line on the canonical Maven coordinate and version 1.1.0', () => {
+    expect(source).toMatch(/implementation\(["']dev\.avinya\.ads:admob-cmp:1\.1\.0["']\)/);
+  });
+
+  it('preserves the gatherConsentAndInitialize(AdConfig(...)) initialization shape', () => {
+    expect(source).toMatch(/adManager\.gatherConsentAndInitialize\(/);
+    expect(source).toMatch(/AdConfig\(/);
+  });
+
+  it('keeps the iOS note mentioning ConsentMode.InitializeOnlyIfAlreadyAllowed and the UMP -> ATT -> initialize ordering', () => {
+    expect(source).toMatch(/ConsentMode\.InitializeOnlyIfAlreadyAllowed/);
+    expect(source).toMatch(/UMP consent/i);
+    expect(source).toMatch(/ATT[^.]*tracking authorization|tracking authorization/i);
+    expect(source).toMatch(/then initialize/i);
+  });
+
+  it('links the Quickstart example to /start/quickstart/ with a trailing slash', () => {
+    const matches = source.match(/\(\/start\/quickstart\/\)/g) ?? [];
+    expect(matches.length, 'multiple quickstart links expected (intro + continue)').toBeGreaterThan(
+      0
+    );
+  });
+});

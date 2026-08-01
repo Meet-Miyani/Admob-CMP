@@ -22,7 +22,44 @@ head:
 
 import ProjectMetadata from '../../components/landing/ProjectMetadata.astro';
 import FormatList from '../../components/landing/FormatList.astro';
+import CapabilityMatrix from '../../components/landing/CapabilityMatrix.astro';
 
 <ProjectMetadata />
 
 <FormatList />
+
+<section class="landing-section">
+
+## Quick start
+
+The integration has two required lines: one Maven dependency in `commonMain`, and one initialization call at the root of the app that gathers consent and starts Mobile Ads in a single step. The full setup — version catalogs, the Gradle plugin, Kotlin/Native test linking, the iOS-only Info.plist keys, and the `doctorIos` check — lives in the [Quickstart guide](/start/quickstart/).
+
+```kotlin
+// shared/build.gradle.kts
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            implementation("dev.avinya.ads:admob-cmp:1.1.0")
+        }
+    }
+}
+```
+
+```kotlin
+// commonMain — initialize once at the root
+adManager.gatherConsentAndInitialize(
+    AdConfig(
+        androidAppId = TestAdIds.ANDROID_APP_ID,
+        iosAppId = TestAdIds.IOS_APP_ID,
+        testMode = true,
+    )
+)
+```
+
+On iOS, the production ordering is UMP consent, then ATT tracking authorization, then initialize with `ConsentMode.InitializeOnlyIfAlreadyAllowed`. See the [iOS setup guide](/start/ios-setup/) for the two Swift Package Manager package URLs and the three `Info.plist` keys.
+
+[Continue to the full Quickstart →](/start/quickstart/)
+
+</section>
+
+<CapabilityMatrix />
