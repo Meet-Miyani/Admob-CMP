@@ -121,6 +121,12 @@
   overflow: hidden;
 }
 
+.landing-format__screenshot--placeholder {
+  width: 100%;
+  aspect-ratio: 9 / 19.5;
+  background: var(--admob-surface);
+}
+
 @media (max-width: 720px) {
   .landing-formats {
     grid-template-columns: 1fr;

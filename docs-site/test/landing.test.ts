@@ -421,8 +421,20 @@ describe('FormatList.astro contracts', () => {
     expect(source.match(allCapsLabelRe), 'section label must not be all-caps').toBeNull();
   });
 
-  it('does not render a placeholder screenshot element when the data record has no screenshot', () => {
-    const placeholderRe = /<img[^>]*placeholder/;
-    expect(source.match(placeholderRe), 'no <img placeholder> allowed').toBeNull();
+  it('always renders a landing-format__screenshot frame element on every row', () => {
+    expect(source).toMatch(/<div\s+class="landing-format__screenshot/);
+  });
+
+  it('renders the neutral placeholder div with role="img" and aria-label when the Screenshot is absent', () => {
+    expect(source).toMatch(
+      /<div\s+class="landing-format__screenshot landing-format__screenshot--placeholder"[^>]*role="img"[^>]*aria-label="[^"]+"/
+    );
+  });
+
+  it('landing.css defines aspect-ratio on the placeholder selector so the frame shape is stable', () => {
+    const css = readFileSync(landingCssPath, 'utf8');
+    expect(css).toMatch(
+      /\.landing-format__screenshot--placeholder\s*\{[^}]*aspect-ratio\s*:\s*9\s*\/\s*19\.5/
+    );
   });
 });
