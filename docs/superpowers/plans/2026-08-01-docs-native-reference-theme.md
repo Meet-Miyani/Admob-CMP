@@ -1,6 +1,6 @@
 # Documentation Native Reference Theme Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Completed steps are retained with checked (`- [x]`) boxes as the execution record.
 
 **Goal:** Replace the current stylized editorial theme with a quiet, theme-aware technical reference design based on measured GitHub Docs and Starlight conventions.
 
@@ -8,10 +8,12 @@
 
 **Tech Stack:** Astro 7.1.6, Starlight 0.41.5, Expressive Code/Shiki, Playwright 1.62.1, Vitest 4.1.10, CSS custom properties.
 
+**Status:** Implemented, independently reviewed, and verified. This document is maintained as the as-built implementation record.
+
 ## Global Constraints
 
 - Preserve every existing uncommitted change; refine files in place and do not reset them.
-- Do not commit, stage, push, open a PR, tag, or release during this plan. Integration remains a separate owner decision.
+- During implementation, do not commit, stage, push, open a PR, tag, or release. Integration remains a separate owner decision and occurred only after explicit approval.
 - Do not change documentation prose, routes, landing-page structure, Mermaid content, SDK code, Kotlin ABI, generated API files, or GitHub workflows.
 - Keep `rehypeTableScroll()`, `@astrojs/markdown-remark` 7.2.2, its Vitest coverage, and both local visual checks in release-readiness Section 8.
 - Keep all existing `--admob-*` public token names. Values may change; names may not.
@@ -25,11 +27,15 @@
 ## File Map
 
 - `docs-site/scripts/check-theme.mjs` — executable rendered-design contract for typography, color schemes, code, tables, components, overflow, and motion.
+- `docs-site/scripts/check-overflow.mjs` — all-page mobile containment gate using an isolated static server.
 - `docs-site/astro.config.mjs` — Markdown processor, Starlight configuration, Expressive Code theme selection, Mermaid font stack, and font preloads.
 - `docs-site/src/styles/tokens.css` — Avinya/Starlight color mapping and all presentation overrides.
 - `docs-site/src/lib/rehype-table-scroll.mjs` — unchanged accessible table transform.
 - `docs-site/test/rehype-table-scroll.test.ts` — unchanged table-transform regression coverage.
-- `scripts/release-readiness.sh` — unchanged in this pass; verify that Section 8 still runs `check:theme` and `check:overflow`.
+- `docs-site/src/pages/og/[...route].ts` — generated social images using bundled Noto Sans typography.
+- `docs-site/test/og-theme.test.ts` — regression coverage for local OG fonts and removal of the rejected font families.
+- `docs-site/package.json` and `docs-site/package-lock.json` — explicit Markdown processor and bundled Noto Sans dependencies.
+- `scripts/release-readiness.sh` — Section 8 runs `check:theme` and `check:overflow` after the Astro build.
 
 ### Task 1: Replace the visual regression contract first
 
@@ -37,17 +43,16 @@
 - Modify: `docs-site/scripts/check-theme.mjs:85-164`
 
 **Interfaces:**
-- Consumes: the built `docs-site/dist/` tree and `PREVIEW_URL` override already supported by the script.
+- Consumes: the built `docs-site/dist/` tree, served on an isolated ephemeral localhost port, or an explicit `PREVIEW_URL` override.
 - Produces: failing assertions for the old visual system and executable acceptance criteria for Tasks 2–3.
 
-- [ ] **Step 1: Expand the rendered inspection payload**
+- [x] **Step 1: Expand the rendered inspection payload**
 
 Capture typography, component shape, and theme-specific code data in addition to the existing accessibility and overflow data:
 
 ```js
 const h1 = document.querySelector('h1');
 const h2 = document.querySelector('.sl-markdown-content h2');
-const h3 = document.querySelector('.sl-markdown-content h3');
 const sidebarLink = document.querySelector('.sidebar-content a');
 const searchButton = document.querySelector('site-search button[data-open-modal]');
 const linkCard = document.querySelector('.sl-link-card');
@@ -64,7 +69,6 @@ return {
     h1: getComputedStyle(h1).fontSize,
     h1Family: getComputedStyle(h1).fontFamily,
     h2: getComputedStyle(h2).fontSize,
-    h3: getComputedStyle(h3).fontSize,
   },
   sidebar: {
     fontFamily: getComputedStyle(sidebarLink).fontFamily,
@@ -88,7 +92,7 @@ return {
 };
 ```
 
-- [ ] **Step 2: Add exact Native Reference assertions**
+- [x] **Step 2: Add exact Native Reference assertions**
 
 Use explicit expected values so future theme drift fails locally:
 
@@ -103,13 +107,12 @@ check(desktop.article?.lineHeight === '25.6px', `${theme} body uses 1.6 rhythm`)
 check(desktop.article?.width <= 720, `${theme} reading measure is at most 45rem`);
 check(desktop.headings?.h1 === '32px', `${theme} desktop H1 is 32px`);
 check(desktop.headings?.h2 === '24px', `${theme} H2 is 24px`);
-check(desktop.headings?.h3 === '19px', `${theme} H3 is 19px`);
+check(roadmapH3 === '19px', `${theme} H3 is 19px`);
 check(
-  desktop.article?.fontFamily === desktop.headings?.h1Family &&
-    !/Space Grotesk|Inter/.test(desktop.article?.fontFamily ?? ''),
+  usesNativeStack(desktop.article?.fontFamily) && usesNativeStack(desktop.headings?.h1Family),
   `${theme} prose and headings share the native UI stack`
 );
-check(desktop.sidebar?.fontFamily === desktop.article?.fontFamily, `${theme} sidebar uses the UI stack`);
+check(usesNativeStack(desktop.sidebar?.fontFamily), `${theme} sidebar uses the UI stack`);
 check(desktop.sidebar?.fontSize === '13px', `${theme} sidebar is 13px`);
 check(desktop.code?.background === codeBackground, `${theme} code follows the site theme`);
 check(desktop.code?.fontSize === '14px', `${theme} code is 14px`);
@@ -123,23 +126,24 @@ check(mobile.headings?.h1 === '28px', `${theme} mobile H1 is 28px`);
 ```
 
 Retain the accessible link contrast, focusable table region, structured-table, reduced-motion, and mobile containment checks.
+Measure H3 on `/project/roadmap/`, which contains a real third-level heading, instead of assuming the primary regression page has one.
 
-- [ ] **Step 3: Check syntax color coverage by documented language**
+- [x] **Step 3: Check syntax color coverage by documented language**
 
 Add an inspection helper that loads the specified page and selects the matching block:
 
 ```js
 const syntaxCases = [
-  { language: 'kotlin', path: '/start/quickstart/' },
-  { language: 'xml', path: '/start/android-setup/' },
-  { language: 'toml', path: '/start/installation/' },
-  { language: 'bash', path: '/start/installation/' },
+  { language: 'kotlin', path: '/start/quickstart/', minimumColors: 5 },
+  { language: 'xml', path: '/start/android-setup/', minimumColors: 5 },
+  { language: 'toml', path: '/start/installation/', minimumColors: 3 },
+  { language: 'bash', path: '/start/installation/', minimumColors: 4 },
 ];
 ```
 
-For each case and each theme, count unique computed colors within `.expressive-code[data-language="${language}"] span` and require at least five.
+For each case and each theme, count unique computed colors within `.expressive-code pre[data-language="${language}"] span` and enforce its evidence-based minimum. Kotlin and XML expose five colors in the authored samples; TOML and Bash expose three and four respectively under the paired GitHub themes.
 
-- [ ] **Step 4: Run the new gate against the current build and confirm RED**
+- [x] **Step 4: Run the new gate against the current build and confirm RED**
 
 Run:
 
@@ -150,7 +154,7 @@ npm run check:theme
 
 Expected: non-zero exit with failures for 1.6 line height, 32px desktop H1, native shared font, theme-aware light code, 6px shapes, and absent entrance motion. Table accessibility and mobile containment should continue to pass.
 
-- [ ] **Step 5: Review checkpoint**
+- [x] **Step 5: Review checkpoint**
 
 Inspect only `docs-site/scripts/check-theme.mjs`; do not alter production CSS/config to make the test pass yet, and do not commit.
 
@@ -163,7 +167,7 @@ Inspect only `docs-site/scripts/check-theme.mjs`; do not alter production CSS/co
 - Consumes: built-in Shiki theme identifiers `github-dark` and `github-light`, plus Starlight’s Expressive Code UI-color bridge.
 - Produces: theme-switched token colors and frame surfaces driven by `--sl-color-gray-6`/`--sl-color-gray-7` from Task 3.
 
-- [ ] **Step 1: Remove the permanent-dark theme builder**
+- [x] **Step 1: Remove the permanent-dark theme builder**
 
 Delete `buildCodeTheme(mode)` and its permanent `#15181f` editor colors. Replace the Expressive Code configuration with:
 
@@ -190,7 +194,7 @@ expressiveCode: {
 
 Do not hard-code editor, terminal, title-bar, copy-button, or border colors. Starlight’s UI bridge resolves those per site theme.
 
-- [ ] **Step 2: Remove display/body font preloads**
+- [x] **Step 2: Remove display/body font preloads**
 
 Replace the Space Grotesk and Inter preload entries with one code-font preload:
 
@@ -207,7 +211,7 @@ Replace the Space Grotesk and Inter preload entries with one code-font preload:
 },
 ```
 
-- [ ] **Step 3: Make Mermaid use the same native UI family**
+- [x] **Step 3: Make Mermaid use the same native UI family**
 
 Set its font stack to:
 
@@ -217,7 +221,7 @@ fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Noto Sans, Helvetica N
 
 Keep all existing Mermaid colors and the `rehypeTableScroll` ordering unchanged. Correct the current indentation of the `rehypePlugins` array while editing this block.
 
-- [ ] **Step 4: Build to verify configuration and theme identifiers**
+- [x] **Step 4: Build to verify configuration and theme identifiers**
 
 Run:
 
@@ -228,7 +232,7 @@ npm run build
 
 Expected: 26 pages build, no Markdown deprecation warning, and no unknown Shiki theme error.
 
-- [ ] **Step 5: Review checkpoint**
+- [x] **Step 5: Review checkpoint**
 
 Inspect `astro.config.mjs` for leftover `#15181f`, `#0d1015`, `Space Grotesk`, `Inter`, or `buildCodeTheme` references. Expected: none. Do not commit.
 
@@ -241,7 +245,7 @@ Inspect `astro.config.mjs` for leftover `#15181f`, `#0d1015`, `Space Grotesk`, `
 - Consumes: unchanged `--admob-*` token names and Starlight component selectors.
 - Produces: the computed typography, component shapes, theme surfaces, and motion behavior asserted by Task 1.
 
-- [ ] **Step 1: Replace font declarations and theme tokens**
+- [x] **Step 1: Replace font declarations and theme tokens**
 
 Delete all Space Grotesk and Inter `@font-face` rules. Keep both JetBrains Mono faces. Set the theme-independent values exactly:
 
@@ -297,7 +301,7 @@ Use these paired surface tokens:
 
 Map Starlight’s dark `--sl-color-gray-6` to `#161b22` and light `--sl-color-gray-7` to `#f6f8fa`; these are the code-frame surfaces consumed by Task 2.
 
-- [ ] **Step 2: Apply the exact typography scale**
+- [x] **Step 2: Apply the exact typography scale**
 
 Replace display typography overrides with:
 
@@ -350,12 +354,12 @@ h6,
 
 Delete `.mono-label` display treatment and paragraph `text-wrap: pretty`; allow browser-default wrapping.
 
-- [ ] **Step 3: Simplify prose and navigation**
+- [x] **Step 3: Simplify prose and navigation**
 
 - Replace border-bottom link simulation with `text-decoration: underline`, `text-underline-offset: 0.15em`, and a 150ms `text-decoration-color`/`color` transition.
 - Delete the custom unordered-list reset and pseudo-rule bullets so native Starlight bullets return.
 - Set `.sidebar-content a` to the UI stack, 13px/1.5, and a 150ms color transition.
-- Keep the current-page 2px inset orange marker, but set `background: transparent`.
+- Use stronger neutral text for the current sidebar page with no marker, tinted fill, shadow, or nested hierarchy rail.
 - Set group labels and TOC headings to the UI stack, 12px, weight 600, normal tracking, and `text-transform: none`.
 - Keep TOC active-marker opacity changes at 150ms with no transform.
 
@@ -367,11 +371,11 @@ Use this active navigation contract:
   color: var(--admob-ink);
   font-weight: 600;
   background: transparent;
-  box-shadow: inset 2px 0 var(--admob-accent);
+  box-shadow: none;
 }
 ```
 
-- [ ] **Step 4: Let Expressive Code follow its themes**
+- [x] **Step 4: Let Expressive Code follow its themes**
 
 Delete every hard-coded frame/editor color. Keep only structural integration:
 
@@ -392,7 +396,7 @@ Delete every hard-coded frame/editor color. Keep only structural integration:
 }
 ```
 
-- [ ] **Step 5: Flatten asides, cards, pagination, and search**
+- [x] **Step 5: Flatten asides, cards, pagination, and search**
 
 - Remove the universal orange aside border/title and restore `.starlight-aside__icon { display: block; }`.
 - Set aside radius to 6px; title to UI font, 14px, weight 600, normal tracking/case; content to 15px/1.6.
@@ -400,14 +404,15 @@ Delete every hard-coded frame/editor color. Keep only structural integration:
 - Delete `transform: translateY(-1px)` and every transform transition.
 - Set card titles and pagination titles to the UI family with normal letter spacing.
 - Set the search button to the UI font, 13px, and 6px radius; remove the pill comment and `100px` radius.
+- Keep header utilities compact: remove the social divider, render the GitHub icon in neutral slate, and make the theme selector borderless while retaining its global focus outline.
 
-- [ ] **Step 6: Remove decorative motion**
+- [x] **Step 6: Remove decorative motion**
 
 Delete `@keyframes admob-article-enter` and the `main[data-pagefind-body]` animation rule. Keep the reduced-motion block, but limit it to disabling smooth scrolling and reducing animation/transition durations.
 
 Allowed transitions are only `color`, `background-color`, `border-color`, `text-decoration-color`, and `opacity`, lasting 120–150ms.
 
-- [ ] **Step 7: Simplify tables without changing structure**
+- [x] **Step 7: Simplify tables without changing structure**
 
 Use:
 
@@ -455,7 +460,7 @@ Use:
 
 Keep `.table-scroll--wide table { min-width: 42rem; }` and the last-row border removal. Delete table row transition and hover rules.
 
-- [ ] **Step 8: Build and run the new visual gate to reach GREEN**
+- [x] **Step 8: Build and run the new visual gate to reach GREEN**
 
 Run:
 
@@ -467,7 +472,7 @@ npm run check:theme
 
 Expected: the build completes and every light, dark, desktop, mobile, language-color, accessibility, shape, and motion assertion passes.
 
-- [ ] **Step 9: Review checkpoint**
+- [x] **Step 9: Review checkpoint**
 
 Search the final CSS for rejected patterns:
 
@@ -487,7 +492,7 @@ Expected: no matches. Do not commit.
 - Consumes: the production build from Task 3.
 - Produces: evidence that the CSS contract works across real content shapes, not just one regression page.
 
-- [ ] **Step 1: Capture representative desktop and mobile pages**
+- [x] **Step 1: Capture representative desktop and mobile pages**
 
 Render these pages in light and dark themes at 1440×1000, 768×1024, and 390×844:
 
@@ -499,7 +504,7 @@ Render these pages in light and dark themes at 1440×1000, 768×1024, and 390×8
 /reference/troubleshooting/
 ```
 
-- [ ] **Step 2: Inspect the exact acceptance checklist**
+- [x] **Step 2: Inspect the exact acceptance checklist**
 
 For every viewport/theme combination confirm:
 
@@ -512,13 +517,39 @@ For every viewport/theme combination confirm:
 - standard bullets, semantic callouts, cards, search, sidebar, and TOC have no ornamental motion or oversized rounding;
 - focus outlines remain visible.
 
-- [ ] **Step 3: Fix only evidence-backed visual defects**
+- [x] **Step 3: Fix only evidence-backed visual defects**
 
 If a rendered check fails, first add or tighten the corresponding `check-theme.mjs` assertion, verify RED, make the smallest CSS/config correction, rebuild, and verify GREEN.
 
-- [ ] **Step 4: Review checkpoint**
+- [x] **Step 4: Review checkpoint**
 
-Record any deviations from the approved spec. Expected: none. Do not commit.
+Record the owner-approved deviations from the initial draft: text-only active sidebar navigation, compact header utilities, and language-specific syntax thresholds. Do not commit during implementation.
+
+### Task 4A: Close final-review gaps
+
+**Files:**
+- Modify: `docs-site/scripts/check-theme.mjs`
+- Modify: `docs-site/scripts/check-overflow.mjs`
+- Modify: `docs-site/src/pages/og/[...route].ts`
+- Modify: `docs-site/package.json`
+- Modify: `docs-site/package-lock.json`
+- Create: `docs-site/test/og-theme.test.ts`
+
+- [x] **Step 1: Isolate browser gates from stale preview processes**
+
+When `PREVIEW_URL` is unset, bind each gate to `127.0.0.1` on port `0`, read the assigned port from the server, and inspect only the freshly built `dist/` directory. When `PREVIEW_URL` is explicit, verify it is reachable and use it unchanged.
+
+- [x] **Step 2: Exercise the theme selector**
+
+In light and dark desktop contexts, require the visible theme selector to match `:focus-visible`, expose a non-none outline at least 2px wide, and update `document.documentElement.dataset.theme` when the opposite theme is selected.
+
+- [x] **Step 3: Align generated social imagery**
+
+Replace Space Grotesk and Inter in the OG route with bundled Noto Sans 400/600 assets from exact dependency `@fontsource/noto-sans` 5.3.0. Add a focused Vitest test that rejects the legacy families and network font URLs and verifies both local assets.
+
+- [x] **Step 4: Re-review and verify**
+
+Run the 13-test suite, 26-page build, both isolated browser gates, generated-artifact verification, and the full eight-section readiness script. Expected: independent review clean and `READINESS: PASS`.
 
 ### Task 5: Run the complete local verification protocol
 
@@ -531,7 +562,7 @@ Record any deviations from the approved spec. Expected: none. Do not commit.
 - Consumes: the final implementation tree.
 - Produces: exact local evidence required for handoff; no remote actions.
 
-- [ ] **Step 1: Run docs unit and build verification**
+- [x] **Step 1: Run docs unit and build verification**
 
 ```bash
 cd docs-site
@@ -544,13 +575,13 @@ npm run verify
 
 Expected:
 
-- 12 Vitest tests pass, including all three table-transform cases;
+- 13 Vitest tests pass, including the table-transform and bundled-OG-font cases;
 - 26 pages build without the Markdown deprecation warning;
 - theme checks pass in light, dark, mobile, and reduced-motion contexts;
 - every authored page is contained at 375px in both themes;
 - sitemap, SEO, Pagefind, Mermaid, API reference, and generated artifacts pass.
 
-- [ ] **Step 2: Run whitespace and scope checks**
+- [x] **Step 2: Run whitespace and scope checks**
 
 ```bash
 git -c core.fsmonitor=false diff --check
@@ -559,7 +590,7 @@ git -c core.fsmonitor=false status --short
 
 Expected: no whitespace errors. Only the approved docs-theme files, design spec, implementation plan, and the already-approved local readiness integration are modified/untracked.
 
-- [ ] **Step 3: Run the repository’s full eight-section gate**
+- [x] **Step 3: Run the repository’s full eight-section gate**
 
 ```bash
 ./scripts/release-readiness.sh
@@ -567,6 +598,6 @@ Expected: no whitespace errors. Only the approved docs-theme files, design spec,
 
 Expected: all eight sections run without `--skip-docs` and finish with `READINESS: PASS`. Section 8 must visibly run both `npm run check:theme` and `npm run check:overflow` after the Astro build.
 
-- [ ] **Step 4: Final handoff without integration actions**
+- [x] **Step 4: Final handoff without integration actions**
 
-Report the files changed, the measured visual decisions, every verification result, and the absence of commit/push/PR/tag/release actions. Leave the branch and working tree intact for owner review.
+Report the files changed, measured visual decisions, approved deviations, and every verification result. Leave the branch and working tree intact for owner review; integration requires a separate explicit request.
