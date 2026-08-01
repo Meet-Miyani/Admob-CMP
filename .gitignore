@@ -21,3 +21,6 @@ node_modules/
 .gradle_home/
 .codegraph/
 kotlin-js-store/
+
+# Agent scratch dirs (headless browser profiles, temp captures)
+scratch/
