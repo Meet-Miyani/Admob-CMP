@@ -1,9 +1,11 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
+import { unified } from '@astrojs/markdown-remark';
 import starlight from '@astrojs/starlight';
 import sitemap from '@astrojs/sitemap';
 import starlightLlmsTxt from 'starlight-llms-txt';
 import rehypeMermaid from 'rehype-mermaid';
+import rehypeTableScroll from './src/lib/rehype-table-scroll.mjs';
 
 
 /**
@@ -21,39 +23,32 @@ export default defineConfig({
   site: SITE,
   build: { format: 'directory' },
   markdown: {
-    /**
-     * Mermaid is rendered to static SVG at BUILD time, not in the browser:
-     * indexable, no client JS, no layout shift.
-     *
-     * This costs a headless Chromium at build time (see `npx playwright install
-     * chromium`). CI must install that browser before `npm run build` or the
-     * build fails with a Playwright "Executable doesn't exist" error.
-     *
-     * astro-expressive-code appends its own rehype plugin, so this one runs
-     * first and consumes the `language-mermaid` fence before EC sees it.
-     */
-    rehypePlugins: [
-      [
-        rehypeMermaid,
-        {
-          strategy: 'inline-svg',
-          mermaidConfig: {
-            theme: 'base',
-            fontFamily: 'Inter, system-ui, sans-serif',
-            themeVariables: {
-              background: '#f3f4f2',
-              primaryColor: '#ebecea',
-              primaryTextColor: '#16181a',
-              primaryBorderColor: '#d8dad6',
-              secondaryColor: '#f3f4f2',
-              tertiaryColor: '#ebecea',
-              lineColor: '#5a5f63',
-              textColor: '#16181a',
+    processor: unified({
+      rehypePlugins: [
+        [
+          rehypeMermaid,
+          {
+            strategy: 'inline-svg',
+            mermaidConfig: {
+              theme: 'base',
+              fontFamily:
+                '-apple-system, BlinkMacSystemFont, Segoe UI, Noto Sans, Helvetica Neue, Arial, sans-serif',
+              themeVariables: {
+                background: '#f3f4f2',
+                primaryColor: '#ebecea',
+                primaryTextColor: '#16181a',
+                primaryBorderColor: '#d8dad6',
+                secondaryColor: '#f3f4f2',
+                tertiaryColor: '#ebecea',
+                lineColor: '#5a5f63',
+                textColor: '#16181a',
+              },
             },
           },
-        },
+        ],
+        rehypeTableScroll,
       ],
-    ],
+    }),
   },
   integrations: [
     starlight({
@@ -72,12 +67,21 @@ export default defineConfig({
       customCss: ['./src/styles/tokens.css', './src/styles/mermaid.css'],
       components: { Head: './src/components/Head.astro' },
       expressiveCode: {
+        themes: ['github-dark', 'github-light'],
+        minSyntaxHighlightingColorContrast: 5.5,
         useStarlightUiThemeColors: true,
         useStarlightDarkModeSwitch: true,
         styleOverrides: {
-          borderRadius: 'var(--admob-radius)',
+          borderRadius: '6px',
           codeFontFamily: 'var(--admob-font-mono)',
+          codeFontSize: '0.875rem',
+          codeLineHeight: '1.55',
           uiFontFamily: 'var(--admob-font-body)',
+          frames: {
+            shadowColor: 'transparent',
+            tooltipSuccessBackground: 'var(--admob-accent-text)',
+            tooltipSuccessForeground: 'var(--admob-accent-contrast)',
+          },
         },
       },
       head: [
@@ -85,17 +89,7 @@ export default defineConfig({
           tag: 'link',
           attrs: {
             rel: 'preload',
-            href: '/fonts/space-grotesk-600.woff2',
-            as: 'font',
-            type: 'font/woff2',
-            crossorigin: 'anonymous',
-          },
-        },
-        {
-          tag: 'link',
-          attrs: {
-            rel: 'preload',
-            href: '/fonts/inter-400.woff2',
+            href: '/fonts/jetbrains-mono-400.woff2',
             as: 'font',
             type: 'font/woff2',
             crossorigin: 'anonymous',

@@ -28,7 +28,7 @@ plugins {
 }
 ```
 
-Platform setup — the Android manifest entry, and on iOS the two Swift packages plus `Info.plist` keys — is required. Follow [`admob-cmp/docs/SETUP.md`](admob-cmp/docs/SETUP.md), then verify with `./gradlew :admob-cmp-core:doctorIos`.
+Platform setup — the Android manifest entry, and on iOS the two Swift packages plus `Info.plist` keys — is required. Follow the [Android setup](https://ads.avinya.dev/start/android-setup/) and [iOS setup](https://ads.avinya.dev/start/ios-setup/) guides, then verify with `./gradlew :admob-cmp-core:doctorIos`.
 
 ## Ad formats
 
@@ -167,19 +167,19 @@ Underlying Google SDKs bound by 1.1.0:
 
 ## Documentation
 
-Full guides, diagrams, and the generated API reference live at **[ads.avinya.dev](https://ads.avinya.dev)**. The in-repo sources:
+Full guides, diagrams, and the generated API reference live at **[ads.avinya.dev](https://ads.avinya.dev)**.
 
-- [Setup & initialization](admob-cmp/docs/SETUP.md) — dependency, Android and iOS platform setup, init, troubleshooting
-- [Banner ads](admob-cmp/docs/BANNER.md) — adaptive sizes, collapsible, refresh policies, geometry
-- [Interstitial & rewarded](admob-cmp/docs/INTERSTITIAL.md) — load/show, caching, retry
-- [Native ads](admob-cmp/docs/NATIVE.md) — layout DSL, pooling, media info
-- [App-open ads](admob-cmp/docs/APP_OPEN.md) — `AppOpenAdCoordinator`, cooldowns, blocking
-- [Consent & privacy](admob-cmp/docs/CONSENT.md) — UMP modes, privacy options form
-- [Mediation](admob-cmp/docs/MEDIATION.md) — adapters, initialization hooks
-- [Architecture](admob-cmp/docs/ARCHITECTURE.md) — module map, threading, caching, decisions
-- [Publishing](admob-cmp/docs/PUBLISHING.md) — maintainer guide
+- [Quickstart](https://ads.avinya.dev/start/quickstart/) — a rendering test ad in five minutes
+- [Installation](https://ads.avinya.dev/start/installation/) — Gradle, version catalog, and the Gradle plugin
+- [Android setup](https://ads.avinya.dev/start/android-setup/) · [iOS setup](https://ads.avinya.dev/start/ios-setup/)
+- [Banner](https://ads.avinya.dev/formats/banner/) · [Interstitial](https://ads.avinya.dev/formats/interstitial/) · [Rewarded](https://ads.avinya.dev/formats/rewarded/) · [App-open](https://ads.avinya.dev/formats/app-open/) · [Native](https://ads.avinya.dev/formats/native/)
+- [UMP consent](https://ads.avinya.dev/privacy/consent/) · [App Tracking Transparency](https://ads.avinya.dev/privacy/app-tracking-transparency/) · [Play Data safety](https://ads.avinya.dev/privacy/play-data-safety/)
+- [Mediation](https://ads.avinya.dev/advanced/mediation/) · [Revenue events](https://ads.avinya.dev/advanced/revenue-events/) · [Caching, retry and timeouts](https://ads.avinya.dev/advanced/caching-retry-timeouts/) · [Test safety](https://ads.avinya.dev/advanced/test-safety/)
+- [Architecture](https://ads.avinya.dev/reference/architecture/) · [Compatibility](https://ads.avinya.dev/reference/compatibility/) · [Troubleshooting](https://ads.avinya.dev/reference/troubleshooting/) · [Changelog](https://ads.avinya.dev/reference/changelog/)
+- [Roadmap](https://ads.avinya.dev/project/roadmap/) · [Contributing](https://ads.avinya.dev/project/contributing/) · [Using with AI agents](https://ads.avinya.dev/project/ai-agents/)
+- [Publishing](admob-cmp/docs/PUBLISHING.md) — maintainer guide, repository only
 
-Integrating with an AI coding agent? Point it at [`admob-cmp/AGENTS.md`](admob-cmp/AGENTS.md) — it is the authoritative, condensed API and usage guide.
+Integrating with an AI coding agent? Point it at [`admob-cmp/AGENTS.md`](admob-cmp/AGENTS.md) and <https://ads.avinya.dev/llms.txt> — the latter is the canonical, machine-readable bundle of the full site.
 
 ## Repository layout
 

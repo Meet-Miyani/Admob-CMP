@@ -1,9 +1,102 @@
 ---
 title: "Changelog"
-description: "Release history for dev.avinya.ads:admob-cmp."
+description: "The admob-cmp changelog — what changed in each published release of the AdMob CMP Kotlin Multiplatform library, with links to the GitHub releases."
+faq:
+  - q: Which version of admob-cmp is current?
+    a: 1.1.0, published to Maven Central as dev.avinya.ads:admob-cmp along with the dev.avinya.ads.admob-cmp Gradle plugin marker.
+  - q: Does a new admob-cmp release change the required Kotlin version?
+    a: Not so far. Every 1.x release is built with Kotlin 2.3.20. A change to the Kotlin floor would be a breaking change and would ship as 2.0.0.
 ---
 
-Plan 3 writes this page. Target length is 800–1,500 words with worked examples,
-question-based H2s, and explicit cross-links. The file path and the frontmatter
-`title` / `description` above are fixed by Plan 2 — the sidebar, the sitemap and
-the generated OpenGraph card all key off them.
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+## Which versions are published?
+
+All published artifacts live under `dev.avinya.ads` on Maven Central:
+`admob-cmp`, `admob-cmp-core`, `admob-cmp-compose`, and the
+`dev.avinya.ads.admob-cmp.gradle.plugin` marker. The current
+release is **1.1.0**.
+
+| Version | Status | Notes |
+|---|---|---|
+| 1.1.0 | Current | Gradle plugin, banner geometry as input, refresh replay |
+| 1.0.2 | Superseded | First split into `admob-cmp-core` / `admob-cmp-compose` |
+| 1.0.1 | Superseded | Bug-fix release |
+| 1.0.0 | Superseded | First public release of `dev.avinya.ads:admob-cmp` |
+
+Release dates and full notes for older releases live on the
+[GitHub releases page](https://github.com/Meet-Miyani/admob-compose-multiplatform/releases).
+This page is updated in the same pull request that bumps
+`VERSION_NAME` for a release — see
+[Contributing](/project/contributing/) for the policy.
+
+## What changed in 1.1.0?
+
+- The `dev.avinya.ads.admob-cmp` **Gradle plugin is published
+  alongside the library**, so Kotlin/Native iOS test executables
+  link without a manual workaround. See
+  [Installation](/start/installation/) and
+  [Troubleshooting](/reference/troubleshooting/).
+- **Banner geometry is now a host-supplied input.**
+  `BannerAdController.load(geometry, sizePolicy, requestOptions)`
+  replaces the previous self-resolving behaviour, which silently
+  produced full-screen width on iPad split view, Slide Over and
+  popovers. Existing no-argument `load()` calls still compile
+  because `geometry` defaults to `null`, but a headless call
+  with no geometry now fails rather than guessing. See
+  [Banner ads](/formats/banner/).
+- **`refresh()` replays the whole resolved request** —
+  geometry, size policy and request options — from the most
+  recent `load()`, instead of rebuilding options from
+  `placement.requestOptions` and silently dropping custom
+  `AdRequestOptions`.
+
+## What changed in 1.0.2?
+
+- The library was **split into `admob-cmp-core` and
+  `admob-cmp-compose`** behind the existing `admob-cmp` umbrella
+  artifact, so the controller API can be consumed without a
+  Compose Multiplatform dependency. The umbrella coordinate is
+  unchanged, so no consumer action is required.
+
+## What changed in 1.0.1?
+
+A maintenance release on the 1.0 line. No behavioural changes
+documented in the release notes surfaced during review; the
+release is recorded for completeness.
+
+## What changed in 1.0.0?
+
+First public release of `dev.avinya.ads:admob-cmp` — six ad
+formats (banner, interstitial, rewarded, rewarded interstitial,
+app-open, native), UMP consent integrated into the
+initialisation flow, mediation support, paid-event streaming,
+and the bindings-only iOS distribution.
+
+## How is this page maintained?
+
+From 1.2.0 onward, this page is updated in the same pull request
+that bumps `VERSION_NAME` in `gradle.properties`. A release that
+does not update this page is incomplete. Older release notes
+that pre-date this policy are mirrored from the GitHub releases
+page; if a date or change cannot be established from a tag, a
+release, the git log, or Maven Central metadata, the cell is
+**omitted** rather than estimated. The
+[contributing guide](/project/contributing/) has the full
+release policy.
+
+A note on this page's scope. It documents changes to the public
+ABI, the Maven coordinate, and the Gradle plugin. It does not
+document internal refactors, test-only changes, or dependency
+upgrades that have no consumer-visible effect. Those land in the
+git log without a changelog entry, and a release that contains
+only internal changes still has a version bump but may not have
+a new section here.
+
+## Where to next?
+
+<CardGrid>
+  <LinkCard title="Compatibility" href="/reference/compatibility/" description="Which Kotlin and Compose versions each release needs." />
+  <LinkCard title="Roadmap" href="/project/roadmap/" description="What is planned, and what is gated." />
+  <LinkCard title="Contributing" href="/project/contributing/" description="How a release is cut." />
+</CardGrid>

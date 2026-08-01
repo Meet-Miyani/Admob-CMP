@@ -173,11 +173,11 @@ xcodebuild \
 if [ "$SKIP_DOCS" = "false" ]; then
   # Section 8 regenerates docs-site/public/api (gitignored) and
   # docs-site/dist/ (gitignored). Neither should ever be committed.
-  section "8. Docs (Dokka + Astro + verify)"
+  section "8. Docs (Dokka + Astro + visual checks + verify)"
   ./gradlew syncApiDocsToDocsSite --no-configuration-cache
   if [ ! -f docs-site/public/api/index.html ]; then
     echo "docs-site/public/api/index.html was not produced by syncApiDocsToDocsSite." >&2
-    FAILING_SECTION="8. Docs (Dokka + Astro + verify)"
+    FAILING_SECTION="8. Docs (Dokka + Astro + visual checks + verify)"
     exit 1
   fi
   (
@@ -189,6 +189,8 @@ if [ "$SKIP_DOCS" = "false" ]; then
     npx playwright install chromium
     npm test
     npm run build
+    npm run check:theme
+    npm run check:overflow
     npm run verify
   )
 else

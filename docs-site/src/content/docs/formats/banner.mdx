@@ -1,9 +1,239 @@
 ---
 title: "Banner ads"
-description: "Adaptive banner sizes, collapsible banners, refresh, and how banner geometry is resolved."
+description: "AdMob banners in Compose Multiplatform — BannerAdView, adaptive and collapsible size policies, refresh policies, and how banner width is resolved."
+faq:
+  - q: How do I show an AdMob banner in Compose Multiplatform?
+    a: Declare an AdPlacement with AdFormat.Banner and render BannerAdView. The composable measures its container, loads, sizes, attaches, refreshes and disposes the platform banner view for you.
+  - q: How do I make a collapsible banner?
+    a: Collapsible is a property of the anchored adaptive size policy. Set bannerSizePolicy to AdSizePolicy.LargeAnchoredAdaptive(collapsible = CollapsiblePlacement.Bottom), and test with the dedicated collapsible test ad units.
+  - q: Why is my banner blank?
+    a: Either the ad manager is not Ready yet, or the placement uses BannerRefreshPolicy.Manual and nothing has called refresh().
 ---
 
-Plan 3 writes this page. Target length is 800–1,500 words with worked examples,
-question-based H2s, and explicit cross-links. The file path and the frontmatter
-`title` / `description` above are fixed by Plan 2 — the sidebar, the sitemap and
-the generated OpenGraph card all key off them.
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import BannerGeometry from '../../../components/diagrams/BannerGeometry.astro';
+
+## How do I show a banner ad in Compose Multiplatform?
+
+Size and refresh behaviour come from the **placement**, not from
+composable parameters, which is why the same banner behaves identically
+whether it is driven from Compose or headlessly. The full
+AdMob Compose Multiplatform banner integration:
+
+```kotlin
+val placement = remember {
+    AdPlacement(
+        id = "banner_home",
+        format = AdFormat.Banner,
+        adUnitIds = AdUnitIds(
+            android = TestAdIds.ANDROID_BANNER,
+            ios = TestAdIds.IOS_BANNER,
+        ),
+    )
+}
+
+BannerAdView(
+    placement = placement,
+    modifier = Modifier.fillMaxWidth(),
+    onEvent = { event ->
+        when (event) {
+            is AdEvent.Loaded -> println("banner loaded")
+            is AdEvent.LoadFailed -> println("banner failed: ${event.error}")
+            is AdEvent.Paid -> println("revenue: ${event.paidEvent.value.valueMicros}")
+            else -> Unit
+        }
+    },
+)
+```
+
+`BannerAdView` resolves the width from its constraints (overridable
+with the `widthDp` parameter), sizes its height from the returned ad
+size, and clears the controller on dispose. The `remember` around the
+placement matters because controllers are cached per placement id for
+the manager's lifetime and are never auto-evicted, so ids must be
+static and finite. The
+[architecture reference](/reference/architecture/) explains why the
+cache exists.
+
+A subtle but important property: the same `BannerAdView` composable is
+reused across recompositions of the same screen, so its
+`onEvent` callback fires for every state change of the placement. The
+recommendation is to hoist ad events to a single collector rather than
+react in place, both for analytics accuracy and to keep recomposition
+work bounded. The
+[revenue and paid events guide](/advanced/revenue-events/) has the
+full event-stream pattern.
+
+## Which banner size should I use?
+
+```kotlin
+AdPlacement(
+    id = "banner_home",
+    format = AdFormat.Banner,
+    adUnitIds = AdUnitIds(android = "…", ios = "…"),
+    bannerSizePolicy = AdSizePolicy.LargeAnchoredAdaptive(),   // default
+)
+```
+
+| Policy | What it maps to | Use it when |
+|---|---|---|
+| `AdSizePolicy.LargeAnchoredAdaptive(collapsible)` | Large anchored adaptive | The banner is pinned to the top or bottom of the screen. This is the default. |
+| `AdSizePolicy.InlineAdaptive(maxHeightDp)` | Inline adaptive | The banner sits inside scrolling content and may be taller. |
+| `AdSizePolicy.Fixed(widthDp, heightDp)` | A fixed custom size | You need an exact size and accept lower fill. |
+| `AdSizePolicy.Fluid` | Fluid | The container dictates the size. |
+
+Anchored adaptive is the right default because it lets AdMob pick the
+best height for the device width. Inline adaptive is for feeds, where
+`maxHeightDp` bounds how much of the viewport an ad may take. Fixed
+sizes reduce eligible demand and should be a deliberate choice — they
+make sense for a custom layout slot that other UI elements measure
+against, and almost nowhere else.
+
+A practical note on heights: anchored adaptive returns a height that
+matches the device's current orientation. A banner at the bottom of
+the screen in portrait may grow when the device rotates to landscape,
+which is correct behaviour for an anchored ad and is the reason the
+size comes from the platform SDK rather than from a fixed number.
+
+## How do collapsible banners work?
+
+```kotlin
+bannerSizePolicy = AdSizePolicy.LargeAnchoredAdaptive(
+    collapsible = CollapsiblePlacement.Bottom,
+)
+```
+
+`CollapsiblePlacement` is `Top` or `Bottom`. Collapsible is a property
+of the anchored adaptive policy rather than a separate format. The part
+that wastes people's afternoons: **regular banner test ids never serve
+collapsible fill.** Testing requires
+`TestAdIds.ANDROID_COLLAPSIBLE_BANNER` and
+`TestAdIds.IOS_COLLAPSIBLE_BANNER`. With regular test ids, the banner
+loads and renders normally, but never collapses, which looks like a
+bug in the size policy rather than a test-id mismatch.
+
+Collapsible banners expand on a user tap and stay expanded until the
+user dismisses them, then return to a small anchor at the configured
+edge of the screen. They are subject to AdMob's collapsible-specific
+policies, and the publisher's AdMob account must have collapsible
+enabled — a unit from an account without collapsible enabled behaves
+the same as a regular banner.
+
+## How often does a banner refresh?
+
+```kotlin
+AdPlacement(
+    id = "banner_home",
+    format = AdFormat.Banner,
+    adUnitIds = AdUnitIds(android = "…", ios = "…"),
+    bannerRefreshPolicy = BannerRefreshPolicy.SdkManaged(60.seconds),
+)
+```
+
+| Policy | Behaviour |
+|---|---|
+| `BannerRefreshPolicy.AdServerManaged` | The default. No client timer; configure refresh in the AdMob UI. |
+| `BannerRefreshPolicy.SdkManaged(interval)` | Client-side reload every `interval`, enforced to the 30s–120s range, only while the app is foregrounded, and it waits for an in-flight load to settle. |
+| `BannerRefreshPolicy.Manual` | No automatic load at all. Call `adManager.banner(placement).refresh()` yourself. |
+
+<Aside type="caution">
+With `Manual`, nothing loads until `refresh()` is called, and
+`refresh()` fails if nothing has been loaded yet — so a `Manual` banner
+that has never been composed and loaded renders nothing. This is the
+single most common "my banner is blank" cause.
+</Aside>
+
+The `SdkManaged` 30s–120s range is enforced because AdMob's policy
+treats banners refreshing faster than 30 seconds as invalid traffic.
+Outside that range, the constructor clamps silently rather than
+throwing, which is the design choice that lets the same placement
+work across reasonable timer settings without forcing the caller to
+validate.
+
+## How is the banner width resolved?
+
+A banner's width is an **input**, not something the SDK can always
+discover. `BannerAdView` measures its own container and supplies it. A
+headless caller must supply it:
+
+```kotlin
+adManager.banner(placement).load(geometry = BannerGeometry(widthDp = 320))
+```
+
+<BannerGeometry />
+
+`load()` previously took `(sizePolicy, requestOptions)` and resolved
+its own width — from an `Activity` on Android and from
+`UIScreen.mainScreen` on iOS. The iOS path silently produced
+full-screen width in iPad split view, Slide Over and popovers, sizing
+every banner wrong with no error. Width is now a host-supplied input:
+`load(geometry, sizePolicy, requestOptions)`. Existing no-argument
+`load()` calls still compile because `geometry` defaults to `null`,
+but a headless call with no geometry now **fails** rather than guessing
+when the platform cannot resolve a width.
+
+`refresh()` replays the **whole** resolved request — geometry, size
+policy and request options — from the most recent `load()`. It
+previously kept only the resolved size and rebuilt options from
+`placement.requestOptions`, silently dropping any custom
+`AdRequestOptions` the original `load()` was given. It fails if nothing
+has been loaded yet.
+
+The fix is part of the 1.1.0 release and is the kind of behaviour
+change that is invisible until the day you depend on it. The
+[changelog](/reference/changelog/) entry for 1.1.0 calls it out
+explicitly.
+
+## Can I use banners without Compose?
+
+Yes. `adManager.banner(placement)` returns a `BannerAdController` with
+`load(geometry, sizePolicy, requestOptions)`, `refresh()`, `clear()`,
+`loadState: StateFlow<AdLoadState>`, `events: SharedFlow<AdEvent>`,
+and `placement`. The controller does not host a view — the caller is
+responsible for that. `BannerAdView` is the recommended path for
+anything Compose-rendered, because it measures its own container
+correctly; the headless path is for custom Android Views, for UIKit
+code, and for unit tests that need to drive a banner directly.
+
+A typical headless use case is a banner embedded in an `AndroidView`
+inside Compose, where the underlying view is a real platform widget
+the app manages. The controller API gives that widget a `loadState`
+it can observe and an `events` flow it can pipe into the rest of the
+app's analytics. The geometry parameter is mandatory in this case,
+because there is no Compose `Modifier` to measure.
+
+## Why is my banner blank?
+
+Each line is one common cause:
+
+- The manager is not `AdManagerStatus.Ready` yet. Gate on `status`
+  before placing any `BannerAdView`.
+- Consent has not been granted, so loads fail with
+  `AdErrorCode.CONSENT_REQUIRED`. Check
+  `adManager.consent.canRequestAds`.
+- The policy is `Manual` and nothing has called `refresh()`. Switch to
+  `SdkManaged` or compose the view and call `refresh()` explicitly.
+- The ad unit has no fill right now, which surfaces as GMA code `3` on
+  Android and `1` on iOS. That is normal; it is not a configuration
+  error and is not retried.
+- A headless `load()` was issued with no geometry on a platform that
+  cannot resolve a width. The library now fails rather than guessing.
+
+The full symptom table is on
+[Troubleshooting](/reference/troubleshooting/).
+
+One more thing worth knowing: a banner that loaded once and is now
+returning "no fill" is not a configuration error. AdMob's fill rate
+fluctuates by region, time of day, and ad unit age, and the right
+behaviour is to keep retrying on the configured refresh schedule.
+Retrying more aggressively — for instance, on every recomposition —
+risks invalid-traffic flags.
+
+## Where to next?
+
+<CardGrid>
+  <LinkCard title="Native ads" href="/formats/native/" description="Ads that match your own layout." />
+  <LinkCard title="Caching, retry and timeouts" href="/advanced/caching-retry-timeouts/" description="Retry backoff and load bounds." />
+  <LinkCard title="Revenue and paid events" href="/advanced/revenue-events/" description="AdValue and the mediation chain." />
+  <LinkCard title="Troubleshooting" href="/reference/troubleshooting/" description="Blank banners and no fill." />
+</CardGrid>

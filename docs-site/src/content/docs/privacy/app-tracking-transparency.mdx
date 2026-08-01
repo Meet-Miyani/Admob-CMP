@@ -1,9 +1,195 @@
 ---
 title: "App Tracking Transparency"
-description: "The required iOS ordering: consent, then ATT, then initialize."
+description: "App Tracking Transparency for Kotlin Multiplatform AdMob apps — the required Info.plist key, the consent to ATT to initialize order, and what IDFA loss costs."
+faq:
+  - q: What order should I call consent, ATT and initialize in?
+    a: UMP consent first, then ATT, then your first ad request. Requesting ads before ATT resolves permanently forfeits the IDFA for those requests.
+  - q: What happens without NSUserTrackingUsageDescription?
+    a: The ATT prompt cannot be shown, so iOS withholds the IDFA and every request serves non-personalised ads at materially lower eCPM.
+  - q: Does App Tracking Transparency apply on Android?
+    a: No. Android has no ATT. adManager.tracking is a no-op there and always reports AdTrackingAuthorization.NotApplicable.
 ---
 
-Plan 3 writes this page. Target length is 800–1,500 words with worked examples,
-question-based H2s, and explicit cross-links. The file path and the frontmatter
-`title` / `description` above are fixed by Plan 2 — the sidebar, the sitemap and
-the generated OpenGraph card all key off them.
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import InitSequence from '../../../components/diagrams/InitSequence.astro';
+
+## What is App Tracking Transparency and why does it matter for ads?
+
+Since iOS 14.5, an app must ask permission before accessing the
+IDFA, and AdMob uses the IDFA for personalised ads and
+attribution. Without the prompt, iOS withholds the IDFA and every
+request serves non-personalised ads at materially lower eCPM. The
+AdMob CMP library does not decide this for the app — it exposes
+`adManager.tracking` and leaves the timing to the caller, because
+the timing is the whole problem.
+
+ATT is the only place where the *order* of three otherwise
+unrelated calls determines whether the publisher gets paid for
+the ad. The consent form has to be presented, the ATT prompt has
+to be answered, and the first ad request has to be sent. Reversed
+or skipped, the user is forever non-personalised on that install.
+
+A useful framing: the three calls are the publisher's three
+permissions, and iOS is the only platform that requires all of
+them in a specific order. Android's equivalent is the AD_ID
+permission at install time, which is automatic and unguarded. iOS
+chose to make the same permission a runtime prompt; the result is
+that the prompt's *moment* is the publisher's decision, and the
+moment is the entire constraint.
+
+A common mistake: bundling the ATT prompt with the consent form
+into a single onboarding screen. The consent form is presented
+by the platform SDK and is modal; the ATT prompt is presented by
+iOS and is also modal. Showing one on top of the other confuses
+the user about which decision they are making and is rejected by
+App Review. The right shape is two distinct moments, each with
+its own screen and its own rationale, in the order documented
+above.
+
+## What is the correct call order?
+
+The order first, then the why:
+
+```kotlin
+adManager.consent.gatherConsent(config)
+adManager.tracking.requestAuthorization()
+adManager.initialize(config, ConsentMode.InitializeOnlyIfAlreadyAllowed)
+```
+
+<InitSequence />
+
+The three reasons, one sentence each. UMP consent comes first
+because the GDPR / TCF decision determines whether ads may be
+requested at all. ATT comes next because the IDFA decision must be
+resolved before any request goes out. And initialization comes
+last with `InitializeOnlyIfAlreadyAllowed` so it does not
+re-present a form the app has already handled.
+
+<Aside type="danger">
+Requesting ads before ATT resolves permanently forfeits the IDFA
+for those requests. There is no retroactive fix — those
+impressions are non-personalised for good.
+</Aside>
+
+A practical note on the `ConsentMode` choice here. The
+`InitializeOnlyIfAlreadyAllowed` mode is the right one because the
+app has already driven the consent flow. Using
+`GatherBeforeInitialize` would re-present the UMP form on
+subsequent `initialize` calls, which is wrong because the
+publisher already chose whether to drive the flow. The pattern
+above is the right one for any iOS app that wants explicit control
+over the prompt order.
+
+## What do I need in Info.plist?
+
+```xml
+<key>NSUserTrackingUsageDescription</key>
+<string>This identifier will be used to deliver personalised ads to you.</string>
+```
+
+This goes in the **app target's** `Info.plist`. The string is
+shown verbatim in the system prompt so it should say what the user
+gets rather than what the app wants; App Review rejects vague or
+misleading strings. `./gradlew :admob-cmp-core:doctorIos` checks
+`GADApplicationIdentifier` and `SKAdNetworkItems` but the tracking
+description is the developer's responsibility to add. The
+[iOS setup guide](/start/ios-setup/) has the rest of the iOS
+configuration.
+
+## How do I read the tracking authorization state?
+
+```kotlin
+when (adManager.tracking.status()) {
+    AdTrackingAuthorization.Authorized -> Unit      // IDFA available
+    AdTrackingAuthorization.Denied -> Unit          // user said no
+    AdTrackingAuthorization.NotDetermined -> Unit   // prompt not shown yet
+    AdTrackingAuthorization.Restricted -> Unit      // blocked by policy or parental controls
+    AdTrackingAuthorization.NotApplicable -> Unit   // Android, always
+}
+```
+
+`status()` is synchronous and cheap, so it is safe to read in a
+settings screen. `requestAuthorization()` is suspending and presents
+the system prompt at most once per install — a second call returns
+the existing decision rather than re-prompting, which is an OS
+behaviour rather than a library one. The `Restricted` value is
+distinct from `Denied`: it is set by parental controls or
+device-management policy, and the user has not been given the
+choice to decline.
+
+A practical detail: `status()` does not present UI, so it is
+safe to call in a `LaunchedEffect` or a composable's render path.
+Some apps gate the first ad call on a `status() != NotDetermined`
+check, which is a way to enforce "never show a request before
+the user has answered". That check is a stronger form of the
+order rule on the previous section: it is enforced at the call
+site, not just by the library's init flow.
+
+## Can I request ATT from an initialization hook?
+
+For apps that prefer a single `gatherConsentAndInitialize` call:
+
+```kotlin
+AdConfig(
+    androidAppId = "ca-app-pub-…",
+    iosAppId = "ca-app-pub-…",
+    initializationHooks = listOf(
+        object : AdInitializationHook {
+            override suspend fun onPhase(phase: AdInitializationPhase, config: AdConfig) {
+                if (phase == AdInitializationPhase.BeforeMobileAdsInitialize) {
+                    adManager.tracking.requestAuthorization()
+                }
+            }
+        }
+    ),
+)
+```
+
+`AdInitializationPhase` has exactly three values —
+`BeforeConsentRequest`, `BeforeMobileAdsInitialize` and
+`AfterMobileAdsInitialize` — and `BeforeMobileAdsInitialize` runs
+after the UMP gate and before native GMA initialization, which is
+precisely the ATT slot. Hooks run exactly once per real
+native-initialization attempt, so cancelling one `initialize()`
+caller can never skip or duplicate a hook.
+
+A note on the hook shape: the body is suspending, so it can call
+`requestAuthorization()` directly without `launch`. The hook
+itself runs inside the library's internal `nativeInitializationScope`,
+which is a detached scope that survives caller cancellation. That
+is the design property that makes hooks safe to put critical
+side-effects in: even if the caller that triggered `initialize`
+cancels its coroutine, the hook runs to completion.
+
+A second design property worth knowing: hooks run exactly once
+per real native-init attempt, not once per `initialize` call. A
+second `initialize` call with the same effective `AdConfig`
+identity does not re-run hooks; it just returns the cached
+result. That is the property that makes hooks safe to use for
+network-dependent side-effects — a re-run would otherwise mean a
+second ATT prompt and a second network round-trip.
+
+## What does Android do?
+
+One short paragraph. Android has no ATT. `adManager.tracking` is a
+no-op there and always reports `AdTrackingAuthorization.NotApplicable`,
+so the same common-code sequence compiles and runs correctly on
+both platforms with no `expect`/`actual` needed. The
+`requestAuthorization()` call is suspending on iOS and resolves
+immediately on Android, which means hooks that include ATT do not
+introduce a measurable delay on Android.
+
+A related Android point: Android 13 and above have a similar
+notification-permission flow, but it is not coupled to ad
+attribution in the same way. The
+[Android setup guide](/start/android-setup/) covers the AD_ID
+permission, which is the Android side of the same disclosure.
+
+## Where to next?
+
+<CardGrid>
+  <LinkCard title="iOS setup" href="/start/ios-setup/" description="SPM packages, Info.plist, and doctorIos." />
+  <LinkCard title="UMP consent" href="/privacy/consent/" description="Consent modes and canRequestAds." />
+  <LinkCard title="Play Data safety" href="/privacy/play-data-safety/" description="The Android side of the same disclosure." />
+  <LinkCard title="Revenue and paid events" href="/advanced/revenue-events/" description="Measuring what IDFA loss costs you." />
+</CardGrid>

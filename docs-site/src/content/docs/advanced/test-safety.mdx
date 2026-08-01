@@ -1,9 +1,190 @@
 ---
 title: "Test safety"
-description: "testMode versus strictTestMode, and how AdMob CMP stops test ads reaching production."
+description: "AdMob test ads on Kotlin Multiplatform — why testMode does not serve test ads, what strictTestMode guards, and how to keep live ads out of debug builds."
+faq:
+  - q: Does testMode make AdMob serve test ads?
+    a: No. AdDebugOptions.testMode configures UMP consent debugging only. Test ads come from registering the device in GlobalRequestConfiguration.testDeviceIds or from using a TestAdIds ad unit.
+  - q: What does strictTestMode do?
+    a: AdPlacement.strictTestMode throws at construction if the placement points at a production ad unit. Turn it on in debug builds so a test build can never request live ads.
+  - q: Why does requesting live ads in a debug build matter?
+    a: It is invalid traffic, and invalid traffic gets AdMob accounts suspended. That is why the check fails closed with an exception rather than a warning.
 ---
 
-Plan 3 writes this page. Target length is 800–1,500 words with worked examples,
-question-based H2s, and explicit cross-links. The file path and the frontmatter
-`title` / `description` above are fixed by Plan 2 — the sidebar, the sitemap and
-the generated OpenGraph card all key off them.
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+## Why are there two different test flags?
+
+The confusion this page exists to remove, stated as an
+`<Aside type="danger">`:
+
+> **`testMode` and `strictTestMode` are not the same flag, and neither one does what the other does.**
+> `AdDebugOptions.testMode` configures **UMP consent debugging** only. It does **not** make Google Mobile Ads serve test ads.
+> `AdPlacement.strictTestMode` is the safety guard: it **throws at construction** if the placement points at a production ad unit.
+
+A small table so the distinction sticks:
+
+| Flag | Lives on | Affects | Default |
+|---|---|---|---|
+| `testMode` | `AdConfig` / `AdDebugOptions` | UMP consent debugging: debug geography and consent test devices | `false` |
+| `strictTestMode` | `AdPlacement` | Construction-time validation of the ad unit ids | `false` |
+
+The reason there are two flags is that they guard different
+layers. `testMode` affects the consent flow; `strictTestMode`
+affects the ad request. A debug build that sets `testMode = true`
+and uses a real ad unit is requesting live ads with consent
+debug enabled, which is the configuration that gets AdMob
+accounts suspended. A debug build that sets
+`strictTestMode = true` and uses a test ad unit is testing
+the consent flow safely. The flags are independent and the
+debug build needs both, configured correctly.
+
+## What does testMode actually configure?
+
+`testMode` gates the UMP debug settings: `consentDebugGeography`
+and `consentTestDeviceIds` change nothing unless `testMode` is
+`true`. The library ships a guardrail: if `testMode` is `true`
+and no test device ids are configured anywhere, the SDK logs a
+warning at initialization rather than silently doing nothing —
+because in that state requests may serve **live** ads. The
+warning is not a substitute for fixing the configuration; it is
+a hook to make the misconfiguration visible.
+
+A note on what `testMode` does *not* do. It does not make the
+GMA network serve test ads, it does not register the device for
+test traffic, and it does not change the ad unit ids the
+placements point at. The only thing it does is unlock the
+UMP-side debug fields. The "test" name in the flag is
+unfortunate — it is a consent-debug flag, not a "test ads"
+flag — and the [UMP consent guide](/privacy/consent/) has the
+full semantics.
+
+## How do I actually get test ads?
+
+From exactly two places:
+
+```kotlin
+// 1. Google's official sample ad units — always test, on any device
+AdPlacement(
+    id = "banner_home",
+    format = AdFormat.Banner,
+    androidAdUnitId = TestAdIds.ANDROID_BANNER,
+    iosAdUnitId = TestAdIds.IOS_BANNER,
+    strictTestMode = true,
+)
+
+// 2. Your production ad units, on a registered test device
+AdConfig(
+    appIds = AdAppIds(android = "ca-app-pub-…", ios = "ca-app-pub-…"),
+    globalRequestConfiguration = GlobalRequestConfiguration(
+        testDeviceIds = listOf("YOUR-DEVICE-HASH"),
+    ),
+)
+```
+
+Emulators and simulators qualify as test devices automatically.
+A physical device needs its hashed id — printed to logcat or the
+Xcode console on the first unregistered request. `TestAdIds` also
+exposes `ANDROID_APP_ID` and `IOS_APP_ID`, plus ready-made
+`debugAdConfig` and `debugAdPlacements` values for a complete
+test setup.
+
+The two paths serve different purposes. Path 1 is the right
+shape for an integration test or a debug build that needs
+to render a real ad layout with a real ad network; the test ids
+are guaranteed to serve an ad. Path 2 is the right shape for a
+QA build that needs to test the publisher's real ad units
+without generating billable impressions; the device hash routes
+those requests to test inventory.
+
+A common misuse is to combine the two paths. A debug build that
+sets `strictTestMode = true` *and* registers a test device hash
+in `GlobalRequestConfiguration.testDeviceIds` is doubly safe and
+twice as much configuration to maintain. Pick the path that
+matches the build's purpose: an internal dev build wants path 1
+(Google's test ids, no publisher configuration needed); a QA
+build that exercises the publisher's real ad units wants path 2
+(test device hash, real unit ids, `strictTestMode = false`).
+Mixing them obscures which test mode is active.
+
+## What does strictTestMode protect me from?
+
+The failure it prevents and why it fails closed. Because
+`testMode` only affects UMP, a developer who trusts it requests
+**real** ads against production ad units from a debug build.
+That is invalid traffic, and invalid traffic gets AdMob accounts
+suspended. A warning was judged insufficient; the check throws.
+
+```kotlin
+// Throws IllegalArgumentException at construction
+AdPlacement(
+    id = "banner_home",
+    format = AdFormat.Banner,
+    androidAdUnitId = "ca-app-pub-1234567890123456/1234567890",  // production unit
+    iosAdUnitId = "ca-app-pub-1234567890123456/0987654321",
+    strictTestMode = true,
+)
+```
+
+The exception message names the placement and the offending ad
+unit ids. The escape hatch is deliberate and explicit: set
+`strictTestMode = false` when live ads in that build are
+genuinely intended. Production builds ship with
+`strictTestMode = false`; debug builds ship with
+`strictTestMode = true`.
+
+A note on what the exception is *not*. It is not a runtime
+check; it fires at construction. That means a placement built
+inside a `remember { … }` block in a Compose tree will throw
+on the first composition, not on the first ad request. The
+benefit is that the misconfiguration is caught before any
+network traffic; the cost is that the exception surfaces in a
+context that is sometimes hard to map back to the offending
+placement. The exception message names the placement id, which
+is the key.
+
+## How should I wire this into debug and release builds?
+
+The shape a real app should use — one flag, threaded through:
+
+```kotlin
+// A single build-time flag, e.g. from BuildConfig or an expect/actual
+val isDebugBuild: Boolean = /* … */
+
+val placements = listOf(
+    AdPlacement(
+        id = "banner_home",
+        format = AdFormat.Banner,
+        adUnitIds = if (isDebugBuild) {
+            AdUnitIds(android = TestAdIds.ANDROID_BANNER, ios = TestAdIds.IOS_BANNER)
+        } else {
+            AdUnitIds(android = "ca-app-pub-…/…", ios = "ca-app-pub-…/…")
+        },
+        strictTestMode = isDebugBuild,
+    )
+)
+```
+
+The release checklist: `testMode = false`, no debug geography,
+no consent test device ids, real app ids in the Android manifest
+and the iOS `Info.plist`, and real ad unit ids in every
+placement. Each item is a checkbox, and missing one is the
+difference between a release build and a debug build that has
+been signed and uploaded by accident.
+
+A related release-checklist item that is easy to forget: the
+[Play Data safety form](/privacy/play-data-safety/) and the
+[iOS Info.plist](/start/ios-setup/) must be aligned with the
+production ad units. A release build that uses Google's
+sample ad ids will serve Google's sample ads in production,
+which is a different kind of bug than a debug build that
+serves live ads — both fail the publisher's expectations,
+both come from the same misconfiguration, and both are
+caught by the same release-time checklist.
+
+## Where to next?
+
+<CardGrid>
+  <LinkCard title="UMP consent" href="/privacy/consent/" description="Where testMode actually applies." />
+  <LinkCard title="Quickstart" href="/start/quickstart/" description="The sample-ad-unit path." />
+  <LinkCard title="Troubleshooting" href="/reference/troubleshooting/" description="When strictTestMode throws." />
+</CardGrid>

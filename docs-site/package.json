@@ -13,11 +13,14 @@
     "astro": "astro",
     "test": "vitest run",
     "verify": "node scripts/verify-build.mjs",
+    "check:theme": "node scripts/check-theme.mjs",
     "check:overflow": "node scripts/check-overflow.mjs"
   },
   "dependencies": {
+    "@astrojs/markdown-remark": "7.2.2",
     "@astrojs/sitemap": "3.7.3",
     "@astrojs/starlight": "0.41.5",
+    "@fontsource/noto-sans": "5.3.0",
     "astro": "7.1.6",
     "astro-og-canvas": "0.13.0",
     "rehype-mermaid": "3.0.0",

@@ -29,14 +29,14 @@ export const { getStaticPaths, GET } = await OGImageRoute({
     padding: 60,
     font: {
       title: {
-        families: ['Space Grotesk'],
+        families: ['Noto Sans'],
         weight: 'SemiBold',
         color: [237, 238, 236],
         size: 66,
         lineHeight: 1.1,
       },
       description: {
-        families: ['Inter'],
+        families: ['Noto Sans'],
         weight: 'Normal',
         color: [154, 159, 156],
         size: 32,
@@ -44,8 +44,8 @@ export const { getStaticPaths, GET } = await OGImageRoute({
       },
     },
     fonts: [
-      'https://api.fontsource.org/v1/fonts/space-grotesk/latin-600-normal.ttf',
-      'https://api.fontsource.org/v1/fonts/inter/latin-400-normal.ttf',
+      './node_modules/@fontsource/noto-sans/files/noto-sans-latin-600-normal.woff2',
+      './node_modules/@fontsource/noto-sans/files/noto-sans-latin-400-normal.woff2',
     ],
     format: 'PNG',
   }),

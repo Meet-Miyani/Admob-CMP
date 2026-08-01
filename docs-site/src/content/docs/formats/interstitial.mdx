@@ -1,9 +1,221 @@
 ---
 title: "Interstitial ads"
-description: "Loading, showing, caching, and retrying full-screen interstitial ads."
+description: "Compose Multiplatform interstitial ads with suspend load and show, multi-ad caching, TTL eviction, retry, and why a second show returns NotReady."
+faq:
+  - q: How do I show an interstitial ad in Kotlin Multiplatform?
+    a: Get the controller with adManager.interstitial(placement) inside remember, call load() to fill the cache, then call show() from a UI-scoped coroutine. show() suspends until the ad is dismissed.
+  - q: Why does my second show() call return NotReady?
+    a: show() is not reentrant per controller. A second call while the first presentation is still on screen returns AdShowResult.NotReady immediately instead of queueing. Await the first result before calling again.
+  - q: How long does a cached interstitial stay valid?
+    a: One hour by default, from AdExpirationPolicy.fullScreenTtl. App-open ads default to four hours. Expired ads are evicted on access.
 ---
 
-Plan 3 writes this page. Target length is 800–1,500 words with worked examples,
-question-based H2s, and explicit cross-links. The file path and the frontmatter
-`title` / `description` above are fixed by Plan 2 — the sidebar, the sitemap and
-the generated OpenGraph card all key off them.
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import FullScreenLifecycle from '../../../components/diagrams/FullScreenLifecycle.astro';
+
+## How do I show an interstitial ad in Compose Multiplatform?
+
+Interstitial, rewarded, rewarded interstitial and app-open controllers
+all implement `FullScreenAdController`, whose surface is `load()`,
+`show()`, `isReady()`, `preload()`, `availability()`, `clear()`,
+`loadState: StateFlow<AdLoadState>`, `events: SharedFlow<AdEvent>` and
+`placement`. The interstitial integration:
+
+```kotlin
+val placement = remember {
+    AdPlacement(
+        id = "interstitial_main",
+        format = AdFormat.Interstitial,
+        androidAdUnitId = TestAdIds.ANDROID_INTERSTITIAL,
+        iosAdUnitId = TestAdIds.IOS_INTERSTITIAL,
+    )
+}
+val interstitial = remember(adManager) { adManager.interstitial(placement) }
+val scope = rememberCoroutineScope()
+
+// Preload, well before the moment you want to show
+scope.launch {
+    when (val state = interstitial.load()) {
+        is AdLoadState.Loaded -> println("ready: ${state.responseInfo?.responseId}")
+        is AdLoadState.Failed -> println("load failed: ${state.error}")
+        else -> Unit
+    }
+}
+
+// Show — suspends until the ad is dismissed
+scope.launch {
+    when (val result = interstitial.show()) {
+        is AdShowResult.Shown -> println("shown and dismissed")
+        is AdShowResult.NotReady -> println("call load() first")
+        is AdShowResult.Failed -> println("show failed: ${result.error}")
+    }
+}
+```
+
+Two rules that matter. Wrap the controller lookup in `remember`
+because controllers are placement-keyed and cached. And call `show()`
+from a UI-scoped coroutine and never `GlobalScope`, because it
+suspends for the ad's full on-screen lifetime.
+
+The `remember(adManager)` form (rather than `remember { … }`) is the
+common shape: it is keyed on the manager so the controller is rebuilt
+if the manager is replaced, but not on every recomposition. The
+placement itself is `remember`-ed separately so its id is stable
+across recompositions of the same screen. A typical app also owns
+the placement list as a `val` in a `CompositionLocal` or a top-level
+object so every screen shares the same `AdPlacement` instances.
+
+## What does show() actually return?
+
+The three-case sealed result explicitly:
+
+- `AdShowResult.Shown` — the ad was presented and has now been
+  dismissed. This is **not** "the ad started"; it is "the ad
+  finished." It is the only result on the success path.
+- `AdShowResult.NotReady` — there was nothing to show, or a
+  presentation is already active on this controller. This is the
+  no-op result; do not retry immediately.
+- `AdShowResult.Failed(error)` — the SDK started a presentation but
+  the platform rejected it. The `AdError` carries `code`, `message`,
+  `domain` and `responseInfo`.
+
+Branching on the result is the right shape; do not assume the ad
+shown just because the call returned. A `Failed` result is rare but
+real, usually caused by an iOS ATT denial that lands between the
+`show()` call and the platform's `present` hook, or by a race with
+another presentation on the same controller.
+
+A practical point on `Shown`: it is emitted after the platform SDK
+fires its `didDismissFullScreenContent` / `onAdDismissedFullScreenContent`
+callback. The coroutine that called `show()` resumes at that point.
+A common shape is to use `Shown` as the trigger to launch the next
+screen, hide the loading indicator, or restore UI that was disabled
+during the presentation.
+
+## What happens between load and show?
+
+<FullScreenLifecycle />
+
+The state machine the diagram shows, in prose: `AdLoadState` moves
+`Idle → Loading → Loaded(responseInfo)` or `Failed(error)`. Loaded
+ads enter a TTL'd FIFO cache. `show()` consumes the oldest first.
+Expired entries are evicted on access. `clear()` bumps a generation
+counter so a load or scheduled reload started before the `clear()`
+can never repopulate a cache the caller just asked to be emptied.
+
+The generation counter is the part that is hard to see from the
+public API but matters in practice: without it, an in-flight
+`load()` issued before `clear()` could race with the clear and leave
+the cache populated when the caller expected it empty. With it, the
+load checks the generation before publishing its result and
+discards it on a mismatch. The same mechanism protects
+`reloadAfterShow` from re-populating a cache the caller just
+cleared. The [architecture reference](/reference/architecture/) has
+the full state machine.
+
+A subtle but important consequence: `load()` returns a single
+`AdLoadState`, but the cache it represents may be larger. A `Loaded`
+result with `responseInfo` only describes the most recent entry;
+`availability().cachedCount` is the source of truth for how many
+ads the cache currently holds. The two views are consistent — the
+cache never claims more than `maxSize` and never reports an
+expired entry — but they answer different questions.
+
+## How do I cache more than one interstitial?
+
+```kotlin
+AdPlacement(
+    id = "cached_interstitial",
+    format = AdFormat.Interstitial,
+    adUnitIds = AdUnitIds(android = "…", ios = "…"),
+    cachePolicy = AdCachePolicy(
+        maxSize = 3,               // load() tops the cache up to 3 ads
+        reloadAfterShow = true,    // refill in the background after each show
+    ),
+)
+```
+
+Each behaviour, in turn. `load()` fills the cache sequentially and a
+partial fill still reports `Loaded`; the cache is full when it has
+`maxSize` ads. `show()` consumes FIFO, oldest first. TTL defaults are
+one hour for full-screen formats and four hours for app-open, both
+from `AdExpirationPolicy`. `preload()` is an alias of `load()` — both
+top up the cache and return the resulting `AdLoadState`. The
+[caching, retry and timeouts guide](/advanced/caching-retry-timeouts/)
+goes through every knob.
+
+A warning worth stating plainly: a large `maxSize` is not free.
+Every cached ad is a live SDK object with its own TTL, and an ad
+shown near the end of its hour is more likely to be an expired
+eviction than an impression. The default of one is right for a
+natural-break interstitial; a `maxSize` of three is right for a
+game's end-of-level cadence; a `maxSize` of ten is almost always
+wrong.
+
+`reloadAfterShow = true` is the right choice for a placement that
+should always be ready to show. The library schedules a background
+reload after each `show()`, so the next break has warm inventory.
+The cost is the same as a regular `load()` — the next impression
+incurred the network cost of a request — but the timing is
+guaranteed, and the user never sees a "loading" state because no
+ad is currently being shown.
+
+## Why does a second show() return NotReady?
+
+`show()` is **not reentrant per controller.** Calling it again while
+a previous `show()` on the *same* controller is still on screen
+returns `AdShowResult.NotReady` immediately — it does **not** queue
+and wait for the first presentation to finish. Await the first
+`show()`'s result, which suspends until dismissal, before issuing
+another on the same controller.
+
+The design reason in one sentence: presentation ownership is a
+one-shot handle, so a queued second show would either double-present
+or silently swallow the caller's request. The library surfaces the
+not-ready case as an explicit result rather than a thrown exception
+so a caller that genuinely needs to handle a denied show has a
+typed branch to write.
+
+A common related question: does this rule mean a controller cannot
+preload while another presentation is on screen? No. `load()` runs
+independently of `show()`. The only operation gated on the
+"presenting" flag is `show()` itself. The cache can fill, drain,
+refill, and TTL-evict while a presentation is on screen. The
+not-ready rule is about presentation ownership, not about cache
+state.
+
+## How do I check availability before showing?
+
+```kotlin
+if (interstitial.isReady()) {
+    interstitial.show()
+}
+
+val availability = interstitial.availability()
+println(availability.isReady)      // Boolean
+println(availability.cachedCount)  // Int
+println(availability.expiresIn)    // Duration?
+```
+
+`isReady()` is a cheap boolean check while `availability()` returns
+the full `AdAvailability` record. Neither is a guarantee — an ad can
+expire between the check and the show, which is exactly why `show()`
+returns a result instead of throwing. Treat both as advisory, and
+treat `AdShowResult` as the source of truth.
+
+`expiresIn` is a `Duration?` — `null` when the cache is empty. When
+the cache has one ad, it is the time until that ad expires. When
+the cache has multiple, it is the time until the *oldest* ad
+expires, because that is the next one `show()` will consume. The
+field is useful for telemetry — "how long before we lose warm
+inventory?" — but not for control flow, because the same ad can
+expire between reading the value and acting on it.
+
+## Where to next?
+
+<CardGrid>
+  <LinkCard title="Rewarded ads" href="/formats/rewarded/" description="Rewards, and granting them exactly once." />
+  <LinkCard title="App-open ads" href="/formats/app-open/" description="AppOpenAdCoordinator and cooldowns." />
+  <LinkCard title="Caching, retry and timeouts" href="/advanced/caching-retry-timeouts/" description="TTL, backoff, and load bounds." />
+  <LinkCard title="Revenue and paid events" href="/advanced/revenue-events/" description="AdValue and response info." />
+</CardGrid>
