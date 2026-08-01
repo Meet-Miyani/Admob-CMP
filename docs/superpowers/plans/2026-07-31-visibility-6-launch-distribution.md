@@ -2,6 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Status:** Pending.
+
+**Visual boundary:** The
+[`Documentation Native Reference Theme Design`](../specs/2026-08-01-docs-native-reference-theme-design.md)
+governs only assets rendered by `docs-site/`. The featured open-source card on
+`avinya.dev` continues to use that separate site's design system. Distribution
+copy, third-party listings, release notes, and channel artwork must not introduce
+a second docs-site visual contract.
+
 **Goal:** Establish `dev.avinya.ads:admob-cmp` in the off-site channels Kotlin Multiplatform developers actually browse — klibs.io, `kmp-awesome`, Maven Central metadata, `avinya.dev/open-source/`, GitHub releases, and a sequenced launch calendar — and instrument the §12 success metrics with 30-day and 90-day review checkpoints.
 
 **Architecture:** This is Plan 6 of the seven-plan program in `docs/superpowers/specs/2026-07-31-public-visibility-design.md` §10. It produces three kinds of artifact: (1) **repeatable verification scripts** under `scripts/distribution/` that a human or CI can re-run at each metrics checkpoint; (2) **committed records and verbatim copy** under `docs/distribution/` so nothing is improvised at posting time; and (3) **small source changes** in two repositories — POM metadata in this repo, and a featured-card treatment in the separate `avinya.dev` studio site repo. Every step that publishes something outward — a forum post, a PR to a third party's repo, an issue on JetBrains' tracker, a GitHub release edit, a deploy of the studio site — is marked as a human step and is never performed by an agent.

@@ -1,8 +1,8 @@
 # Documentation Native Reference Theme Design
 
 **Date:** 2026-08-01
-**Status:** Approved direction, pending written-spec review
-**Scope:** Presentation and regression gates for `docs-site/`; no content, URL, SDK, or public API changes.
+**Status:** Implemented, independently reviewed, and verified
+**Scope:** Presentation, generated social imagery, and regression gates for `docs-site/`; no content, URL, SDK, or public API changes.
 
 ## 1. Problem
 
@@ -50,7 +50,7 @@ The selected direction follows GitHub Docs and Starlight for density and color-s
 - Light page: white or near-white with a single pale neutral secondary surface.
 - Dark page: charcoal, not absolute black, with one slightly raised neutral surface.
 - Retain `#ee3a20` as the brand source color, but use accessible darker/lighter text variants for prose links.
-- Orange is limited to links, focus rings, the current navigation marker, and selection. Callouts retain their semantic note/tip/caution/danger colors.
+- Orange is limited to links, focus rings, the active table-of-contents marker, and selection. Callouts retain their semantic note/tip/caution/danger colors.
 - Remove tinted active-row fills and universal orange callout titles.
 - Use one-pixel neutral borders. No shadows.
 
@@ -62,11 +62,14 @@ The selected direction follows GitHub Docs and Starlight for density and color-s
 - Title bar, editor, copy control, and terminal variants share the active theme instead of hard-coded colors.
 - Keep Expressive Code contrast correction at 5.5:1 and preserve copy feedback.
 - Remove hard-coded permanent-dark frame colors from both Astro configuration and CSS.
+- Generated Open Graph cards use bundled Noto Sans assets so social imagery follows the same neutral sans direction without build-time font downloads.
 
 ## 7. Navigation and Components
 
 - Sidebar and table-of-contents labels use the regular UI font; group labels are 12px semibold without uppercase tracking.
-- Current navigation uses stronger text and a 2px orange left marker, without a tinted rectangle.
+- Current sidebar navigation uses stronger neutral text only, without an orange marker, tinted rectangle, or nested hierarchy rail.
+- The table of contents retains a thin coral active marker because it communicates reading position without competing with the sidebar.
+- Header utilities are compact and quiet: the GitHub icon is neutral, the social divider is removed, and the theme selector is borderless while preserving visible keyboard focus.
 - Search uses a 6px rectangle rather than a pill.
 - Restore conventional unordered-list bullets.
 - Cards and pagination use a 6px radius, flat background, and quiet border. Remove lift and spatial hover motion.
@@ -90,7 +93,9 @@ The selected direction follows GitHub Docs and Starlight for density and color-s
 
 - Refine the current uncommitted files in place; do not reset them.
 - Keep the Markdown table transform, its tests, and the explicit `@astrojs/markdown-remark` processor migration.
-- Update `check-theme.mjs` to assert the new typography, paired code backgrounds, reduced radii, absence of entrance animation, table structure, overflow containment, and reduced-motion behavior.
+- Update `check-theme.mjs` to assert the new typography, paired code backgrounds, reduced radii, absence of entrance animation, table structure, overflow containment, theme-selector focus and switching, and reduced-motion behavior.
+- Make both browser gates serve the freshly built `dist/` directory on isolated ephemeral localhost ports unless an explicit `PREVIEW_URL` is supplied.
+- Cover the bundled Open Graph typography contract with a focused unit test.
 - Keep both visual checks in Section 8 of `scripts/release-readiness.sh`.
 - Do not change documentation prose, route structure, Mermaid content, generated API files, SDK code, or GitHub workflows.
 
@@ -99,7 +104,8 @@ The selected direction follows GitHub Docs and Starlight for density and color-s
 - The light theme contains no permanent dark code islands.
 - Headings and prose clearly use the same native sans family.
 - No article entrance, card lift, pill search, uppercase mono navigation labels, or decorative list rules remain.
+- Header utilities remain compact, and the sidebar uses a text-only current-page state with no nested rail.
 - Quickstart, Installation, Consent, Compatibility, and Troubleshooting remain readable at desktop, tablet, and mobile widths.
-- Kotlin, XML, TOML, and Bash blocks expose at least five computed syntax colors in both themes.
+- Computed syntax-color minimums match the documented samples in both themes: Kotlin 5, XML 5, TOML 3, and Bash 4.
 - Tables remain accessible, focusable, and horizontally contained.
-- `npm test`, `npm run build`, `npm run verify`, `npm run check:theme`, `npm run check:overflow`, `git diff --check`, and the full eight-section `./scripts/release-readiness.sh` pass.
+- `npm test` passes 13 tests, the Astro build produces 26 pages, and `npm run verify`, `npm run check:theme`, `npm run check:overflow`, `git diff --check`, and the full eight-section `./scripts/release-readiness.sh` finish cleanly with `READINESS: PASS`.

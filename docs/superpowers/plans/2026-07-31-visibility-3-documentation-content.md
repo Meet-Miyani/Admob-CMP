@@ -2,6 +2,17 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Status:** Authored content implemented. Diagram replacement, screenshot
+integration, and Task 27's final audit remain pending on Plans 4 and 7.
+
+**Visual authority:** This plan owns documentation content, semantic component
+selection, code examples, and diagram placement. It does not define presentation.
+All Starlight components, tables, code blocks, diagram wrappers, and future
+screenshot embeds inherit the
+[`Documentation Native Reference Theme Design`](../specs/2026-08-01-docs-native-reference-theme-design.md).
+Do not add page-local fonts, colors, radii, shadows, decorative labels, or motion
+to compensate for the shared theme.
+
 **Goal:** Rewrite and expand every AdMob CMP documentation page into 24 keyword-targeted, diagram-backed guides at `docs-site/src/content/docs/**`, so the library ranks for the queries its audience actually types and the old Markdown files stop competing with them.
 
 **Architecture:** Plan 2 has already scaffolded Starlight, fixed the 24 file paths, written the sidebar, and shipped 24 placeholder stubs. This plan replaces the **body** of each stub — never its path — with an 800–1,500-word guide whose H2s are questions, whose code samples are verified line-by-line against `admob-cmp/AGENTS.md` and the frozen klib ABI dumps, and which embeds one of the eight diagram components Plan 4 produces. The nine legacy files under `admob-cmp/docs/` are then reduced to one-line pointers so no page competes with its own canonical URL.
@@ -17,7 +28,7 @@ Every task's requirements implicitly include this section. Values are copied ver
 **Ownership and file paths**
 
 - Docs live at `docs-site/src/content/docs/**` and are authored as `.mdx`.
-- **Plan 2 owns the 24 file paths, the `sidebar` array in `docs-site/astro.config.mjs`, and the `title` frontmatter.** This plan rewrites bodies only. **Never move, rename, or delete a page file, and never add a page** — the sidebar, the sitemap, the OG image route, and `llms.txt` all key off those exact slugs.
+- **Plan 2 owns the 24 guide paths, the `sidebar` array in `docs-site/astro.config.mjs`, and the `title` frontmatter.** This plan rewrites bodies only. **Never move, rename, delete, or add an authored guide page.** Plan 4's generated and committed `/reference/diagrams-in-words/` route is the sole exception; it is owned by Plan 4, excluded from this plan's 24-guide count, and must be incorporated into later sitemap/build counts rather than treated as a new authored guide.
 - **Plan 4 owns `docs-site/src/components/diagrams/*.astro`.** Import them; do not author diagram markup. Task 1 writes a build-safe stub *only for components that do not yet exist*, which Plan 4 later overwrites.
 - **Plan 5 owns the landing page** `docs-site/src/content/docs/index.mdx` and `docs-site/src/components/landing/*`. Do not touch either.
 - The trademark line lives in the **site footer** (Plan 2/Plan 5). Do **not** repeat it on individual pages.
@@ -4266,24 +4277,28 @@ const DOCS = 'src/content/docs';
 const DIAGRAMS = 'src/components/diagrams';
 const problems = [];
 
-/** Every .mdx page under src/content/docs, excluding the Plan 5 landing page. */
-function pages(dir = DOCS) {
+/** Every .mdx content entry, excluding the Plan 5 landing page. */
+function contentEntries(dir = DOCS) {
   const out = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...pages(path));
+    if (entry.isDirectory()) out.push(...contentEntries(path));
     else if (entry.name.endsWith('.mdx') && path !== join(DOCS, 'index.mdx')) out.push(path);
   }
   return out;
 }
 
-/** Set of every valid canonical URL, derived from the file tree itself. */
-const files = pages();
+/** Every route is linkable, including Plan 4's generated prose page. */
+const allFiles = contentEntries();
 const validUrls = new Set(
-  files.map((f) => '/' + f.slice(DOCS.length + 1).replace(/\.mdx$/, '') + '/')
+  allFiles.map((f) => '/' + f.slice(DOCS.length + 1).replace(/\.mdx$/, '') + '/')
 );
 validUrls.add('/');
 validUrls.add('/api/');
+
+/** Only the 24 authored Plan 3 guides receive this plan's prose rules. */
+const generatedDiagramProse = join(DOCS, 'reference', 'diagrams-in-words.mdx');
+const files = allFiles.filter((file) => file !== generatedDiagramProse);
 
 for (const file of files) {
   const raw = readFileSync(file, 'utf8');
@@ -4322,8 +4337,9 @@ for (const file of files) {
 
 // No diagram may still be a Plan 3 placeholder.
 if (existsSync(DIAGRAMS)) {
-  for (const name of readdirSync(DIAGRAMS)) {
-    const path = join(DIAGRAMS, name);
+  for (const entry of readdirSync(DIAGRAMS, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.astro')) continue;
+    const path = join(DIAGRAMS, entry.name);
     if (readFileSync(path, 'utf8').includes('diagram-placeholder'))
       problems.push(`${path}: still a Plan 3 placeholder — Plan 4 must replace it`);
   }
@@ -4376,7 +4392,7 @@ Do not add screenshots to the remaining pages. `/reference/troubleshooting/` in 
 ```bash
 cd /Users/meetmiyani/Documents/MeetMiyani/MEET/AdmobCMP/docs-site
 node scripts/audit-content.mjs
-node scripts/wordcount.mjs $(find src/content/docs -name '*.mdx' ! -name 'index.mdx' | sort)
+node scripts/wordcount.mjs $(find src/content/docs -name '*.mdx' ! -name 'index.mdx' ! -name 'diagrams-in-words.mdx' | sort)
 ```
 
 Expected: `AUDIT OK — 24 pages`, then 24 word counts. Check each against the page inventory table at the top of this plan. Any page below its floor is under-written and must be expanded — a page under 300 prose words is the exact thin-content failure this plan exists to fix.
@@ -4385,8 +4401,8 @@ Expected: `AUDIT OK — 24 pages`, then 24 word counts. Check each against the p
 
 ```bash
 cd /Users/meetmiyani/Documents/MeetMiyani/MEET/AdmobCMP/docs-site
-find src/content/docs -name '*.mdx' ! -name 'index.mdx' | wc -l
-grep -L '^faq:' $(find src/content/docs -name '*.mdx' ! -name 'index.mdx') || echo "ALL PAGES HAVE FAQ OK"
+find src/content/docs -name '*.mdx' ! -name 'index.mdx' ! -name 'diagrams-in-words.mdx' | wc -l
+grep -L '^faq:' $(find src/content/docs -name '*.mdx' ! -name 'index.mdx' ! -name 'diagrams-in-words.mdx') || echo "ALL PAGES HAVE FAQ OK"
 grep -rn 'Plan 3 writes this page' src/content/docs || echo "NO PLAN 2 STUBS LEFT OK"
 ```
 
@@ -4398,10 +4414,11 @@ Expected: `24`; then `ALL PAGES HAVE FAQ OK`; then `NO PLAN 2 STUBS LEFT OK`.
 cd /Users/meetmiyani/Documents/MeetMiyani/MEET/AdmobCMP/docs-site
 npm run build
 npm run verify
+npm run check:theme
 npm run check:overflow
 ```
 
-Expected: the build succeeds with no `[starlight]` sidebar warning; `verify` passes its sitemap, robots, llms, canonical, OG and JSON-LD assertions; and `check:overflow` reports no horizontal overflow at 375 px — the wide tables on `/reference/troubleshooting/` and `/reference/compatibility/` are the ones most likely to fail this, and the fix is an `overflow-x: auto` wrapper, never a narrower table.
+Expected: the build succeeds with no `[starlight]` sidebar warning; `verify` passes its sitemap, robots, llms, canonical, OG and JSON-LD assertions; `check:theme` confirms the Native Reference contract; and `check:overflow` reports no horizontal overflow at 375 px — the wide tables on `/reference/troubleshooting/` and `/reference/compatibility/` are the ones most likely to fail this, and the fix is the canonical focusable `.table-scroll` wrapper, never a narrower table.
 
 - [ ] **Step 6: Commit**
 
@@ -4413,17 +4430,21 @@ git commit -m "docs(site): add the content audit gate and retrofit screenshots"
 
 ---
 
-## Addendum: Plan 4 and Plan 7 integration
+## Addendum: Future Plan 4 and Plan 7 integration
 
-Both plans landed after Tasks 2–18 of this plan were drafted. Their contracts are binding on every task above.
+Both plans remain pending. Their contracts are binding on the final integration
+task, while the current eight diagram components are build-safe Plan 3 stubs and
+the screenshot component/assets do not exist yet.
 
-**Plan 4 — diagrams.** The eight components exist at `docs-site/src/components/diagrams/`: `ModuleMap`, `InitSequence`, `FullScreenLifecycle`, `NativePoolLifecycle`, `BannerGeometry`, `ConsentDecisionTree`, `RetryTimeline`, `PlatformMatrix`. Consequences:
+**Plan 4 — diagrams.** Plan 4 will replace the eight stubs at `docs-site/src/components/diagrams/`: `ModuleMap`, `InitSequence`, `FullScreenLifecycle`, `NativePoolLifecycle`, `BannerGeometry`, `ConsentDecisionTree`, `RetryTimeline`, `PlatformMatrix`. Consequences:
 
-- Task 1 Step 3's `-f` guard makes the stub generation a **no-op** for every component Plan 4 has written. Run it anyway — it is idempotent, and it prints `KEEP` for each existing file, which is itself the verification that all eight are present.
+- Task 1 Step 3's `-f` guard preserves any completed Plan 4 component. Before
+  Plan 4, it preserves the existing stubs; Task 27 must still fail until Plan 4
+  replaces every `diagram-placeholder` marker.
 - Plan 4 Task 10 defines a **prose equivalent per diagram** for the `llms.txt` bundle. Pages must **not** restate that prose. Write the surrounding explanation the page needs, embed the component, and let the diagram carry its own description. Duplicating it creates two sources of truth that will diverge on the first diagram revision.
 - Import path from a page two directories deep, which every page in this plan is: `../../../components/diagrams/<Name>.astro`.
 
-**Plan 7 — screenshots.** Screenshots are embedded only through `docs-site/src/components/Screenshot.astro`, which resolves ids from `docs-site/src/assets/screenshots/screenshots.json`. Never a raw `<img>`, never a direct asset path.
+**Plan 7 — screenshots.** Once Plan 7 lands, screenshots are embedded only through `docs-site/src/components/Screenshot.astro`, which resolves ids from `docs-site/src/assets/screenshots/screenshots.json`. Never a raw `<img>`, never a direct asset path.
 
 - **Every ad-format screenshot is dark-only.** The demo's `DebugTokens` is a theme-fixed dark palette, so `banner-*`, `interstitial-*`, `rewarded-*`, `app-open-*` and `native-*` have no light variant.
 - Only `consent-*` and `att-*` have light/dark pairs.

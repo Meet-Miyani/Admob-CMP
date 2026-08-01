@@ -2,9 +2,20 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Status:** Pending. Existing eight component stubs belong to Plan 3 and are not
+the completed diagram system described here.
+
+**Visual authority:** The implemented
+[`Documentation Native Reference Theme Design`](../specs/2026-08-01-docs-native-reference-theme-design.md)
+is binding. Diagram semantics, accessibility, prose equivalents, and static-SVG
+architecture remain owned by this plan; typography, color roles, component
+shape, table treatment, focus, and motion inherit the Native Reference system.
+If a historical code sample below conflicts with the binding rules in Global
+Constraints, preserve its structure and data but apply the binding rules.
+
 **Goal:** Ship eight theme-aware, build-time-static, WCAG-AA diagrams as Astro components in `docs-site/src/components/diagrams/`, each with a prose equivalent that survives into the `llms.txt` bundle, so Plans 3 and 5 can import them by exact name.
 
-**Architecture:** One shared visual language (`diagrams.css` + `DiagramFigure.astro` + `DiagramFrame.astro`) defines stroke weights, type scale, colour roles derived entirely from Plan 2's `--admob-*` tokens, and the accessibility contract. Five diagrams are hand-authored inline SVG whose body is slotted into `DiagramFrame`, which emits the `<svg>` shell with `role="img"`, `<title>`, `<desc>` and namespaced arrow markers. Two (sequence and decision flow) are authored as Mermaid fences in `.md` files imported into `.astro` components, so Plan 2's already-configured `rehype-mermaid` renders them to inline SVG at build time. The eighth, the platform support matrix, is tabular data and ships as a semantic `<table>`. Every diagram's text alternative lives once in `descriptions.json` and is emitted into a generated Starlight page, `/reference/diagrams-in-words/`, which is real Markdown and therefore lands in `llms-full.txt`.
+**Architecture:** One shared visual language (`diagrams.css` + `DiagramFigure.astro` + `DiagramFrame.astro`) defines neutral stroke roles, a compact native-sans type scale, and the accessibility contract from the current `--admob-*` tokens. Five diagrams are hand-authored inline SVG whose body is slotted into `DiagramFrame`, which emits the `<svg>` shell with `role="img"`, `<title>`, `<desc>` and namespaced arrow markers. Two (sequence and decision flow) are authored as Mermaid fences in `.md` files imported into `.astro` components, so the unified Markdown processor renders them to inline SVG at build time. The eighth, the platform support matrix, is tabular data and uses the canonical focusable `.table-scroll` structure. Every diagram's text alternative lives once in `descriptions.json` and is emitted into a generated Starlight page, `/reference/diagrams-in-words/`, which is real Markdown and therefore lands in `llms-full.txt`.
 
 **Tech Stack:** Astro 7.1.6, `@astrojs/starlight` 0.41.5, `rehype-mermaid` 3.0.0 (`strategy: 'inline-svg'`, already wired by Plan 2), `starlight-llms-txt` 0.11.0, Vitest 4.1.10, Node ≥ 22.12.0. No client-side JavaScript of any kind.
 
@@ -13,25 +24,28 @@
 - **Prerequisite: Plan 2 is merged.** `docs-site/` exists with `package.json`, `astro.config.mjs`, `src/styles/tokens.css`, `test/`, `scripts/`, and Vitest 4.1.10 installed. Every `npm` command in this plan runs from `docs-site/`.
 - **Absolute repo root:** `/Users/meetmiyani/Documents/MeetMiyani/MEET/AdmobCMP`. Docs site root: `/Users/meetmiyani/Documents/MeetMiyani/MEET/AdmobCMP/docs-site`.
 - **Diagram components live at `docs-site/src/components/diagrams/`.** Plans 3 and 5 import these eight names verbatim: `ModuleMap.astro`, `InitSequence.astro`, `FullScreenLifecycle.astro`, `NativePoolLifecycle.astro`, `BannerGeometry.astro`, `ConsentDecisionTree.astro`, `RetryTimeline.astro`, `PlatformMatrix.astro`.
-- **Style only against Plan 2's 19-property token contract.** Never invent a token name and never hardcode a colour in `diagrams.css` or in any component: `--admob-paper` `--admob-surface` `--admob-code` `--admob-ink` `--admob-slate` `--admob-hair` `--admob-accent` `--admob-accent-contrast` `--admob-accent-soft` `--admob-font-display` `--admob-font-body` `--admob-font-mono` `--admob-tracking-tight` `--admob-tracking-tighter` `--admob-radius` `--admob-radius-lg` `--admob-border` `--admob-shadow` `--admob-content-max`.
+- **Style only against the current 22-property Native Reference token contract.** Never invent a color/font/radius token and never hardcode a color in `diagrams.css` or in any component. Preserve all original Plan 2 names and the three additions `--admob-accent-text`, `--admob-reading`, and `--admob-ease`.
+- **Diagrams are neutral technical figures.** Use ink/slate weight, labels, geometry, and dash patterns for emphasis and categories. Brand orange is reserved for focus outlines and links; use `--admob-accent-text` for linked text. Do not use orange node fills, arrows, diagram edges, or category coding.
+- **Native Reference shape and type:** all diagram prose, titles, labels, captions, and Mermaid text use `--admob-font-body` with normal tracking. Use `--admob-font-mono` only for literal API identifiers or code. Frames and nodes use at most 6px radii, one-pixel neutral boundaries, no shadows, no raised panels, and no spatial motion.
 - **Theme selectors.** Plan 2 defines the dark theme on `:root, :root[data-theme='dark']` and the light theme on `:root[data-theme='light']`. Starlight's `ThemeProvider` stamps `data-theme` on `<html>` before first paint. Diagrams therefore need **no** theme-specific CSS of their own for colour — they consume `var(--admob-*)` and re-theme for free. The one exception is the Mermaid bridge (Task 1, Step 4), which must override colours Mermaid bakes in at render time.
 - **Measured contrast of the token contract (computed from Plan 2's literal hex values, both themes):**
 
   | Pair | Light | Dark | Verdict |
   |---|---|---|---|
-  | `--admob-ink` on `--admob-paper` | 16.13 | 16.48 | AA text |
-  | `--admob-ink` on `--admob-surface` | 15.02 | 15.28 | AA text |
-  | `--admob-slate` on `--admob-paper` | 5.85 | 7.14 | AA text |
-  | `--admob-slate` on `--admob-surface` | 5.45 | 6.62 | AA text |
-  | `--admob-accent` on `--admob-paper` | 3.62 | 4.81 | non-text / large text only |
-  | `--admob-accent` on `--admob-surface` | 3.37 | 4.45 | non-text / large text only |
-  | `--admob-surface` on `--admob-paper` | 1.07 | 1.08 | decorative fill only |
-  | `--admob-hair` on `--admob-paper` | 1.28 | 1.37 | decorative only |
+  | `--admob-ink` on `--admob-paper` | 15.80 | 16.02 | AA text |
+  | `--admob-ink` on `--admob-surface` | 14.84 | 14.64 | AA text |
+  | `--admob-slate` on `--admob-paper` | 6.11 | 6.15 | AA text |
+  | `--admob-slate` on `--admob-surface` | 5.74 | 5.62 | AA text |
+  | `--admob-accent-text` on `--admob-paper` | 7.74 | 9.22 | AA text |
+  | `--admob-accent-text` on `--admob-surface` | 7.27 | 8.43 | AA text |
+  | `--admob-surface` on `--admob-paper` | 1.06 | 1.09 | decorative fill only |
+  | `--admob-hair` on `--admob-paper` | 1.45 | 1.55 | decorative only |
 
 - **Three rules follow from that table and are non-negotiable:**
-  1. **All diagram text is `--admob-ink` (≥ 15:1) or `--admob-slate` (≥ 5.45:1). `--admob-accent` never carries text below 24px** — it fails AA for normal-size text in the light theme (3.37:1).
-  2. **Every informational boundary is a `--admob-slate` stroke** (≥ 5.45:1, comfortably past the 3:1 non-text minimum). `--admob-surface` node fills and `--admob-hair` gridlines are decorative and carry no information on their own.
-  3. **Category is never encoded by hue.** The token contract exposes exactly one accent, so platform/role differences are encoded by stroke dash pattern *plus* an explicit text label. This satisfies WCAG 1.4.1 by construction.
+  1. **Diagram text is `--admob-ink` or `--admob-slate`; links use `--admob-accent-text`.** Brand `--admob-accent` is not a normal-text color.
+  2. **Every informational boundary is a `--admob-slate` stroke.** `--admob-surface` node fills and `--admob-hair` gridlines are decorative and carry no information on their own.
+  3. **Category is never encoded by hue.** Platform/role differences use stroke pattern plus an explicit text label. This satisfies WCAG 1.4.1 by construction.
+- **PlatformMatrix uses the shared table contract.** Emit a focusable `.table-scroll.table-scroll--wide` region with `tabindex="0"`, `role="region"`, and an accessible label, then inherit the centralized 14px row-separated table style. Do not create a parallel `.dg-table` skin.
 - **Build-time static SVG only.** No `<script>`, no client-side Mermaid, no runtime rendering, no `client:*` directives. The SVG must be present in view-source.
 - **Overflow contract.** Every diagram sits in a `.dg-scroll` container with `overflow-x: auto; max-width: 100%`. The SVG carries `width: 100%; min-width: <viewBox width>px; height: auto`, so text never renders below its authored size — narrow viewports scroll the container, never the page body. Plan 2's `npm run check:overflow` is the gate.
 - **Accessibility contract (every diagram).** `role="img"` on the SVG; `aria-labelledby` pointing at an in-SVG `<title>` and `<desc>` with ids derived from the diagram id; a visible caption naming the diagram; and a link to that diagram's prose equivalent on `/reference/diagrams-in-words/`. `PlatformMatrix` is the documented exception: it is tabular data and ships as a real `<table>`, which is more accessible and more indexable than SVG text in a grid.
@@ -42,7 +56,7 @@
 
 | File | Responsibility |
 |---|---|
-| `docs-site/src/styles/diagrams.css` | The entire shared visual language: colour roles mapped from `--admob-*`, stroke weights, type scale, spacing, figure/scroll/caption chrome, `.dg-*` SVG utility classes, the table skin, and the Mermaid theme bridge. Imported once by `DiagramFigure.astro`. |
+| `docs-site/src/styles/diagrams.css` | Shared neutral diagram roles, stroke weights, type scale, spacing, figure/scroll/caption chrome, `.dg-*` SVG utilities, and the Mermaid theme bridge. PlatformMatrix inherits the centralized table skin. Imported once by `DiagramFigure.astro`. |
 | `docs-site/src/components/diagrams/descriptions.json` | Single source of truth for every diagram's `title`, `desc`, `invariants`, and multi-paragraph `prose`. Read by both Astro (via `descriptions.ts`) and a Node generator script. |
 | `docs-site/src/components/diagrams/descriptions.ts` | Types the JSON and exposes `getDiagram(id)`, which throws on an unknown id. |
 | `docs-site/src/components/diagrams/DiagramFigure.astro` | Outer chrome for **all** diagrams: `<figure>`, the `overflow-x: auto` scroll region, the caption, the "read this diagram in words" link. Imports `diagrams.css`. Slot = any content (SVG or table). |
@@ -82,11 +96,12 @@
 - Create: `docs-site/src/components/diagrams/DiagramFrame.astro`
 - Create: `docs-site/src/pages/dev/diagram-gallery.astro`
 - Modify: `docs-site/astro.config.mjs` (sitemap `filter` — exclude `/dev/`)
+- Modify: `docs-site/scripts/verify-build.mjs` (exclude the internal `/dev/` fixture from authored-page SEO checks)
 
 **Interfaces:**
-- Consumes: `docs-site/src/styles/tokens.css` and its 19 `--admob-*` properties (Plan 2, Task 2); Vitest 4.1.10 and the `npm test` script (Plan 2, Task 1); the `sitemap()` call in `astro.config.mjs` (Plan 2, Task 4).
+- Consumes: the complete Native Reference `--admob-*` contract in `docs-site/src/styles/tokens.css`; Vitest 4.1.10 and the `npm test` script; the `sitemap()` call in `astro.config.mjs`.
 - Produces:
-  - `docs-site/src/styles/diagrams.css` — colour roles `--dg-paper --dg-node --dg-ink --dg-muted --dg-stroke --dg-accent --dg-hair`; metrics `--dg-sw --dg-sw-strong --dg-sw-hair --dg-r --dg-fs-title --dg-fs-label --dg-fs-body --dg-fs-caption --dg-dash-android --dg-dash-ios --dg-dash-flow`; SVG classes `dg-node dg-node--android dg-node--ios dg-node--accent dg-panel dg-title dg-label dg-sub dg-note dg-mono dg-edge dg-edge--flow dg-edge--accent dg-axis dg-grid dg-arrow dg-arrow--accent dg-fill-hair dg-fill-accent-soft`; HTML classes `dg-figure dg-scroll dg-svg dg-caption dg-caption-title dg-caption-invariants dg-alt-link dg-table dg-mark dg-mermaid`.
+  - `docs-site/src/styles/diagrams.css` — colour roles `--dg-paper --dg-node --dg-ink --dg-muted --dg-stroke --dg-accent --dg-hair`; metrics `--dg-sw --dg-sw-strong --dg-sw-hair --dg-r --dg-fs-title --dg-fs-label --dg-fs-body --dg-fs-caption --dg-dash-android --dg-dash-ios --dg-dash-flow`; SVG classes `dg-node dg-node--android dg-node--ios dg-node--accent dg-panel dg-title dg-label dg-sub dg-note dg-mono dg-edge dg-edge--flow dg-edge--accent dg-axis dg-grid dg-arrow dg-arrow--accent dg-fill-hair dg-fill-accent-soft`; HTML classes `dg-figure dg-scroll dg-svg dg-caption dg-caption-title dg-caption-invariants dg-alt-link dg-mark dg-mermaid`, plus the shared `table-scroll` classes for `PlatformMatrix`.
   - `getDiagram(id: string): DiagramDescription` from `docs-site/src/components/diagrams/descriptions.ts`, where `DiagramDescription = { id: string; title: string; desc: string; invariants: number[]; prose: string[] }`. Throws on an unknown id.
   - `DiagramFigure.astro` with props `{ id: string; minWidth?: number }`.
   - `DiagramFrame.astro` with props `{ id: string; width: number; height: number }`. Inside its slot, arrow markers are referenced as `url(#<id>-arrow)` and `url(#<id>-arrow-accent)`.
@@ -252,13 +267,13 @@ const PAIRINGS = [
   { fg: '--dg-muted', bg: '--dg-node', min: 4.5, use: 'sub-labels inside a node' },
   { fg: '--dg-stroke', bg: '--dg-paper', min: 3, use: 'node borders and edges' },
   { fg: '--dg-stroke', bg: '--dg-node', min: 3, use: 'dividers drawn inside a node' },
-  { fg: '--dg-accent', bg: '--dg-paper', min: 3, use: 'emphasised stroke (non-text only)' },
-  { fg: '--dg-accent', bg: '--dg-node', min: 3, use: 'emphasised stroke (non-text only)' },
+  { fg: '--dg-accent', bg: '--dg-paper', min: 3, use: 'neutral emphasised stroke' },
+  { fg: '--dg-accent', bg: '--dg-node', min: 3, use: 'neutral emphasised stroke inside a node' },
 ] as const;
 
 /**
- * SVG text classes. `--admob-accent` measures 3.37:1 on `--admob-surface` in the
- * light theme, which fails AA for normal-size text, so no text class may use it.
+ * SVG text classes remain neutral. Functional HTML links use the separately
+ * contrast-checked `--admob-accent-text` token.
  */
 const TEXT_RULES = ['.dg-title', '.dg-label', '.dg-sub', '.dg-note', '.dg-mono'] as const;
 const ALLOWED_TEXT_FILLS = ['var(--dg-ink)', 'var(--dg-muted)'];
@@ -312,7 +327,7 @@ Create `docs-site/src/styles/diagrams.css`:
  * Imported once, by DiagramFigure.astro.
  *
  * COLOUR: this file declares no literal colour. Every diagram role is a bare
- * var() reference to one of Plan 2's 19 --admob-* tokens, which are themselves
+ * var() reference to the Native Reference --admob-* contract, which is
  * defined per theme in tokens.css. Diagrams therefore re-theme with Starlight's
  * data-theme switch and need no theme-specific rules of their own.
  * test/diagram-contrast.test.ts re-derives the WCAG ratios from tokens.css for
@@ -328,18 +343,17 @@ Create `docs-site/src/styles/diagrams.css`:
 :root {
   /* Diagram background. Matches the page so a diagram reads as part of it. */
   --dg-paper: var(--admob-paper);
-  /* Node fill. Decorative only — 1.07:1 against paper. The informational
+  /* Node fill. Decorative only — 1.06:1 light / 1.09:1 dark against paper. The informational
      boundary is always the --dg-stroke border, never this fill. */
   --dg-node: var(--admob-surface);
-  /* Primary text. 16.13:1 light / 16.48:1 dark on paper. */
+  /* Primary text. 15.80:1 light / 16.02:1 dark on paper. */
   --dg-ink: var(--admob-ink);
-  /* Secondary text. 5.85:1 light / 7.14:1 dark on paper. */
+  /* Secondary text. 6.11:1 light / 6.15:1 dark on paper. */
   --dg-muted: var(--admob-slate);
-  /* Every informational boundary. 5.85:1 light / 7.14:1 dark on paper. */
+  /* Every informational boundary. 6.11:1 light / 6.15:1 dark on paper. */
   --dg-stroke: var(--admob-slate);
-  /* Emphasis. 3.62:1 light / 4.81:1 dark on paper — STROKES AND LARGE TEXT
-     ONLY. It fails AA for normal-size text in the light theme. */
-  --dg-accent: var(--admob-accent);
+  /* Neutral emphasis. Orange remains reserved for focus and linked text. */
+  --dg-accent: var(--admob-ink);
   /* Decorative gridlines that carry no information on their own. */
   --dg-hair: var(--admob-hair);
 }
@@ -347,10 +361,10 @@ Create `docs-site/src/styles/diagrams.css`:
 /* ----------------------------------------------------------------- metrics */
 
 :root {
-  --dg-sw: 1.5;
-  --dg-sw-strong: 2.25;
+  --dg-sw: 1;
+  --dg-sw-strong: 1;
   --dg-sw-hair: 1;
-  --dg-r: 8;
+  --dg-r: 6;
   --dg-fs-title: 14px;
   --dg-fs-label: 13px;
   --dg-fs-body: 12px;
@@ -379,7 +393,7 @@ Create `docs-site/src/styles/diagrams.css`:
 }
 
 .dg-scroll:focus-visible {
-  outline: 2px solid var(--dg-accent);
+  outline: 2px solid var(--admob-accent);
   outline-offset: 2px;
 }
 
@@ -415,9 +429,9 @@ Create `docs-site/src/styles/diagrams.css`:
   font-size: 0.78rem;
 }
 
-/* Ink, not accent: this is normal-size text and accent fails AA in light. */
+/* Accessible accent text is reserved for this functional link. */
 .dg-alt-link {
-  color: var(--dg-ink);
+  color: var(--admob-accent-text);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -451,10 +465,10 @@ Create `docs-site/src/styles/diagrams.css`:
 
 .dg-title {
   fill: var(--dg-ink);
-  font-family: var(--admob-font-display);
+  font-family: var(--admob-font-body);
   font-size: var(--dg-fs-title);
   font-weight: 600;
-  letter-spacing: var(--admob-tracking-tight);
+  letter-spacing: normal;
 }
 
 .dg-label {
@@ -524,52 +538,15 @@ Create `docs-site/src/styles/diagrams.css`:
 }
 
 .dg-fill-accent-soft {
-  fill: var(--admob-accent-soft);
+  fill: var(--admob-surface);
 }
 
 /* -------------------------------------------------------------- the table */
 /* PlatformMatrix is tabular data, so it ships as a real <table>: better for
    assistive technology and better for indexing than SVG text in a grid. */
 
-.dg-table {
-  width: 100%;
-  /* Same overflow contract as the SVGs: below --dg-min-w the scroll region
-     scrolls rather than crushing the columns. */
+.dg-scroll > table {
   min-width: var(--dg-min-w, 0px);
-  border-collapse: collapse;
-  color: var(--dg-ink);
-  font-family: var(--admob-font-body);
-  font-size: 0.9rem;
-}
-
-.dg-table + .dg-table {
-  margin-top: 1.5rem;
-}
-
-.dg-table caption {
-  caption-side: top;
-  padding-bottom: 0.5rem;
-  color: var(--dg-muted);
-  font-size: 0.85rem;
-  text-align: left;
-}
-
-.dg-table th,
-.dg-table td {
-  border: 1px solid var(--dg-stroke);
-  padding: 0.5rem 0.7rem;
-  text-align: left;
-  vertical-align: top;
-}
-
-.dg-table thead th {
-  background: var(--dg-node);
-  font-weight: 600;
-}
-
-.dg-table tbody th {
-  background: var(--dg-node);
-  font-weight: 500;
 }
 
 /* The glyph is decoration; the adjacent word carries the meaning. */
@@ -588,9 +565,9 @@ Create `docs-site/src/styles/diagrams.css`:
  * `!important` is required, not stylistic: Mermaid emits an in-SVG <style> whose
  * selectors are id-scoped (`#mermaid-0 .node rect`) and would otherwise win.
  *
- * font-family is deliberately NOT overridden. Mermaid measured every label with
- * Inter in a headless Chromium at build time; changing the family afterwards
- * would desynchronise the text from the boxes drawn around it. */
+ * Mermaid is rendered with the same native UI stack configured in astro.config,
+ * so its measured labels and the surrounding Native Reference typography stay
+ * aligned without a post-render font substitution. */
 
 .dg-mermaid svg {
   display: block;
@@ -675,7 +652,9 @@ cd /Users/meetmiyani/Documents/MeetMiyani/MEET/AdmobCMP/docs-site
 npx vitest run test/diagram-contrast.test.ts
 ```
 
-Expected: PASS, 20 tests. The lowest measured ratio is `--dg-accent` on `--dg-node` at 3.37:1 in the light theme, against a 3:1 threshold.
+Expected: PASS, 20 tests. The lowest informational pairing is
+`--dg-stroke` on `--dg-node` at 5.62:1, comfortably above the 3:1 non-text
+threshold. Linked caption text is covered by the shared accent-text theme gate.
 
 - [ ] **Step 6: Write `descriptions.json` — the text alternative for all eight diagrams**
 
@@ -864,9 +843,9 @@ const scrollStyle = minWidth ? `--dg-min-w:${minWidth}px` : undefined;
 
 <figure class="dg-figure" data-diagram={id}>
   <div
-    class="dg-scroll"
+    class:list={['dg-scroll', id === 'platform-matrix' && 'table-scroll table-scroll--wide']}
     tabindex="0"
-    role="group"
+    role="region"
     aria-label={`${diagram.title} — scrollable diagram`}
     style={scrollStyle}
   >
@@ -989,8 +968,8 @@ import '../../styles/tokens.css';
         margin: 0 auto;
       }
       h1 {
-        font-family: var(--admob-font-display);
-        letter-spacing: var(--admob-tracking-tight);
+        font-family: var(--admob-font-body);
+        letter-spacing: normal;
       }
     </style>
   </head>
@@ -1009,10 +988,12 @@ import '../../styles/tokens.css';
 
 - [ ] **Step 11: Exclude `/dev/` from the sitemap, then build**
 
-In `docs-site/astro.config.mjs`, replace the `filter` line inside the `sitemap({ … })` call:
+In `docs-site/astro.config.mjs`, replace the current `filter` line inside the `sitemap({ … })` call:
 
 ```js
-      filter: (page) => !page.includes('/og/') && !page.includes('/api/'),
+      filter: (page) =>
+        !page.includes('/og/') &&
+        (page === `${SITE}/api/` || !page.includes('/api/')),
 ```
 
 with:
@@ -1021,8 +1002,15 @@ with:
       // `/dev/` is the noindex diagram review gallery (Plan 4). It must not
       // appear in the sitemap of an SEO-focused host.
       filter: (page) =>
-        !page.includes('/og/') && !page.includes('/api/') && !page.includes('/dev/'),
+        !page.includes('/og/') &&
+        !page.includes('/dev/') &&
+        (page === `${SITE}/api/` || !page.includes('/api/')),
 ```
+
+Also update `docs-site/scripts/verify-build.mjs` so `listHtmlPages()` skips the
+top-level `dev` directory alongside `api`, `pagefind`, and `_astro`. The gallery
+is an internal noindex fixture, not an authored SEO page; without this exclusion
+the verifier incorrectly requires canonical, OG, and JSON-LD metadata on it.
 
 Then:
 
@@ -1038,7 +1026,7 @@ Expected: the build finishes with `Complete!`; `dist/dev/diagram-gallery/index.h
 
 ```bash
 cd /Users/meetmiyani/Documents/MeetMiyani/MEET/AdmobCMP
-git add docs-site/src/styles/diagrams.css docs-site/src/components/diagrams docs-site/src/pages/dev docs-site/test/helpers docs-site/test/diagram-contrast.test.ts docs-site/astro.config.mjs
+git add docs-site/src/styles/diagrams.css docs-site/src/components/diagrams docs-site/src/pages/dev docs-site/test/helpers docs-site/test/diagram-contrast.test.ts docs-site/astro.config.mjs docs-site/scripts/verify-build.mjs
 git commit -m "feat(docs): add the shared diagram visual language and accessibility contract"
 ```
 
@@ -1067,18 +1055,18 @@ import DiagramFrame from './DiagramFrame.astro';
 
 <DiagramFrame id="module-map" width={920} height={570}>
   {/* published artifacts */}
-  <rect class="dg-node dg-node--accent" x="330" y="16" width="260" height="54" rx="8" />
+  <rect class="dg-node dg-node--accent" x="330" y="16" width="260" height="54" rx="6" />
   <text class="dg-title" x="460" y="40" text-anchor="middle">dev.avinya.ads:admob-cmp</text>
   <text class="dg-sub" x="460" y="58" text-anchor="middle">umbrella — api(core) + api(compose)</text>
 
   <path class="dg-edge" d="M460 70 V92 H200 V112" marker-end="url(#module-map-arrow)" />
   <path class="dg-edge" d="M460 70 V92 H720 V112" marker-end="url(#module-map-arrow)" />
 
-  <rect class="dg-node" x="60" y="116" width="280" height="54" rx="8" />
+  <rect class="dg-node" x="60" y="116" width="280" height="54" rx="6" />
   <text class="dg-title" x="200" y="140" text-anchor="middle">admob-cmp-core</text>
   <text class="dg-sub" x="200" y="158" text-anchor="middle">no Compose dependency</text>
 
-  <rect class="dg-node" x="580" y="116" width="280" height="54" rx="8" />
+  <rect class="dg-node" x="580" y="116" width="280" height="54" rx="6" />
   <text class="dg-title" x="720" y="140" text-anchor="middle">admob-cmp-compose</text>
   <text class="dg-sub" x="720" y="158" text-anchor="middle">Compose UI + adLayout DSL</text>
 
@@ -1087,7 +1075,7 @@ import DiagramFrame from './DiagramFrame.astro';
   <path class="dg-grid" d="M24 200 H896" />
 
   {/* commonMain */}
-  <rect class="dg-node" x="24" y="222" width="300" height="280" rx="8" />
+  <rect class="dg-node" x="24" y="222" width="300" height="280" rx="6" />
   <text class="dg-title" x="40" y="250">commonMain</text>
   <text class="dg-sub" x="40" y="268">shared, platform-free</text>
   <text class="dg-mono" x="40" y="294">core · dev.avinya.ads</text>
@@ -1103,7 +1091,7 @@ import DiagramFrame from './DiagramFrame.astro';
   <text class="dg-sub" x="40" y="474">adLayout {'{}'} DSL, validator, templates</text>
 
   {/* androidMain */}
-  <rect class="dg-node dg-node--android" x="340" y="222" width="264" height="280" rx="8" />
+  <rect class="dg-node dg-node--android" x="340" y="222" width="264" height="280" rx="6" />
   <text class="dg-title" x="356" y="250">androidMain</text>
   <text class="dg-sub" x="356" y="268">thin adapter</text>
   <text class="dg-mono" x="356" y="294">AndroidGoogleAdManager</text>
@@ -1118,7 +1106,7 @@ import DiagramFrame from './DiagramFrame.astro';
   <text class="dg-sub" x="356" y="456">destroyAd · canPresent</text>
 
   {/* iosMain */}
-  <rect class="dg-node dg-node--ios" x="620" y="222" width="276" height="280" rx="8" />
+  <rect class="dg-node dg-node--ios" x="620" y="222" width="276" height="280" rx="6" />
   <text class="dg-title" x="636" y="250">iosMain</text>
   <text class="dg-sub" x="636" y="268">thin adapter</text>
   <text class="dg-mono" x="636" y="294">IosGoogleAdManager</text>
@@ -1329,18 +1317,18 @@ import DiagramFrame from './DiagramFrame.astro';
 
 <DiagramFrame id="full-screen-lifecycle" width={940} height={650}>
   {/* happy path */}
-  <rect class="dg-node" x="30" y="64" width="130" height="54" rx="8" />
+  <rect class="dg-node" x="30" y="64" width="130" height="54" rx="6" />
   <text class="dg-title" x="95" y="96" text-anchor="middle">Idle</text>
 
-  <rect class="dg-node" x="230" y="64" width="150" height="54" rx="8" />
+  <rect class="dg-node" x="230" y="64" width="150" height="54" rx="6" />
   <text class="dg-title" x="305" y="88" text-anchor="middle">Loading</text>
   <text class="dg-sub" x="305" y="106" text-anchor="middle">AdRetry backoff</text>
 
-  <rect class="dg-node" x="450" y="64" width="190" height="54" rx="8" />
+  <rect class="dg-node" x="450" y="64" width="190" height="54" rx="6" />
   <text class="dg-title" x="545" y="88" text-anchor="middle">Loaded</text>
   <text class="dg-sub" x="545" y="106" text-anchor="middle">admitted to the cache</text>
 
-  <rect class="dg-node dg-node--accent" x="710" y="64" width="200" height="54" rx="8" />
+  <rect class="dg-node dg-node--accent" x="710" y="64" width="200" height="54" rx="6" />
   <text class="dg-title" x="810" y="88" text-anchor="middle">Presenting</text>
   <text class="dg-sub" x="810" y="106" text-anchor="middle">SDK owns the screen</text>
 
@@ -1362,7 +1350,7 @@ import DiagramFrame from './DiagramFrame.astro';
   {/* failure path */}
   <path class="dg-edge" d="M230 91 H186 V224 H184" marker-end="url(#full-screen-lifecycle-arrow)" />
   <text class="dg-sub" x="192" y="215">load failed</text>
-  <rect class="dg-node" x="30" y="200" width="150" height="48" rx="8" />
+  <rect class="dg-node" x="30" y="200" width="150" height="48" rx="6" />
   <text class="dg-title" x="105" y="222" text-anchor="middle">Failed</text>
   <text class="dg-sub" x="105" y="240" text-anchor="middle">load() again to retry</text>
 
@@ -1371,7 +1359,7 @@ import DiagramFrame from './DiagramFrame.astro';
   <text class="dg-sub" x="820" y="160">presentAd suspends</text>
   <text class="dg-sub" x="820" y="176">until dismissal</text>
 
-  <rect class="dg-node" x="710" y="240" width="200" height="54" rx="8" />
+  <rect class="dg-node" x="710" y="240" width="200" height="54" rx="6" />
   <text class="dg-title" x="810" y="264" text-anchor="middle">Dismissed</text>
   <text class="dg-sub" x="810" y="282" text-anchor="middle">SDK terminal callback</text>
 
@@ -1384,12 +1372,12 @@ import DiagramFrame from './DiagramFrame.astro';
 
   <path class="dg-edge" d="M545 309 V336" marker-end="url(#full-screen-lifecycle-arrow)" />
   <text class="dg-sub" x="553" y="326">no</text>
-  <rect class="dg-node" x="430" y="340" width="230" height="48" rx="8" />
+  <rect class="dg-node" x="430" y="340" width="230" height="48" rx="6" />
   <text class="dg-sub" x="545" y="362" text-anchor="middle">Idle if the cache is empty,</text>
   <text class="dg-sub" x="545" y="378" text-anchor="middle">Loaded if it is not</text>
 
   {/* explanatory panels */}
-  <rect class="dg-panel" x="24" y="400" width="440" height="190" rx="8" />
+  <rect class="dg-panel" x="24" y="400" width="440" height="190" rx="6" />
   <text class="dg-title" x="40" y="426">clear() and the generation counter</text>
   <text class="dg-sub" x="40" y="452">clear() bumps slotState.generation and</text>
   <text class="dg-sub" x="40" y="470">retires the cached ads.</text>
@@ -1398,7 +1386,7 @@ import DiagramFrame from './DiagramFrame.astro';
   <text class="dg-sub" x="40" y="524">it before publishing, so it can never</text>
   <text class="dg-sub" x="40" y="542">repopulate a cache the caller just emptied.</text>
 
-  <rect class="dg-panel" x="484" y="400" width="430" height="190" rx="8" />
+  <rect class="dg-panel" x="484" y="400" width="430" height="190" rx="6" />
   <text class="dg-title" x="500" y="426">Presentation ownership</text>
   <text class="dg-sub" x="500" y="452">presentAd suspends until dismissal. A</text>
   <text class="dg-sub" x="500" y="470">presented ad is destroyed on normal return</text>
@@ -1478,19 +1466,19 @@ import DiagramFrame from './DiagramFrame.astro';
 
 <DiagramFrame id="native-pool-lifecycle" width={940} height={620}>
   {/* load path */}
-  <rect class="dg-node" x="24" y="56" width="170" height="54" rx="8" />
+  <rect class="dg-node" x="24" y="56" width="170" height="54" rx="6" />
   <text class="dg-title" x="109" y="80" text-anchor="middle">pool.preload(count)</text>
   <text class="dg-sub" x="109" y="98" text-anchor="middle">one batch requested</text>
 
-  <rect class="dg-node" x="234" y="56" width="210" height="54" rx="8" />
+  <rect class="dg-node" x="234" y="56" width="210" height="54" rx="6" />
   <text class="dg-title" x="339" y="80" text-anchor="middle">platform.loadBatch()</text>
   <text class="dg-sub" x="339" y="98" text-anchor="middle">locking stays platform-side</text>
 
-  <rect class="dg-node" x="484" y="56" width="170" height="54" rx="8" />
+  <rect class="dg-node" x="484" y="56" width="170" height="54" rx="6" />
   <text class="dg-title" x="569" y="80" text-anchor="middle">pool inventory</text>
   <text class="dg-sub" x="569" y="98" text-anchor="middle">TTL 1h, FIFO</text>
 
-  <rect class="dg-node dg-node--accent" x="694" y="56" width="170" height="54" rx="8" />
+  <rect class="dg-node dg-node--accent" x="694" y="56" width="170" height="54" rx="6" />
   <text class="dg-title" x="779" y="80" text-anchor="middle">pool.acquire()</text>
   <text class="dg-sub" x="779" y="98" text-anchor="middle">returns a token</text>
 
@@ -1510,15 +1498,15 @@ import DiagramFrame from './DiagramFrame.astro';
   <path class="dg-edge" d="M779 110 V224" marker-end="url(#native-pool-lifecycle-arrow)" />
   <text class="dg-sub" x="789" y="170">token</text>
 
-  <rect class="dg-node" x="694" y="230" width="170" height="54" rx="8" />
+  <rect class="dg-node" x="694" y="230" width="170" height="54" rx="6" />
   <text class="dg-title" x="779" y="254" text-anchor="middle">NativeAdView</text>
   <text class="dg-sub" x="779" y="272" text-anchor="middle">renders the leased ad</text>
 
-  <rect class="dg-node" x="454" y="230" width="180" height="54" rx="8" />
+  <rect class="dg-node" x="454" y="230" width="180" height="54" rx="6" />
   <text class="dg-title" x="544" y="254" text-anchor="middle">pool.release(token)</text>
   <text class="dg-sub" x="544" y="272" text-anchor="middle">destroys the ad</text>
 
-  <rect class="dg-node" x="214" y="230" width="200" height="54" rx="8" />
+  <rect class="dg-node" x="214" y="230" width="200" height="54" rx="6" />
   <text class="dg-title" x="314" y="254" text-anchor="middle">slot freed</text>
   <text class="dg-sub" x="314" y="272" text-anchor="middle">availableAds unchanged</text>
 
@@ -1533,7 +1521,7 @@ import DiagramFrame from './DiagramFrame.astro';
   <text class="dg-sub" x="120" y="200">re-run preload(), not just acquire()</text>
 
   {/* explanatory panels */}
-  <rect class="dg-panel" x="24" y="320" width="440" height="230" rx="8" />
+  <rect class="dg-panel" x="24" y="320" width="440" height="230" rx="6" />
   <text class="dg-title" x="40" y="346">maxSize accounting</text>
   <text class="dg-sub" x="40" y="372">AdCachePolicy.maxSize budgets available</text>
   <text class="dg-sub" x="40" y="390">plus in-use ads. Do not redefine it.</text>
@@ -1545,7 +1533,7 @@ import DiagramFrame from './DiagramFrame.astro';
   <text class="dg-sub" x="40" y="498">Views key their acquisition effect on</text>
   <text class="dg-sub" x="40" y="516">availableAds and re-run preload().</text>
 
-  <rect class="dg-panel" x="484" y="320" width="430" height="230" rx="8" />
+  <rect class="dg-panel" x="484" y="320" width="430" height="230" rx="6" />
   <text class="dg-title" x="500" y="346">clear() contract</text>
   <text class="dg-sub" x="500" y="372">clear() drains and destroys available</text>
   <text class="dg-sub" x="500" y="390">inventory only.</text>
@@ -1626,20 +1614,20 @@ import DiagramFrame from './DiagramFrame.astro';
 
 <DiagramFrame id="banner-geometry" width={920} height={650}>
   {/* the two ways a width arrives */}
-  <rect class="dg-node" x="24" y="26" width="240" height="72" rx="8" />
+  <rect class="dg-node" x="24" y="26" width="240" height="72" rx="6" />
   <text class="dg-title" x="144" y="56" text-anchor="middle">BannerAdView</text>
   <text class="dg-sub" x="144" y="74" text-anchor="middle">measures its own container</text>
 
-  <rect class="dg-node" x="24" y="128" width="240" height="72" rx="8" />
+  <rect class="dg-node" x="24" y="128" width="240" height="72" rx="6" />
   <text class="dg-title" x="144" y="158" text-anchor="middle">Headless caller</text>
   <text class="dg-sub" x="144" y="176" text-anchor="middle">load(geometry = null)</text>
 
   {/* the core's spine */}
-  <rect class="dg-node" x="560" y="26" width="330" height="72" rx="8" />
+  <rect class="dg-node" x="560" y="26" width="330" height="72" rx="6" />
   <text class="dg-title" x="725" y="54" text-anchor="middle">BannerCore.load()</text>
   <text class="dg-sub" x="725" y="74" text-anchor="middle">geometry · sizePolicy · requestOptions</text>
 
-  <rect class="dg-node" x="560" y="128" width="330" height="72" rx="8" />
+  <rect class="dg-node" x="560" y="128" width="330" height="72" rx="6" />
   <text class="dg-title" x="725" y="154" text-anchor="middle">resolve the width</text>
   <text class="dg-mono" x="725" y="178" text-anchor="middle">geometry?.widthDp ?: fallbackWidthDp()</text>
 
@@ -1652,25 +1640,25 @@ import DiagramFrame from './DiagramFrame.astro';
   <text class="dg-label" x="725" y="250" text-anchor="middle">widthDp resolved?</text>
   <path class="dg-edge" d="M725 200 V206" marker-end="url(#banner-geometry-arrow)" />
 
-  <rect class="dg-node dg-node--accent" x="180" y="214" width="300" height="64" rx="8" />
+  <rect class="dg-node dg-node--accent" x="180" y="214" width="300" height="64" rx="6" />
   <text class="dg-label" x="330" y="240" text-anchor="middle">load fails with an explicit error</text>
   <text class="dg-sub" x="330" y="260" text-anchor="middle">BannerCore owns the failure policy</text>
   <path class="dg-edge" d="M615 246 H484" marker-end="url(#banner-geometry-arrow)" />
   <text class="dg-sub" x="550" y="238" text-anchor="middle">no</text>
 
-  <rect class="dg-node" x="560" y="296" width="330" height="64" rx="8" />
+  <rect class="dg-node" x="560" y="296" width="330" height="64" rx="6" />
   <text class="dg-title" x="725" y="320" text-anchor="middle">platform.resolveSize()</text>
   <text class="dg-sub" x="725" y="340" text-anchor="middle">sizePolicy + widthDp → platform ad size</text>
   <path class="dg-edge" d="M725 282 V290" marker-end="url(#banner-geometry-arrow)" />
   <text class="dg-sub" x="737" y="294">yes</text>
 
-  <rect class="dg-node" x="560" y="390" width="330" height="64" rx="8" />
+  <rect class="dg-node" x="560" y="390" width="330" height="64" rx="6" />
   <text class="dg-title" x="725" y="414" text-anchor="middle">platform.loadBanner()</text>
   <text class="dg-sub" x="725" y="434" text-anchor="middle">size · sizePolicy · options · generation</text>
   <path class="dg-edge" d="M725 360 V384" marker-end="url(#banner-geometry-arrow)" />
 
   {/* explanatory panels */}
-  <rect class="dg-panel" x="24" y="474" width="430" height="150" rx="8" />
+  <rect class="dg-panel" x="24" y="474" width="430" height="150" rx="6" />
   <text class="dg-title" x="40" y="500">The fallback is nullable on both platforms</text>
   <text class="dg-sub" x="40" y="524">Android: the current Activity; null when</text>
   <text class="dg-sub" x="40" y="542">there is none.</text>
@@ -1678,7 +1666,7 @@ import DiagramFrame from './DiagramFrame.astro';
   <text class="dg-sub" x="40" y="578">UIScreen.mainScreen, which sized banners</text>
   <text class="dg-sub" x="40" y="596">wrong in Split View, Slide Over, popovers.</text>
 
-  <rect class="dg-panel" x="474" y="474" width="422" height="150" rx="8" />
+  <rect class="dg-panel" x="474" y="474" width="422" height="150" rx="6" />
   <text class="dg-title" x="490" y="500">refresh() and registerGeometry()</text>
   <text class="dg-sub" x="490" y="524">refresh() replays the WHOLE resolved</text>
   <text class="dg-sub" x="490" y="542">request: geometry + size policy + options.</text>
@@ -1922,7 +1910,7 @@ import DiagramFrame from './DiagramFrame.astro';
   </text>
 
   {/* classification panels */}
-  <rect class="dg-panel" x="24" y="320" width="430" height="170" rx="8" />
+  <rect class="dg-panel" x="24" y="320" width="430" height="170" rx="6" />
   <text class="dg-title" x="40" y="346">Retried — transient failures</text>
   <text class="dg-sub" x="40" y="372">Android (enum names): NETWORK_ERROR,</text>
   <text class="dg-sub" x="40" y="390">TIMEOUT, INTERNAL_ERROR</text>
@@ -1930,7 +1918,7 @@ import DiagramFrame from './DiagramFrame.astro';
   <text class="dg-sub" x="40" y="426">11 internal</text>
   <text class="dg-sub" x="40" y="444">delay(n) = min(initialDelay × 2^(n−1), maxDelay)</text>
 
-  <rect class="dg-panel" x="474" y="320" width="422" height="170" rx="8" />
+  <rect class="dg-panel" x="474" y="320" width="422" height="170" rx="6" />
   <text class="dg-title" x="490" y="346">Never retried</text>
   <text class="dg-sub" x="490" y="372">NO_FILL (Android) / code 1 (iOS) — no</text>
   <text class="dg-sub" x="490" y="390">inventory; retrying burns requests and</text>
@@ -1990,7 +1978,7 @@ git commit -m "feat(docs): add the retry backoff timeline diagram"
 - Modify: `docs-site/src/pages/dev/diagram-gallery.astro`
 
 **Interfaces:**
-- Consumes: `DiagramFigure.astro` directly (**not** `DiagramFrame`) with props `{ id: 'platform-matrix', minWidth: 680 }`; the `platform-matrix` entry of `descriptions.json`; classes `dg-table dg-mark`.
+- Consumes: `DiagramFigure.astro` directly (**not** `DiagramFrame`) with props `{ id: 'platform-matrix', minWidth: 680 }`; the `platform-matrix` entry of `descriptions.json`; the canonical `.table-scroll.table-scroll--wide` wrapper emitted by `DiagramFigure`; class `dg-mark` for the decorative state glyph only.
 - Produces: `PlatformMatrix.astro`, imported by name from Plan 3's `/reference/compatibility/` page and Plan 5's landing page.
 
 **Why this one is a `<table>`, not an SVG.** A support matrix is tabular data. A real `<table>` with `scope`-ed headers is navigable cell-by-cell by a screen reader, is parsed as a table by search engines, reflows, and is selectable text; SVG text laid out in a grid is none of those things. This is the documented exception to the "diagrams are SVG" rule, and it is why `PlatformMatrix` uses `DiagramFigure` rather than `DiagramFrame` — there is no `<svg>`, so there is no `role="img"`, `<title>` or `<desc>` to emit. Its accessible name comes from the two `<caption>` elements and the figure caption.
@@ -2009,7 +1997,7 @@ import DiagramFigure from './DiagramFigure.astro';
 ---
 
 <DiagramFigure id="platform-matrix" minWidth={680}>
-  <table class="dg-table">
+  <table>
     <caption>Ad formats</caption>
     <thead>
       <tr>
@@ -2059,7 +2047,7 @@ import DiagramFigure from './DiagramFigure.astro';
     </tbody>
   </table>
 
-  <table class="dg-table">
+  <table>
     <caption>Cross-cutting capabilities</caption>
     <thead>
       <tr>
@@ -2392,11 +2380,11 @@ git commit -m "feat(docs): generate text equivalents for every diagram into llms
 
 **Files:**
 - Create: `docs-site/test/diagram-build-output.test.ts`
-- Modify: none
+- Modify: `docs-site/scripts/check-theme.mjs` (diagram gallery typography, palette, shape, focus, theme, motion, and containment assertions)
 
 **Interfaces:**
-- Consumes: everything Tasks 1–10 produced; `dist/dev/diagram-gallery/index.html`; Plan 2's `npm run check:overflow`.
-- Produces: no new runtime artefact. This task is the merge gate.
+- Consumes: everything Tasks 1–10 produced; `dist/dev/diagram-gallery/index.html`; the current isolated `npm run check:theme` and `npm run check:overflow` gates.
+- Produces: no new runtime artefact. This task is the local merge-readiness gate.
 
 **Preconditions.** Steps 2 onward read `dist/`, so Step 1 must run first in a clean session.
 
@@ -2450,7 +2438,8 @@ describe('accessibility contract', () => {
   });
 
   it('the platform matrix ships as a real table with scoped headers', () => {
-    expect(html).toContain('<table class="dg-table">');
+    expect(html).toContain('table-scroll table-scroll--wide');
+    expect(html).toContain('<table>');
     expect(html).toContain('scope="row"');
     expect(html).toContain('scope="col"');
   });
@@ -2503,20 +2492,25 @@ npx vitest run test/diagram-contrast.test.ts test/diagram-descriptions.test.ts t
 
 Expected: PASS, all four files, zero failures.
 
-- [ ] **Step 4: Run the full suite and the overflow gate**
+- [ ] **Step 4: Run the full suite and both isolated visual gates**
 
 ```bash
 cd /Users/meetmiyani/Documents/MeetMiyani/MEET/AdmobCMP/docs-site
 npm test
-npm run preview &
-PREVIEW_PID=$!
-sleep 4
-npm run check:overflow; RESULT=$?
-kill $PREVIEW_PID
-echo "overflow exit=$RESULT"
+npm run build
+npm run verify
+npm run check:theme
+npm run check:overflow
 ```
 
-Expected: `npm test` green; `overflow exit=0`. A non-zero exit means a diagram is forcing the page body to scroll horizontally instead of scrolling inside `.dg-scroll` — check that its component passes `minWidth` and that no ancestor overrides `max-width: 100%`.
+Expected: all commands pass. Extend `check:theme` with an explicit diagram case
+that loads `/dev/diagram-gallery/` in light, dark, mobile, and reduced-motion
+contexts and asserts the native body font, neutral node/edge roles, radii at most
+6px, one-pixel boundaries, no shadow or transform, visible focus on every scroll
+region, correct theme switching, and page containment. A failing overflow gate
+means a diagram is forcing the page body to scroll horizontally instead of
+scrolling inside `.dg-scroll` — check that its component passes `minWidth` and
+that no ancestor overrides `max-width: 100%`.
 
 - [ ] **Step 5: Verify both themes and the mobile viewport by hand**
 
@@ -2559,11 +2553,25 @@ Open `admob-cmp/CLAUDE.md` beside the gallery and confirm, one diagram at a time
 
 Expected: no contradiction. A contradiction is a defect in the diagram, not in `CLAUDE.md` — fix the diagram.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 8: Run repository-level readiness and report it**
 
 ```bash
 cd /Users/meetmiyani/Documents/MeetMiyani/MEET/AdmobCMP
-git add docs-site/test/diagram-build-output.test.ts
+git diff --check
+./scripts/release-readiness.sh
+```
+
+Expected: `git diff --check` is clean and all eight readiness sections finish
+with `READINESS: PASS`. Report which sections ran, which were skipped, and any
+failure fixed. A pass is a prerequisite for asking the owner about a PR; it is
+not authorization to open one.
+
+- [ ] **Step 9: Commit after explicit owner approval**
+
+```bash
+cd /Users/meetmiyani/Documents/MeetMiyani/MEET/AdmobCMP
+git add docs-site/test/diagram-build-output.test.ts docs-site/scripts/check-theme.mjs
+git diff --cached --check
 git commit -m "test(docs): gate the diagram set on themes, contrast, overflow and static SVG"
 ```
 
@@ -2610,15 +2618,15 @@ No `TBD`, `TODO`, "implement later", "add appropriate error handling", "handle e
 
 - **Component filenames** are identical in the Global Constraints list, the File Structure table, each task's heading, each task's Interfaces block, the gallery import lines, and `COMPONENTS` in `diagram-descriptions.test.ts`: `ModuleMap.astro`, `InitSequence.astro`, `FullScreenLifecycle.astro`, `NativePoolLifecycle.astro`, `BannerGeometry.astro`, `ConsentDecisionTree.astro`, `RetryTimeline.astro`, `PlatformMatrix.astro`.
 - **Diagram ids** are identical across `descriptions.json` keys, the `id` prop, the `<title>`/`<desc>` id prefixes, the arrow-marker id prefixes, the `data-diagram` attribute, the `/reference/diagrams-in-words/#<id>` anchors, and every `grep` in the verification steps: `module-map`, `init-sequence`, `full-screen-lifecycle`, `native-pool-lifecycle`, `banner-geometry`, `consent-decision-tree`, `retry-timeline`, `platform-matrix`.
-- **Token names** are only ever the 19 from Plan 2, spelled `--admob-*`. `diagrams.css` references `--admob-paper`, `--admob-surface`, `--admob-ink`, `--admob-slate`, `--admob-hair`, `--admob-accent`, `--admob-accent-soft`, `--admob-border`, `--admob-radius`, `--admob-font-body`, `--admob-font-display`, `--admob-font-mono`, `--admob-tracking-tight`, `--admob-content-max` — all real, none invented. `resolveRole()` in the test rejects anything that is not a bare `var(--admob-*)`, so a typo fails the suite rather than silently falling back.
+- **Token names** come only from the current Native Reference `--admob-*` contract. `diagrams.css` references the shared surface, ink, slate, hair, accent-text, border, radius, body-font, mono-font, and reading-width roles — all real, none invented. `resolveRole()` in the test rejects anything that is not a bare `var(--admob-*)`, so a typo fails the suite rather than silently falling back.
 - **Wrapper props** match their definitions: `DiagramFigure { id, minWidth? }` is called with `minWidth` by `InitSequence` (760), `ConsentDecisionTree` (820) and `PlatformMatrix` (680); `DiagramFrame { id, width, height }` is called with all three by the five SVG diagrams, and its `width` is what becomes `--dg-min-w`. `getDiagram(id)` has one signature and one return type, used in `DiagramFigure`, `DiagramFrame`, `InitSequence` and `ConsentDecisionTree`. `renderProsePage(descriptions)` is defined once in Task 10 Step 1 and called under that exact name in Task 10 Step 4.
 - **One inconsistency was found and fixed.** The architecture paragraph, the Task 1 Interfaces block and the `DiagramFrame` doc comment all said "six hand-authored diagrams". The real split is five hand-authored SVG + two Mermaid + one table. All three now say five.
-- **One CSS gap was found and fixed.** `.dg-table` originally had no `min-width`, so `PlatformMatrix`'s `minWidth={680}` would have had no effect and the table would have crushed on mobile instead of scrolling. `min-width: var(--dg-min-w, 0px)` was added to the `.dg-table` rule in Task 1.
+- **Table containment is centralized.** `PlatformMatrix` receives the canonical `.table-scroll.table-scroll--wide` wrapper and keeps only a layout-specific `min-width`, so it cannot drift into a parallel table skin.
 
 ### 4. Accessibility and accuracy
 
 - **`role="img"` + `<title>` + `<desc>`**: emitted structurally by `DiagramFrame` for the five SVG diagrams, and by the wrapper `<div role="img" aria-labelledby>` for the two Mermaid diagrams — where `role="img"` also prunes Mermaid's own subtree so the diagram is announced once rather than read as loose labels. `PlatformMatrix` is the documented exception and is justified in its task: a real `<table>` with `scope`-ed headers beats SVG text in a grid for both assistive technology and indexing. Task 11 Step 2 asserts all of this against the built HTML.
 - **Prose equivalent**: all eight have one, in `descriptions.json`, surfaced on `/reference/diagrams-in-words/` and therefore in `llms-full.txt` (asserted in Task 10 Step 6). `diagram-descriptions.test.ts` enforces at least three paragraphs and 600 characters, so a stub cannot pass.
-- **Contrast**: derived from Plan 2's literal hex values, both themes, and re-derived by the test rather than copied. Lowest informational ratio is 3.37:1 for an accent **stroke** (threshold 3:1); lowest text ratio is 5.45:1 (threshold 4.5:1). The test also forbids any text class from using the accent, which is the pairing that would fail.
-- **Colour is never the only channel**: the token contract has one accent, so category is carried by dash pattern plus an explicit label, and the matrix's support cells carry a word next to an `aria-hidden` glyph.
+- **Contrast**: derived from the current token values in both themes and re-derived by the test rather than trusted from comments. The lowest informational stroke pairing is 5.62:1 and the lowest diagram text pairing is also 5.62:1. Functional caption links use the separately checked accent-text token.
+- **Colour is never the only channel**: diagrams use a neutral palette, so category is carried by dash pattern plus an explicit label, and the matrix's support cells carry a word next to an `aria-hidden` glyph.
 - **Invariant citations**: every diagram cites its numbers in `descriptions.json`, in the rendered caption, and in the SVG footer text — #1/#7 (ModuleMap), #5/#11 (InitSequence), #1/#2/#9 (FullScreenLifecycle), #3/#4/#8 (NativePoolLifecycle), #6 (BannerGeometry), #5 (ConsentDecisionTree), #9 (RetryTimeline), #11 (PlatformMatrix). Every claim in every diagram was taken from `CLAUDE.md`, `AGENTS.md`, `ARCHITECTURE.md`, or read directly out of the Kotlin source (`AdRetry.kt`, `AdError.kt`, `AdPlacement.kt`, `BannerCore.kt`, `NativePoolCore.kt`, `FullScreenSlotCore.kt`, `AndroidAdMappersTest.kt`). Task 11 Step 7 re-checks each one by hand before merge.
