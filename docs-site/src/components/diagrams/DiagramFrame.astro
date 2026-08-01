@@ -1,0 +1,61 @@
+---
+/**
+ * The <svg> shell for the five hand-authored SVG diagrams. Emitting it here rather
+ * than in each component makes the accessibility contract structural: a diagram
+ * physically cannot ship without role="img", a <title> and a <desc>.
+ *
+ * Arrow markers are namespaced by diagram id because several diagrams can share
+ * one page and SVG marker ids are document-global.
+ */
+import DiagramFigure from './DiagramFigure.astro';
+import { getDiagram } from './descriptions';
+
+interface Props {
+  id: string;
+  /** viewBox width in user units. Also becomes the scroll threshold. */
+  width: number;
+  /** viewBox height in user units. */
+  height: number;
+}
+
+const { id, width, height } = Astro.props;
+const diagram = getDiagram(id);
+---
+
+<DiagramFigure id={id} minWidth={width}>
+  <svg
+    class="dg-svg"
+    role="img"
+    viewBox={`0 0 ${width} ${height}`}
+    aria-labelledby={`${id}-title ${id}-desc`}
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <title id={`${id}-title`}>{diagram.title}</title>
+    <desc id={`${id}-desc`}>{diagram.desc}</desc>
+    <defs>
+      <marker
+        id={`${id}-arrow`}
+        viewBox="0 0 10 10"
+        refX="9"
+        refY="5"
+        markerWidth="7"
+        markerHeight="7"
+        orient="auto-start-reverse"
+      >
+        <path class="dg-arrow" d="M0 0 L10 5 L0 10 Z" />
+      </marker>
+      <marker
+        id={`${id}-arrow-accent`}
+        viewBox="0 0 10 10"
+        refX="9"
+        refY="5"
+        markerWidth="7"
+        markerHeight="7"
+        orient="auto-start-reverse"
+      >
+        <path class="dg-arrow--accent" d="M0 0 L10 5 L0 10 Z" />
+      </marker>
+    </defs>
+    <slot />
+  </svg>
+</DiagramFigure>

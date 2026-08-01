@@ -238,7 +238,12 @@ export default defineConfig({
       // The /api/ entry must be listed, so the filter is "exclude everything under
       // /api/ except the entry point itself" — the plan's filter would have excluded
       // /api/ entirely, which broke the build verifier.
-      filter: (page) => !page.includes('/og/') && (page === `${SITE}/api/` || !page.includes('/api/')),
+      // `/dev/` is the noindex diagram review gallery (Plan 4). It must not
+      // appear in the sitemap of an SEO-focused host.
+      filter: (page) =>
+        !page.includes('/og/') &&
+        (page === `${SITE}/api/` || !page.includes('/api/')) &&
+        !page.includes('/dev/'),
       customPages: [`${SITE}/api/`],
       changefreq: 'weekly',
     }),
