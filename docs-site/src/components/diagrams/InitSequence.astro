@@ -1,25 +1,29 @@
 ---
-// docs-site/src/components/diagrams/InitSequence.astro
-//
-// PLACEHOLDER. Plan 4 (visual system) replaces this body with the real
-// theme-aware diagram. The file name and the zero-prop contract are fixed by
-// Plan 3 and must not change — 24 content pages import it as <InitSequence />.
-//
-// Plan 3's final audit (Task 27) fails if this placeholder is still present,
-// so a stub can never ship to ads.avinya.dev.
+/**
+ * The Mermaid source is rendered to inline SVG at build time by the
+ * rehype-mermaid plugin Plan 2 registered on the markdown pipeline. Importing
+ * the .md file runs it through that pipeline; `Content` is the rendered result.
+ *
+ * `role="img"` on the wrapper prunes the SVG subtree from the accessibility
+ * tree, so the diagram is announced once, from the title and desc below, rather
+ * than read out as a soup of disconnected labels.
+ *
+ * The referenced spans are `hidden`: per the accessible-name computation,
+ * aria-labelledby uses a hidden element's text content, so this is a label
+ * without a duplicate visible string.
+ */
+import DiagramFigure from './DiagramFigure.astro';
+import { getDiagram } from './descriptions';
+import { Content as MermaidDiagram } from './mermaid/init-sequence.md';
+
+const id = 'init-sequence';
+const diagram = getDiagram(id);
 ---
 
-<figure class="diagram-placeholder" data-diagram="InitSequence">
-  <p>Diagram <code>InitSequence</code> is not authored yet.</p>
-</figure>
-
-<style>
-  .diagram-placeholder {
-    margin: 1.5rem 0;
-    padding: 1rem;
-    border: 2px dashed var(--sl-color-gray-4);
-    border-radius: 0.5rem;
-    text-align: center;
-    color: var(--sl-color-gray-3);
-  }
-</style>
+<DiagramFigure id={id} minWidth={760}>
+  <div class="dg-mermaid" role="img" aria-labelledby={`${id}-title ${id}-desc`}>
+    <span id={`${id}-title`} hidden>{diagram.title}</span>
+    <span id={`${id}-desc`} hidden>{diagram.desc}</span>
+    <MermaidDiagram />
+  </div>
+</DiagramFigure>
