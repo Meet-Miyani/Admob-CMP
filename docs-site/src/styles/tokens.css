@@ -1,16 +1,17 @@
 /* docs-site/src/styles/tokens.css
  *
- * The avinya.dev visual language, ported to Starlight.
+ * The AdMob CMP native reference language, mapped onto Starlight.
  *
- * PUBLIC CONTRACT — Plans 4 (diagrams) and 5 (landing page) style against these
- * 19 custom properties. Do not rename one without updating those plans:
+ * PUBLIC CONTRACT — diagrams and landing-page styles consume these custom
+ * properties. Do not rename one without updating those consumers:
  *
  *   --admob-paper --admob-surface --admob-code --admob-ink --admob-slate
- *   --admob-hair --admob-accent --admob-accent-contrast --admob-accent-soft
+ *   --admob-hair --admob-accent --admob-accent-text
+ *   --admob-accent-contrast --admob-accent-soft
  *   --admob-font-display --admob-font-body --admob-font-mono
  *   --admob-tracking-tight --admob-tracking-tighter
  *   --admob-radius --admob-radius-lg --admob-border --admob-shadow
- *   --admob-content-max
+ *   --admob-content-max --admob-reading --admob-ease
  *
  * This file is unlayered on purpose: Starlight ships its properties inside
  * `@layer starlight.base`, and unlayered author rules beat layered ones.
@@ -19,47 +20,13 @@
 /* ------------------------------------------------------------------ fonts */
 
 @font-face {
-  font-family: 'Space Grotesk';
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url('/fonts/space-grotesk-500.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'Space Grotesk';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url('/fonts/space-grotesk-600.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('/fonts/inter-400.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url('/fonts/inter-500.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url('/fonts/inter-600.woff2') format('woff2');
-}
-@font-face {
   font-family: 'JetBrains Mono';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
   src: url('/fonts/jetbrains-mono-400.woff2') format('woff2');
 }
+
 @font-face {
   font-family: 'JetBrains Mono';
   font-style: normal;
@@ -69,111 +36,119 @@
 }
 
 /* ------------------------------------------------- tokens: dark (default) */
-/* Starlight's bare `:root` IS the dark theme. Values lifted verbatim from
-   avinya.dev's `[data-theme=dark]` block. */
 
 :root,
 :root[data-theme='dark'] {
-  --admob-paper: #0e0f10;
-  --admob-surface: #171819;
-  --admob-code: #161719;
-  --admob-ink: #edeeec;
-  --admob-slate: #9a9f9c;
-  --admob-hair: #2a2c2e;
+  --admob-paper: #0d1117;
+  --admob-surface: #161b22;
+  --admob-code: #161b22;
+  --admob-ink: #e6edf3;
+  --admob-slate: #8b949e;
+  --admob-hair: #30363d;
   --admob-accent: #ee3a20;
+  --admob-accent-text: #ff9a88;
   --admob-accent-contrast: #ffffff;
-  --admob-accent-soft: rgba(238, 58, 32, 0.18);
+  --admob-accent-soft: rgba(238, 58, 32, 0.14);
 }
 
 /* ------------------------------------------------------- tokens: light */
-/* Values lifted verbatim from avinya.dev's `:root` block. */
 
 :root[data-theme='light'] {
-  --admob-paper: #f3f4f2;
-  --admob-surface: #ebecea;
-  --admob-code: #edeeec;
-  --admob-ink: #16181a;
-  --admob-slate: #5a5f63;
-  --admob-hair: #d8dad6;
+  --admob-paper: #ffffff;
+  --admob-surface: #f6f8fa;
+  --admob-code: #f6f8fa;
+  --admob-ink: #1f2328;
+  --admob-slate: #59636e;
+  --admob-hair: #d0d7de;
   --admob-accent: #ee3a20;
+  --admob-accent-text: #9e2411;
   --admob-accent-contrast: #ffffff;
-  --admob-accent-soft: rgba(238, 58, 32, 0.12);
+  --admob-accent-soft: rgba(238, 58, 32, 0.1);
 }
 
 /* -------------------------------------------- tokens: theme-independent */
 
 :root {
-  --admob-font-display: 'Space Grotesk', system-ui, sans-serif;
-  --admob-font-body: 'Inter', system-ui, sans-serif;
-  --admob-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  --admob-tracking-tight: -0.02em;
-  --admob-tracking-tighter: -0.04em;
-  --admob-radius: 10px;
-  --admob-radius-lg: 18px;
+  --admob-font-display: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans',
+    'Helvetica Neue', Arial, sans-serif;
+  --admob-font-body: var(--admob-font-display);
+  --admob-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas,
+    'Liberation Mono', monospace;
+  --admob-tracking-tight: 0;
+  --admob-tracking-tighter: 0;
+  --admob-radius: 6px;
+  --admob-radius-lg: 6px;
   --admob-border: 1px solid var(--admob-hair);
-  --admob-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.08);
+  --admob-shadow: none;
   --admob-content-max: 72rem;
+  --admob-reading: 45rem;
+  --admob-ease: ease-out;
 }
 
 /* ------------------------------------------- remap Starlight onto tokens */
 
 :root,
 :root[data-theme='dark'] {
-  --sl-color-white: #f7f8f6;
-  --sl-color-gray-1: #edeeec;
-  --sl-color-gray-2: #c9ccc8;
-  --sl-color-gray-3: #9a9f9c;
-  --sl-color-gray-4: #6b706d;
-  --sl-color-gray-5: #3d4042;
-  --sl-color-gray-6: #171819;
-  --sl-color-black: #0e0f10;
+  --sl-color-white: #f0f6fc;
+  --sl-color-gray-1: #e6edf3;
+  --sl-color-gray-2: #b1bac4;
+  --sl-color-gray-3: #8b949e;
+  --sl-color-gray-4: #6e7681;
+  --sl-color-gray-5: #30363d;
+  --sl-color-gray-6: #161b22;
+  --sl-color-black: #0d1117;
 
-  --sl-color-accent: #ee3a20;
-  --sl-color-accent-high: #ff9a88;
+  --sl-color-accent: var(--admob-accent);
+  --sl-color-accent-high: var(--admob-accent-text);
   --sl-color-accent-low: #4a150c;
-  --sl-color-text-accent: var(--sl-color-accent-high);
   --sl-color-text-invert: var(--admob-paper);
 
   --sl-color-bg: var(--admob-paper);
-  --sl-color-bg-nav: var(--admob-surface);
+  --sl-color-bg-nav: var(--admob-paper);
   --sl-color-bg-sidebar: var(--admob-paper);
-  --sl-color-bg-inline-code: var(--admob-code);
+  --sl-color-bg-inline-code: var(--admob-surface);
   --sl-color-hairline: var(--admob-hair);
   --sl-color-hairline-light: var(--admob-hair);
   --sl-color-hairline-shade: var(--admob-hair);
 }
 
 :root[data-theme='light'] {
-  --sl-color-white: #0b0c0d;
-  --sl-color-gray-1: #16181a;
-  --sl-color-gray-2: #2e3134;
-  --sl-color-gray-3: #5a5f63;
-  --sl-color-gray-4: #878c8f;
-  --sl-color-gray-5: #d8dad6;
-  --sl-color-gray-6: #ebecea;
-  --sl-color-gray-7: #f3f4f2;
+  --sl-color-white: #1f2328;
+  --sl-color-gray-1: #24292f;
+  --sl-color-gray-2: #424a53;
+  --sl-color-gray-3: #59636e;
+  --sl-color-gray-4: #818b98;
+  --sl-color-gray-5: #d0d7de;
+  --sl-color-gray-6: #eaeef2;
+  --sl-color-gray-7: #f6f8fa;
   --sl-color-black: #ffffff;
 
-  --sl-color-accent: #ee3a20;
-  --sl-color-accent-high: #9e2411;
+  --sl-color-accent: var(--admob-accent);
+  --sl-color-accent-high: var(--admob-accent-text);
   --sl-color-accent-low: #fbdcd6;
-  /* #ee3a20 on #f3f4f2 is only ~3.5:1. Link text uses the darker ramp step. */
-  --sl-color-text-accent: var(--sl-color-accent-high);
   --sl-color-text-invert: #ffffff;
 
   --sl-color-bg: var(--admob-paper);
-  --sl-color-bg-nav: var(--admob-surface);
+  --sl-color-bg-nav: var(--admob-paper);
   --sl-color-bg-sidebar: var(--admob-paper);
-  --sl-color-bg-inline-code: var(--admob-code);
+  --sl-color-bg-inline-code: var(--admob-surface);
   --sl-color-hairline: var(--admob-hair);
   --sl-color-hairline-light: var(--admob-hair);
   --sl-color-hairline-shade: var(--admob-hair);
 }
 
+:root,
+:root[data-theme='dark'],
+:root[data-theme='light'] {
+  --sl-color-text-accent: var(--admob-accent-text);
+}
+
 :root {
   --sl-font: var(--admob-font-body);
   --sl-font-mono: var(--admob-font-mono);
-  --sl-content-width: 48rem;
+  --sl-content-width: var(--admob-reading);
+  --sl-nav-height: 3.75rem;
+  --sl-text-code: 0.875rem;
 }
 
 /* ------------------------------------------------------------ typography */
@@ -185,13 +160,42 @@ h4,
 h5,
 h6,
 .site-title {
-  font-family: var(--admob-font-display);
-  font-weight: 600;
-  letter-spacing: var(--admob-tracking-tight);
+  font-family: var(--admob-font-body);
+  font-weight: 700;
+  letter-spacing: normal;
 }
 
-h1 {
-  letter-spacing: var(--admob-tracking-tighter);
+.sl-markdown-content h1,
+.content-panel h1 {
+  font-size: 2rem;
+  line-height: 1.2;
+  letter-spacing: normal;
+  text-wrap: wrap;
+}
+
+.sl-markdown-content h2 {
+  margin-block: 2.5rem 0.875rem;
+  font-size: 1.5rem;
+  line-height: 1.3;
+}
+
+.sl-markdown-content h3 {
+  margin-block: 1.75rem 0.625rem;
+  font-size: 1.1875rem;
+  line-height: 1.4;
+}
+
+.sl-markdown-content {
+  color: var(--admob-ink);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+@media (max-width: 50rem) {
+  .sl-markdown-content h1,
+  .content-panel h1 {
+    font-size: 1.75rem;
+  }
 }
 
 ::selection {
@@ -205,11 +209,427 @@ h1 {
   border-radius: 2px;
 }
 
-/* Wide content must scroll inside its own box — the page body must never
-   scroll horizontally. `scripts/check-overflow.mjs` enforces this. */
-.sl-markdown-content table,
-.sl-markdown-content pre {
+/* ----------------------------------------------------------- prose links */
+
+.sl-markdown-content p a,
+.sl-markdown-content li a,
+.sl-markdown-content td a {
+  color: var(--admob-accent-text);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--admob-accent-text) 55%, transparent);
+  text-underline-offset: 0.15em;
+  transition: text-decoration-color 150ms var(--admob-ease), color 150ms var(--admob-ease);
+}
+
+.sl-markdown-content p a:hover,
+.sl-markdown-content li a:hover,
+.sl-markdown-content td a:hover {
+  color: var(--admob-accent-text);
+  text-decoration-color: var(--admob-accent-text);
+}
+
+/* ------------------------------------------------------------ inline code */
+
+.sl-markdown-content code:not(:where(.expressive-code *)) {
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--admob-surface);
+  font-family: var(--admob-font-mono);
+  font-size: 0.9em;
+}
+
+/* -------------------------------------------------------------- sidebar */
+
+.sidebar-content a {
+  padding: 0.2em 0.375rem;
+  border-radius: 2px;
+  color: var(--admob-slate);
+  font-family: var(--admob-font-body);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  transition: color 150ms var(--admob-ease);
+}
+
+.sidebar-content a:hover,
+.sidebar-content a:focus-visible {
+  color: var(--admob-ink);
+}
+
+.sidebar-content a[aria-current='page'],
+.sidebar-content a[aria-current='page']:hover,
+.sidebar-content a[aria-current='page']:focus-visible {
+  color: var(--admob-ink);
+  font-weight: 600;
+  background: transparent;
+  box-shadow: none;
+}
+
+.sidebar-content .group-label .large {
+  color: var(--admob-slate);
+  font-family: var(--admob-font-body);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.sidebar-content summary {
+  padding: 0.2em 0.375rem;
+  line-height: 1.35;
+}
+
+.sidebar-content ul ul li {
+  margin-inline-start: 0.375rem;
+  padding-inline-start: 0.375rem;
+  border-inline-start: 0;
+}
+
+.sidebar-content .top-level > li + li {
+  margin-top: 0.375rem;
+}
+
+/* ------------------------------------------------------------------ TOC */
+
+starlight-toc nav > h2 {
+  color: var(--admob-slate);
+  font-family: var(--admob-font-body);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+starlight-toc nav a {
+  position: relative;
   display: block;
+  padding-left: 0.875rem;
+  border: 0;
+  color: var(--admob-slate);
+  font-family: var(--admob-font-body);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  text-decoration: none;
+  transition: color 150ms var(--admob-ease);
+}
+
+starlight-toc nav a::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 0;
+  width: 2px;
+  background: var(--admob-accent);
+  opacity: 0;
+  transition: opacity 150ms var(--admob-ease);
+}
+
+starlight-toc nav a:hover {
+  color: var(--admob-ink);
+}
+
+starlight-toc nav a[aria-current='true'] {
+  color: var(--admob-ink);
+  font-weight: 600;
+}
+
+starlight-toc nav a[aria-current='true']::before {
+  opacity: 1;
+}
+
+/* --------------------------------------------------------- code blocks */
+
+.expressive-code .frame {
+  overflow: hidden;
+  border-radius: var(--admob-radius);
+  box-shadow: none;
+}
+
+.expressive-code code {
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.expressive-code .copy button {
+  border-radius: 4px;
+}
+
+/* --------------------------------------------------------------- asides */
+
+.starlight-aside {
+  border-radius: var(--admob-radius);
+}
+
+.starlight-aside__title {
+  font-family: var(--admob-font-body);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.starlight-aside__icon {
+  display: block;
+}
+
+.starlight-aside__content {
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+/* ---------------------------------------------------------------- cards */
+
+.sl-link-card,
+.card {
+  padding: 1.25rem;
+  border: 1px solid var(--admob-hair);
+  border-radius: var(--admob-radius-lg);
+  background: transparent;
+  box-shadow: none;
+  transition: border-color 150ms var(--admob-ease),
+    background-color 150ms var(--admob-ease), color 150ms var(--admob-ease);
+}
+
+.sl-link-card:hover,
+.card:hover {
+  border-color: var(--admob-ink);
+  background: var(--admob-surface);
+}
+
+.sl-link-card .title,
+.card .title {
+  color: var(--admob-ink);
+  font-family: var(--admob-font-body);
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: normal;
+}
+
+.sl-link-card .description,
+.card .body {
+  color: var(--admob-slate);
+  font-size: 0.84375rem;
+  line-height: 1.5;
+}
+
+.sl-link-card .icon {
+  color: var(--admob-slate);
+}
+
+.card-grid {
+  gap: 0.75rem;
+}
+
+/* ----------------------------------------------------------- pagination */
+
+.pagination-links a {
+  border: 1px solid var(--admob-hair);
+  border-radius: var(--admob-radius-lg);
+  box-shadow: none;
+  transition: border-color 150ms var(--admob-ease),
+    background-color 150ms var(--admob-ease), color 150ms var(--admob-ease);
+}
+
+.pagination-links a:hover {
+  border-color: var(--admob-ink);
+  background: var(--admob-surface);
+}
+
+.pagination-links a > span:first-child {
+  color: var(--admob-slate);
+  font-family: var(--admob-font-body);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.pagination-links .link-title {
+  color: var(--admob-ink);
+  font-family: var(--admob-font-body);
+  font-weight: 600;
+  letter-spacing: normal;
+}
+
+/* ------------------------------------------------------------- chrome */
+
+header.header {
+  border-bottom: 1px solid var(--admob-hair);
+  background: var(--admob-paper);
+}
+
+.right-group {
+  gap: 0.5rem;
+}
+
+.social-icons {
+  gap: 0.25rem;
+}
+
+.social-icons::after {
+  content: none;
+  display: none;
+  border: 0;
+}
+
+.social-icons a {
+  margin: -0.25rem;
+  padding: 0.25rem;
+  border-radius: 4px;
+  color: var(--admob-slate);
+  transition: color 150ms var(--admob-ease);
+}
+
+.social-icons a:hover,
+.social-icons a:focus-visible {
+  border-radius: 4px;
+  color: var(--admob-ink);
+}
+
+starlight-theme-select label {
+  --sl-label-icon-size: 0.75rem;
+  --sl-caret-size: 0.75rem;
+  --sl-inline-padding: 0.25rem;
+  height: 2rem;
+  gap: 0.125rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--admob-slate);
+  font-family: var(--admob-font-body);
+  font-size: 0.8125rem;
+  transition: color 150ms var(--admob-ease);
+}
+
+starlight-theme-select label:hover,
+starlight-theme-select label:focus-within {
+  color: var(--admob-ink);
+}
+
+starlight-theme-select select {
+  width: var(--sl-select-width);
+  height: 2rem;
+  min-height: 0;
+  margin-inline: 0;
+  padding-block: 0;
+  padding-inline: 1rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+starlight-theme-select .label-icon {
+  inset-inline-start: 0.125rem;
+}
+
+starlight-theme-select .caret {
+  inset-inline-end: 0.125rem;
+}
+
+.site-title {
+  font-size: 1.25rem;
+}
+
+site-search button[data-open-modal] {
+  border: 1px solid var(--admob-hair);
+  border-radius: var(--admob-radius);
+  background: transparent;
+  color: var(--admob-slate);
+  font-family: var(--admob-font-body);
+  font-size: 0.8125rem;
+  transition: border-color 150ms var(--admob-ease), color 150ms var(--admob-ease);
+}
+
+site-search button[data-open-modal]:hover {
+  border-color: var(--admob-ink);
+  color: var(--admob-ink);
+}
+
+site-search dialog {
+  box-shadow: none;
+}
+
+@media (min-width: 50rem) {
+  site-search dialog {
+    border-radius: var(--admob-radius);
+  }
+}
+
+/* ------------------------------------------------------------- motion */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* -------------------------------------------------------------- tables */
+
+.table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--admob-hair);
+  border-radius: 6px;
+  scrollbar-color: var(--admob-slate) transparent;
+  scrollbar-width: thin;
+}
+
+.table-scroll:focus-visible {
+  outline-offset: 4px;
+}
+
+.sl-markdown-content .table-scroll table {
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.sl-markdown-content .table-scroll--wide table {
+  min-width: 42rem;
+}
+
+.sl-markdown-content .table-scroll th {
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid var(--admob-hair);
+  background: var(--admob-surface);
+  color: var(--admob-ink);
+  font-family: var(--admob-font-body);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-align: left;
+  text-transform: none;
+}
+
+.sl-markdown-content .table-scroll td {
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid var(--admob-hair);
+  vertical-align: top;
+}
+
+.sl-markdown-content .table-scroll tr:last-child td {
+  border-bottom: 0;
+}
+
+.sl-markdown-content .table-scroll td:first-child {
+  font-weight: 500;
+}
+
+/* ------------------------------------------------------------ overflow */
+
+.sl-markdown-content pre {
   max-width: 100%;
   overflow-x: auto;
 }

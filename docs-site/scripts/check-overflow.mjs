@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Loads every built page at 375 px in both themes and fails if the document
- * scrolls horizontally. Requires `npm run preview` or auto-serves `dist/`.
+ * scrolls horizontally. Uses an explicit PREVIEW_URL or an isolated `dist/` server.
  */
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
@@ -9,7 +9,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 
 const DIST = path.resolve('dist');
-const BASE = process.env.PREVIEW_URL ?? 'http://localhost:4321';
+let BASE = process.env.PREVIEW_URL;
 const failures = [];
 
 async function listRoutes(dir, prefix = '/') {
@@ -27,16 +27,15 @@ async function listRoutes(dir, prefix = '/') {
 }
 
 let server;
-try {
-  await fetch(BASE);
-} catch (err) {
-  // The user has been explicit about where to look — don't second-guess
-  // PREVIEW_URL. Only auto-serve dist/ when BASE is the implicit default.
-  if (process.env.PREVIEW_URL) {
+if (BASE) {
+  try {
+    await fetch(BASE);
+  } catch (err) {
     console.error(`PREVIEW_URL=${process.env.PREVIEW_URL} is unreachable: ${err.message}`);
     console.error('Fix the URL or unset PREVIEW_URL to let this script auto-serve dist/.');
     process.exit(2);
   }
+} else {
   const MIME = {
     '.html': 'text/html',
     '.js': 'text/javascript',
@@ -47,8 +46,13 @@ try {
     '.woff2': 'font/woff2',
   };
   const handler = async (req, res) => {
-    const urlPath = new URL(req.url, BASE).pathname;
-    let filePath = path.join(DIST, urlPath);
+    const urlPath = decodeURIComponent(new URL(req.url, 'http://127.0.0.1').pathname);
+    let filePath = path.resolve(DIST, `.${urlPath}`);
+    if (filePath !== DIST && !filePath.startsWith(`${DIST}${path.sep}`)) {
+      res.writeHead(404);
+      res.end('Not found');
+      return;
+    }
     try {
       let st = await stat(filePath);
       if (st.isDirectory()) filePath = path.join(filePath, 'index.html');
@@ -63,21 +67,14 @@ try {
   };
   server = await new Promise((resolve, reject) => {
     const s = createServer(handler);
-    s.once('error', (err) => {
-      if (err.code === 'EADDRINUSE') {
-        reject(
-          new Error(
-            'port 4321 is already in use — run `npm run preview` to use the dev server, or stop the conflicting process and let this script auto-serve dist/.'
-          )
-        );
-      } else {
-        reject(err);
-      }
-    });
+    s.once('error', reject);
     s.once('listening', () => resolve(s));
-    s.listen(4321);
+    s.listen(0, '127.0.0.1');
   });
-  console.log('Started static fallback server on http://localhost:4321');
+  const address = server.address();
+  if (!address || typeof address === 'string') throw new Error('Unable to determine static server address.');
+  BASE = `http://127.0.0.1:${address.port}`;
+  console.log(`Started isolated static server on ${BASE}`);
 }
 
 try {

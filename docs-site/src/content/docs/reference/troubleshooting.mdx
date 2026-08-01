@@ -1,9 +1,333 @@
 ---
 title: "Troubleshooting"
-description: "Symptom to cause to fix, including undefined GAD symbols when linking Kotlin/Native iOS tests."
+description: "Fix AdMob errors on Kotlin Multiplatform — undefined symbols _OBJC_CLASS_$_GAD when linking iOS tests, no fill, blank banners, consent gates and crashes."
+faq:
+  - q: Why do I get Undefined symbols _OBJC_CLASS_$_GAD when linking Kotlin/Native iOS tests?
+    a: A Kotlin/Native test executable links without Xcode, so it cannot use Swift Package Manager. Apply the dev.avinya.ads.admob-cmp Gradle plugin, which downloads the matching XCFrameworks and adds the linker options to test binaries only.
+  - q: Will adding another Swift Package Manager package fix a test link failure?
+    a: No. SPM is not involved in a Kotlin/Native test link at all. Only the Gradle plugin fixes it. Adding an SPM package fixes the equivalent failure during an Xcode app build.
+  - q: What does AdErrorCode.SDK_NOT_READY mean?
+    a: Initialization has not finished. Gate ad requests on adManager.status being AdManagerStatus.Ready. Nothing reaches the network until then.
+  - q: Why does my ad request fail with GMA code 3 on Android or 1 on iOS?
+    a: No fill. There was no ad available for that request. It is normal, it is non-retryable by policy, and the fix is to retry at a later natural moment rather than immediately.
 ---
 
-Plan 3 writes this page. Target length is 800–1,500 words with worked examples,
-question-based H2s, and explicit cross-links. The file path and the frontmatter
-`title` / `description` above are fixed by Plan 2 — the sidebar, the sitemap and
-the generated OpenGraph card all key off them.
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+## Why do my iOS Kotlin/Native tests fail with undefined GAD symbols?
+
+This section must be answerable in the first screen. The exact
+error text a reader pasted into a search box:
+
+```
+Undefined symbols for architecture arm64:
+  "_OBJC_CLASS_$_GADMobileAds", referenced from: …
+  "_OBJC_CLASS_$_GADBannerView", referenced from: …
+ld: symbol(s) not found for architecture arm64
+```
+
+The cause in two sentences, no preamble: `admob-cmp` ships cinterop
+**bindings** only, never Google's binaries. An iOS app resolves
+`GAD*` and `UMP*` at final link from the Swift packages Xcode
+links — but a Kotlin/Native test executable has **no Xcode, no
+`.xcodeproj` and no Swift Package Manager anywhere in the
+picture**, so it must resolve those symbols itself.
+
+A useful mental model: the Kotlin/Native test link is a fully
+self-contained build that runs without any of the Apple
+toolchain's higher-level conveniences. There is no `xcodebuild`
+to invoke SPM, no `IB` linker to bring in CocoaPods, no Swift
+package resolution at all. The link must resolve every
+Objective-C class the bindings reference, and the only way to
+make that happen is to put the framework on the link line
+directly. The `dev.avinya.ads.admob-cmp` Gradle plugin is what
+adds the framework directory and the `-framework` flags to the
+test executable's link options.
+
+The fix, immediately:
+
+```kotlin
+// shared/build.gradle.kts
+plugins {
+    id("dev.avinya.ads.admob-cmp") version "1.1.0"
+}
+```
+
+```kotlin
+// settings.gradle.kts
+pluginManagement {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+```
+
+```bash
+./gradlew :shared:iosSimulatorArm64Test
+```
+
+The three clarifications that stop the reader trying the wrong
+things:
+
+- This happens even if none of your tests touch ads. The test
+  binary contains the module's whole main compilation, so any
+  production code calling `rememberAdManager`, `NativeAdView` or
+  the consent APIs brings those references along.
+- A `FakeAdManager` does not help. The requirement comes from
+  the bindings being present in the link, not from anyone calling
+  them. For faking ad *behaviour* in tests, the SDK ships
+  `NoOpAdManager`.
+- Adding another SPM package does not help. SPM is not consulted
+  during a Kotlin/Native test link.
+
+<Aside type="danger">
+Adding another Swift Package Manager package will **not** fix a
+`:linkDebugTestIos…` failure. Only the `dev.avinya.ads.admob-cmp`
+Gradle plugin does. The
+[installation guide](/start/installation/) has the full
+mechanism, and the [iOS setup guide](/start/ios-setup/) covers
+the Swift-package side of the same problem.
+</Aside>
+
+A related, often-confused failure: `Undefined symbol:
+_OBJC_CLASS_$_GADMobileAds` during an Xcode *app* build, not a
+Kotlin/Native test link. That failure has the same symbol but
+a different fix: add the `GoogleMobileAds` Swift package to
+the Xcode project. The disambiguation is the failing Gradle
+task name — `linkDebugTestIosSimulatorArm64` is a Kotlin/Native
+test link; `xcodebuild` invoked through Gradle is an Xcode app
+build. The two fixes look similar (both involve frameworks) but
+the mechanisms are different: SPM for the Xcode build, the
+Gradle plugin for the test build.
+
+## Which link failure am I actually looking at?
+
+The same symptom text appears in two completely different builds
+with two completely different fixes. The disambiguation table:
+
+| Symptom | When it happens | Cause | Fix |
+|---|---|---|---|
+| `Undefined symbol: _OBJC_CLASS_$_GAD*` | During an **Xcode / app** build | The GoogleMobileAds SPM package is not added | Add the GMA Swift package — see [iOS setup](/start/ios-setup/) |
+| `Undefined symbol: _OBJC_CLASS_$_UMP*` | During an **Xcode / app** build | The UMP SPM package is not added | Add the UserMessagingPlatform Swift package |
+| `Undefined symbol: _OBJC_CLASS_$_GAD*` or `_UMP*` | During `:linkDebugTestIos…` | A Kotlin/Native test executable cannot use SPM | Apply the `dev.avinya.ads.admob-cmp` Gradle plugin. Adding an SPM package will **not** fix this. |
+| `Undefined symbol: _OBJC_CLASS_$_JSContext` | Either build | JavaScriptCore is not linked; a static Kotlin framework does not autolink it | Add `-framework JavaScriptCore` to `OTHER_LDFLAGS` |
+| `Undefined symbol: GADCurrentOrientation…` or other new-API symbols | Either build | The GMA SPM package major is older than the bound headers | Bump the GMA Swift package to `13.x` |
+| `__swift_FORCE_LOAD_$_swiftCompatibility56` | During a test link | The Swift runtime compatibility shims are not on the link line | Apply the Gradle plugin; it adds the Swift compatibility library directory |
+
+How to tell which build you are in: if the failing Gradle task
+name starts with `link` and contains `Test`, it is the
+Kotlin/Native test link.
+
+A second helpful disambiguator: the symbol that fails. The
+`_OBJC_CLASS_$_JSContext` row is the easiest to miss because the
+error looks GAD-related, but JavaScriptCore is a separate
+Apple-provided framework that GMA depends on. The
+`GADCurrentOrientation…` row is the easiest to misdiagnose
+because the symbol's prefix looks GMA-specific, but the cause
+is the GMA SPM package version, not the GMA XCFramework. The
+table is the single source of truth for which symbol means
+which fix.
+
+## What does the Gradle plugin do to fix it?
+
+Readers trust a fix they understand. The plugin's behaviour,
+exactly as implemented:
+
+- It registers `downloadGmaIos` and `downloadUmpIos`, which
+  fetch the version-stamped GoogleMobileAds and
+  UserMessagingPlatform XCFrameworks into
+  `build/admob-cmp-ios-frameworks/` and verify them against a
+  pinned SHA-256.
+- It makes every `link…Test…` task for `iosArm64` and
+  `iosSimulatorArm64` depend on those downloads.
+- It adds linker options **to test executables only**: `-F` for
+  each framework directory, `-framework GoogleMobileAds`,
+  `-framework UserMessagingPlatform`, `-framework
+  JavaScriptCore` (GMA force-loads it via
+  `GADOMIDJSContextPool`), and `-L` for the Swift compatibility
+  library directory under the active Xcode toolchain.
+- It deliberately leaves the **shipped app framework alone**.
+  Kotlin/Native is supposed to leave those symbols undefined
+  there, for Xcode to bind via SPM.
+- It registers `doctorIos`.
+- Off macOS it contributes no linker options, so Linux CI can
+  still configure the build.
+
+```bash
+./gradlew :shared:downloadGmaIos :shared:downloadUmpIos   # populate the cache explicitly
+./gradlew :admob-cmp-core:doctorIos                       # report-only diagnostic
+```
+
+A note on the cache. The XCFrameworks are downloaded once and
+cached in `build/admob-cmp-ios-frameworks/`, with a SHA-256 check
+on every subsequent download. The cache survives clean builds
+of the consumer's own code but is invalidated by `./gradlew
+clean`. After a clean, the first test link re-downloads the
+frameworks; subsequent test links use the cache. The
+`downloadGmaIos` and `downloadUmpIos` tasks are the explicit
+form of the same operation, useful for warming the cache
+before a CI run that does not have network access mid-build.
+
+## What do SDK_NOT_READY and CONSENT_REQUIRED mean?
+
+`AdErrorCode` is deliberately small — two string constants —
+because everything else is passed through from the platform SDK.
+The small surface is deliberate: the library's two
+distinct gates are the only places where the library returns a
+typed error rather than a platform-code pass-through. Every
+other failure is a GMA error code in a string, and the
+[caching, retry and timeouts guide](/advanced/caching-retry-timeouts/)
+has the classification of which GMA codes are retried
+automatically.
+
+| Code | Constant value | Cause | Fix |
+|---|---|---|---|
+| `AdErrorCode.SDK_NOT_READY` | `"sdk_not_ready"` | `initialize` has not finished | Gate requests on `adManager.status` being `AdManagerStatus.Ready` |
+| `AdErrorCode.CONSENT_REQUIRED` | `"consent_required"` | UMP forbids requests | Run `gatherConsentAndInitialize`, or check `canRequestAds` |
+
+Both are **fail-fast gates**: nothing reaches the network, so
+seeing them is the design working rather than an outage. The
+[UMP consent guide](/privacy/consent/) has the full
+`canRequestAds` semantics and the consent flow.
+
+The numeric codes, which come straight from Google:
+
+| Platform codes | Meaning | Retried automatically? |
+|---|---|---|
+| Android `3`, iOS `1` | No fill — there was no ad for this request | No. Non-retryable by policy; retry at a later natural moment |
+| Android `0` and `2`, iOS `2`, `5` and `11` | Internal, network or timeout | Yes, per `AdRetryPolicy` — default `maxAttempts = 2`, the initial attempt plus one retry |
+
+`AdError` carries `code`, `message`, `domain` and
+`responseInfo`. `code` is either one of the two `AdErrorCode`
+strings or the platform's own numeric code as a string, and
+`responseInfo.adNetworkResponseInfos` is the fastest way to see
+which mediation networks failed and why. The
+[caching, retry and timeouts guide](/advanced/caching-retry-timeouts/)
+and the [mediation guide](/advanced/mediation/) have the full
+shapes.
+
+## Why does my Android app crash at startup?
+
+The Google Mobile Ads SDK crashes on launch when the manifest
+has no `com.google.android.gms.ads.APPLICATION_ID` meta-data
+entry. Add it with the AdMob **app** id (tilde separator), not an
+ad-unit id. The [Android setup guide](/start/android-setup/) has
+the manifest snippet and the rest of the Android configuration.
+
+A subtle variant of this failure: the manifest has the
+meta-data entry, but the value is an ad-unit id, not an app id.
+The two are visually similar — both start with `ca-app-pub-` —
+but the ad-unit id has a `/` between the segments and the app
+id has a `~`. The SDK's manifest check accepts the presence of
+the entry, not its shape, and the crash comes from the value
+being rejected at first network call. The error message
+mentions "app id" but does not show the offending value, so
+the misdiagnosis is to assume the entry is missing.
+
+## Why does my banner render nothing?
+
+Four causes, one line each. The manager is not
+`AdManagerStatus.Ready`. The placement uses
+`BannerRefreshPolicy.Manual` and nothing has called
+`adManager.banner(placement).refresh()`. A headless `load()` was
+issued with no `BannerGeometry` on a platform that cannot resolve
+a width, which now fails rather than guessing. Or the request
+returned no fill. The [banner guide](/formats/banner/) has the
+full size-policy and refresh-policy table.
+
+## Why does acquire() return null and leave feed rows blank?
+
+`AdCachePolicy.maxSize` budgets **available + in-use** ads
+together. With `maxSize = 1` and one row holding the ad,
+`preload()` returns early and `acquire()` returns `null` for every
+other row — deterministically, not as a race. Recover by keying
+the acquisition effect on `pool.availableAds` and re-running
+`preload`, not just `acquire`, because `release()` destroys the
+ad and so frees a slot without incrementing `availableAds`. The
+[native ads guide](/formats/native/) has the full pool
+accounting and the recovery pattern.
+
+## Why does my second show() call return NotReady?
+
+`show()` is not reentrant per controller. A second call while
+the first presentation is still on screen returns
+`AdShowResult.NotReady` immediately rather than queueing. Await
+the first `show()`'s result — it suspends until dismissal —
+before calling again on the same controller. The
+[interstitial guide](/formats/interstitial/) has the full
+`FullScreenAdController` contract.
+
+A common related bug is calling `show()` on two different
+controllers in quick succession, expecting both to be on
+screen. The platform SDK presents one ad at a time per
+process — a second `show()` on any controller, while the first
+is still on screen, gets queued by the platform SDK and
+fires after the first dismisses. The library surfaces this
+as a `NotReady` return on the second controller, which is
+the more useful behaviour because the caller can branch on
+it instead of waiting for a deferred presentation.
+
+## Why did my second initialize() call do nothing?
+
+The native Google Mobile Ads singleton initialises at most once
+per process. A second call with the *same* effective `AdConfig`
+identity — app id plus merged `GlobalRequestConfiguration` — and
+the same `ConsentMode` replays the first result. A call with a
+*different* identity is **ignored with a logged warning**, not
+re-applied, because GMA itself has no supported way to
+re-initialise with new settings. Decide the settings before the
+first `initialize` ever runs. The
+[architecture reference](/reference/architecture/) has the full
+singleton model.
+
+## Why does creating a placement throw an exception?
+
+`AdPlacement` validates at construction and fails closed. It
+throws `IllegalArgumentException` when `id` is blank, when
+`cachePolicy.maxSize` is below 1, or when `strictTestMode` is
+enabled and any ad unit id is not a Google test unit. The last
+one is intentional: requesting real ads from a debug build is
+invalid traffic, and invalid traffic gets AdMob accounts
+suspended. The [test safety guide](/advanced/test-safety/) has
+the full `testMode` versus `strictTestMode` explanation.
+
+## Why do native video events never fire on Android?
+
+iOS emits five video events via `GADVideoControllerDelegate`; the
+Android Google Mobile Ads Next-Gen SDK exposes no equivalent
+callback surface on `NativeAd`, so Android emits none. This is an
+upstream SDK gap, not an AdMob CMP omission.
+`mediaInfo(token).hasVideoContent` **is** cross-platform. The
+[native ads guide](/formats/native/) has the full explanation
+and the cross-platform code shape.
+
+A practical note on what this means for analytics. A
+publisher that wants to track "video started" events for
+native ads must query `mediaInfo(token).hasVideoContent` and
+treat every native ad as potentially-video on Android, while
+emitting real `VideoStarted` events on iOS. The aggregate
+metric is the same — "native ad with video" — but the
+data sources differ by platform.
+
+## How do I diagnose the iOS setup automatically?
+
+```bash
+./gradlew :admob-cmp-core:doctorIos
+./gradlew :admob-cmp-core:doctorIos -PadmobCmp.xcodeproj=path/to/dir
+```
+
+It reports the XCFramework download cache state, whether the
+Xcode project references each SPM product, whether `Info.plist`
+declares `GADApplicationIdentifier` and whether that value is
+still Google's sample id, and whether `SKAdNetworkItems` is
+present. It is diagnostic only and never fails the build.
+
+## Where to next?
+
+<CardGrid>
+  <LinkCard title="iOS setup" href="/start/ios-setup/" description="SPM packages, Info.plist, and JavaScriptCore." />
+  <LinkCard title="Installation" href="/start/installation/" description="The Gradle plugin and test linking." />
+  <LinkCard title="Caching, retry and timeouts" href="/advanced/caching-retry-timeouts/" description="What is retried, and what is not." />
+  <LinkCard title="UMP consent" href="/privacy/consent/" description="Why loads fail before consent." />
+</CardGrid>

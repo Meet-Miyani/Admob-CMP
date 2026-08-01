@@ -1,9 +1,205 @@
 ---
 title: "Mediation"
-description: "Wiring mediation adapters and the initialization hooks AdMob CMP exposes for them."
+description: "AdMob mediation on Kotlin Multiplatform — adding adapters per platform, setting network privacy flags with hooks, and verifying fill."
+faq:
+  - q: Does AdMob CMP bundle mediation adapters?
+    a: No, deliberately. Adapters are platform binaries that must match your GMA SDK version and your network contracts. Add them to your Android module and your Xcode project directly.
+  - q: How do I set a mediation network's privacy flags before initialization?
+    a: Use an AdInitializationHook and act on AdInitializationPhase.BeforeMobileAdsInitialize. Hooks run at well-defined phases on both platforms, exactly once per real native initialization.
+  - q: How do I confirm a mediation adapter is serving?
+    a: Read adManager.diagnostics.adapterStatuses() after the manager is Ready, and open Google's Ad Inspector with adManager.diagnostics.openAdInspector() on a test device.
 ---
 
-Plan 3 writes this page. Target length is 800–1,500 words with worked examples,
-question-based H2s, and explicit cross-links. The file path and the frontmatter
-`title` / `description` above are fixed by Plan 2 — the sidebar, the sitemap and
-the generated OpenGraph card all key off them.
+import { Aside, Tabs, TabItem, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+## Why does AdMob CMP ship zero mediation adapters?
+
+Adapters are platform binaries that must match the GMA SDK version
+and the publisher's network contracts. Bundling them inside a
+cross-platform wrapper would pin versions for everyone and break
+the moment two artifacts carry the same Objective-C class.
+
+The property that makes this work on iOS specifically: because
+the library links nothing itself and ships bindings only, adapters
+resolve against the single copy of GMA in the app, so there is no
+duplicate-class problem. The full rationale is on
+[Architecture](/reference/architecture/).
+
+A consequence worth being explicit about: the same is *not* true
+on Android if an adapter is published as part of the Android
+module that also depends on `admob-cmp-core`. The GMA Android SDK
+uses a different mechanism — adapters register against a single
+singleton at runtime — so the duplicate-class problem does not
+arise, and bundling an adapter at the consumer side is the right
+shape. The [architecture reference](/reference/architecture/) has
+the full platform-by-platform model.
+
+## How do I add an adapter on each platform?
+
+```kotlin
+// Android — app or shared Android module
+dependencies {
+    implementation("com.google.ads.mediation:facebook:…")
+}
+```
+
+On iOS, add the adapter's Swift Package or CocoaPod to the Xcode
+project, alongside the `GoogleMobileAds` package added during
+[iOS setup](/start/ios-setup/).
+
+A few operational notes. Waterfalls and bidding are configured in
+the AdMob UI as normal. Mediated fill flows through every existing
+API with no special casing. And the adapter version must be
+compatible with the GMA version in the app on each platform
+independently, which is the main source of "it works on Android"
+reports. The
+[Play Data safety guide](/privacy/play-data-safety/) covers the
+disclosure side of enabling mediation.
+
+The "works on one platform" failure mode has a specific shape. An
+adapter version that is compatible with GMA 13.x on iOS may not
+be compatible with GMA Next-Gen 1.3.0 on Android, and the
+incompatibility surfaces as a missing-class crash at adapter
+init time, not as a graceful "this adapter is not loaded". The
+fix is to check the adapter's compatibility matrix per platform
+before adding the dependency, and to keep the GMA version
+consistent across the project's two platforms even though the
+library does not enforce that.
+
+## How do I set a network's privacy flags before initialization?
+
+State the problem first: many networks require privacy flags to be
+set *before* SDK initialization, and there is no cross-platform
+place to do that unless the ad library provides one.
+`AdInitializationHook` is that place.
+
+```kotlin
+val metaConsentHook = object : AdInitializationHook {
+    override suspend fun onPhase(phase: AdInitializationPhase, config: AdConfig) {
+        when (phase) {
+            AdInitializationPhase.BeforeConsentRequest -> Unit
+            AdInitializationPhase.BeforeMobileAdsInitialize -> {
+                // Call into the adapter's platform API behind an expect/actual:
+                // Android: AdSettings.setDataProcessingOptions(arrayOf("LDU"))
+                // iOS:     FBAdSettings.setDataProcessingOptions(["LDU"])
+                applyNetworkPrivacyFlags()
+            }
+            AdInitializationPhase.AfterMobileAdsInitialize -> Unit
+        }
+    }
+}
+
+AdConfig(
+    androidAppId = "ca-app-pub-…",
+    iosAppId = "ca-app-pub-…",
+    initializationHooks = listOf(metaConsentHook),
+)
+```
+
+Three properties precisely. The hook body is the caller's code, so
+adapter-specific calls belong in `androidMain`/`iosMain` behind an
+`expect`/`actual` and are invoked from the hook. The three phases
+are `BeforeConsentRequest`, `BeforeMobileAdsInitialize` and
+`AfterMobileAdsInitialize`. And hooks run **exactly once per real
+native initialization attempt**, inside a detached scope, so
+cancelling one `initialize()` caller can never skip or duplicate a
+hook.
+
+The `expect`/`actual` pattern is the right shape for adapter
+privacy calls because the network SDKs are themselves
+platform-specific. The common side declares a suspending
+`applyNetworkPrivacyFlags()` function; `androidMain` calls
+`AdSettings.setDataProcessingOptions(arrayOf("LDU"))` (for Meta's
+Limited Data Use flag) or the equivalent for the chosen network;
+`iosMain` does the same against the iOS class. The hook body
+stays the same on both platforms.
+
+<Aside type="caution">
+The Google Mobile Ads singleton initialises at most once per
+process. A second `initialize` call with the *same* effective
+config replays the first result; a call with a *different* app id
+or request configuration is **ignored with a logged warning**, not
+re-applied. Decide the settings before the first `initialize` ever
+runs.
+</Aside>
+
+## How do I verify an adapter is actually serving?
+
+```kotlin
+// After adManager.status is AdManagerStatus.Ready
+adManager.diagnostics.adapterStatuses().forEach { status ->
+    println("${status.adapterName}: initialized=${status.initialized} latencyMs=${status.latencyMillis}")
+}
+
+scope.launch { adManager.diagnostics.openAdInspector() }
+```
+
+`AdapterInitializationStatus` carries `adapterName`, `initialized`,
+`latencyMillis` and `description`. `openAdInspector()` launches
+Google's Ad Inspector overlay and works on test devices, and is
+the authoritative way to confirm an adapter serves. And
+`adManager.diagnostics.sdkVersion()` reports the underlying GMA
+version, which is the first thing to check against an adapter's
+compatibility matrix.
+
+A practical note on `latencyMillis`. It is the time the adapter
+took to initialise, not the time it took to win an auction. A
+high value here means the adapter is taking long to register
+itself with GMA, which is sometimes an indication of a misconfigured
+network. A low value does not mean the adapter is winning
+impressions; it only means it is ready when GMA needs it.
+
+`openAdInspector()` is the right tool for "I want to see
+everything" — it overlays Google's own inspector on the running
+app, with the live mediation chain for the current screen, the
+device's ad requests in flight, and a way to fire test requests
+against specific ad units. It works only on test devices and
+never in release builds, because Google gates it behind a
+debug-only call path. The
+[test safety guide](/advanced/test-safety/) covers which devices
+count as test devices.
+
+## How do I see which network won a given impression?
+
+```kotlin
+LaunchedEffect(Unit) {
+    adManager.events.collect { event ->
+        if (event is AdEvent.Loaded) {
+            val winner = event.responseInfo?.loadedAdNetworkResponseInfo
+            println("won by ${winner?.adSourceName} (${winner?.adapterClassName}) in ${winner?.latencyMillis} ms")
+        }
+    }
+}
+```
+
+`AdResponseInfo.loadedAdNetworkResponseInfo` identifies the winning
+adapter while `adNetworkResponseInfos` is the whole mediation chain
+including the networks that failed, each with its own `error`. The
+failure entries in the chain are the fastest way to diagnose a
+mediation waterfall that is not filling, and they appear in
+`AdEvent.LoadFailed` as well as on successful loads with partial
+fills.
+
+`AdEvent.Paid` carries the mediated revenue for an impression,
+which is covered in detail on
+[Revenue and paid events](/advanced/revenue-events/). The chain
+visible on a paid event is the same chain visible on a load event
+— the mediation network that won is the same network that paid.
+
+A common debugging pattern: log the full `adNetworkResponseInfos`
+list on every `Loaded` event, and look for the `error` fields.
+A network that consistently appears in the chain with a
+non-null `error` is one that is being asked to bid and failing,
+which is different from a network that is not being asked. The
+former is a configuration issue; the latter is a waterfall
+issue. Both look the same to a publisher who only watches
+`loadedAdNetworkResponseInfo`.
+
+## Where to next?
+
+<CardGrid>
+  <LinkCard title="Revenue and paid events" href="/advanced/revenue-events/" description="AdValue and the mediation chain." />
+  <LinkCard title="Play Data safety" href="/privacy/play-data-safety/" description="Adapters add data disclosures." />
+  <LinkCard title="Architecture" href="/reference/architecture/" description="Why iOS ships bindings only." />
+  <LinkCard title="iOS setup" href="/start/ios-setup/" description="Where adapter packages go in Xcode." />
+</CardGrid>

@@ -1,9 +1,213 @@
 ---
 title: "Caching, retry and timeouts"
-description: "The TTL'd FIFO cache, generation counters, retry backoff, and load timeouts."
+description: "AdMob ad caching and retry on Kotlin Multiplatform — AdCachePolicy, AdExpirationPolicy, AdRetryPolicy and AdTimeoutPolicy, and how to size each one."
+faq:
+  - q: How many ads should I cache?
+    a: Cache the number of ads you can genuinely show before their TTL expires. Full-screen ads live one hour by default and app-open ads four, so a large cache mostly buys evictions.
+  - q: How many times does a failed ad load retry?
+    a: AdRetryPolicy.maxAttempts defaults to 2 — the initial attempt plus one retry — with capped exponential backoff. Set maxAttempts to 1 for no retry at all.
+  - q: Are no-fill errors retried?
+    a: No. Only retryable failures such as network, timeout and internal errors are retried. No fill and consent failures are non-retryable by policy.
 ---
 
-Plan 3 writes this page. Target length is 800–1,500 words with worked examples,
-question-based H2s, and explicit cross-links. The file path and the frontmatter
-`title` / `description` above are fixed by Plan 2 — the sidebar, the sitemap and
-the generated OpenGraph card all key off them.
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import RetryTimeline from '../../../components/diagrams/RetryTimeline.astro';
+import FullScreenLifecycle from '../../../components/diagrams/FullScreenLifecycle.astro';
+
+## Which knobs does AdMob CMP actually expose?
+
+Everything on this page is per-placement configuration on
+`AdPlacement`, so different placements can behave differently in
+the same app. The four policies and what each one bounds:
+
+The reason these are policies, not flags, is that the library
+must enforce a few invariants: `maxSize >= 1`, every TTL finite
+and positive, the backoff multiplier >= 1. A flag is a single
+value with no internal consistency; a policy is a small object
+whose constructor can validate the whole thing at one moment.
+Constructors throw, defaults are sensible, and a misconfigured
+placement fails at the construction site rather than at the
+first `load()`.
+
+| Policy | Bounds | Default |
+|---|---|---|
+| `AdCachePolicy` | How many ads are held, and whether one reloads after a show | `maxSize = 1`, `reloadAfterShow = false` |
+| `AdExpirationPolicy` | How long a cached ad stays usable | 1h full-screen, 4h app-open, 1h native |
+| `AdRetryPolicy` | How a failed load is retried | 2 attempts, 2s initial delay, 30s cap, 2.0 multiplier |
+| `AdTimeoutPolicy` | How long a load or a presentation hand-off may take | 30s load, 10s presentation hand-off |
+
+## How does the ad cache work?
+
+```kotlin
+AdPlacement(
+    id = "interstitial_level_end",
+    format = AdFormat.Interstitial,
+    adUnitIds = AdUnitIds(android = "…", ios = "…"),
+    cachePolicy = AdCachePolicy(
+        maxSize = 3,
+        reloadAfterShow = true,
+        expirationPolicy = AdExpirationPolicy(
+            fullScreenTtl = 1.hours,
+            appOpenTtl = 4.hours,
+            nativeTtl = 1.hours,
+        ),
+    ),
+)
+```
+
+<FullScreenLifecycle />
+
+The mechanics the diagram shows: the cache is a per-slot FIFO
+deque up to `maxSize`. `load()` fills it sequentially and a
+partial fill still reports `Loaded`. `show()` consumes the oldest
+entry first. Eviction happens on every touch. And `clear()` bumps
+a generation counter so any load or scheduled reload still in
+flight for the old generation is invalidated instead of
+repopulating a cache the caller just emptied.
+
+The constraint checks the constructors enforce, because they
+throw rather than clamp: `AdCachePolicy.maxSize` must be at least
+1, and every duration in `AdExpirationPolicy` must be finite and
+positive. The cache also evicts on read, so a `load()` that finds
+expired entries drops them before reporting `Loaded` with the
+remaining valid count.
+
+A practical note on `load()` returning a partial fill. A partial
+fill happens when the platform SDK returns fewer ads than
+requested before the call resolves — usually because the network
+returned a smaller batch than the publisher asked for. The
+library still reports `Loaded` with whatever is in the cache,
+because the caller's intent was "fill the cache", and the cache
+is partially full. A call that returns zero ads is `Failed` with
+a no-fill error, not `Loaded` with an empty cache.
+
+A native-pool cross-reference in one sentence: for native
+placements the same `maxSize` budgets **available + in-use** ads
+together — see the [native ads guide](/formats/native/).
+
+## When and how does a failed load retry?
+
+```kotlin
+AdPlacement(
+    id = "interstitial_level_end",
+    format = AdFormat.Interstitial,
+    adUnitIds = AdUnitIds(android = "…", ios = "…"),
+    retryPolicy = AdRetryPolicy(
+        maxAttempts = 2,          // total attempts, including the first
+        initialDelay = 2.seconds,
+        maxDelay = 30.seconds,
+        backoffMultiplier = 2.0,
+    ),
+)
+```
+
+<RetryTimeline />
+
+`maxAttempts` counts the **initial attempt plus retries**, so the
+default of 2 means one retry and `maxAttempts = 1` means none.
+Delay grows by `backoffMultiplier` after each attempt and is
+capped at `maxDelay`. The constructor requires `maxAttempts >= 1`,
+finite positive delays, `maxDelay >= initialDelay`, and
+`backoffMultiplier >= 1.0`.
+
+The classification, which is the part that surprises people:
+
+| Failure | Retried? |
+|---|---|
+| Network, timeout, internal error — GMA code `0`/`2` on Android, `2`/`5`/`11` on iOS | Yes, per `AdRetryPolicy` |
+| No fill — GMA code `3` on Android, `1` on iOS | No. This is normal; retry later at a natural moment |
+| `AdErrorCode.CONSENT_REQUIRED` | No. Resolve consent first |
+| `AdErrorCode.SDK_NOT_READY` | No. Wait for `AdManagerStatus.Ready` |
+
+A "no" here means the library does not schedule a retry. The
+publisher can still call `load()` again, of course — the policy
+is about automatic retries, not caller-initiated ones.
+
+A note on `maxAttempts = 1`. Setting `maxAttempts` to 1
+disables the retry layer entirely — the call returns whatever
+the platform SDK returns, including transient failures. The
+right shape for that policy is a caller that has its own retry
+mechanism (a button-driven retry, a backoff at a higher level).
+The wrong shape is "I want to load faster" — `maxAttempts = 1`
+is not faster than `maxAttempts = 2` unless the network is
+consistently failing on the first try, in which case the
+underlying problem needs investigation, not a policy tweak.
+
+## What stops a load or a presentation hanging forever?
+
+```kotlin
+AdPlacement(
+    id = "interstitial_level_end",
+    format = AdFormat.Interstitial,
+    adUnitIds = AdUnitIds(android = "…", ios = "…"),
+    timeoutPolicy = AdTimeoutPolicy(
+        loadTimeout = 30.seconds,
+        presentationHandOffTimeout = 10.seconds,
+    ),
+)
+```
+
+Why this policy exists at all, because it is the least obvious of
+the four: GMA is a listener SDK, so if a terminal callback never
+arrives an unbounded `load()` or `show()` suspends forever. For
+`show()` that is worse than a hang — the presentation token is
+process-wide, so one wedged presentation blocks every full-screen
+ad in the app until the process dies.
+
+The precise semantics: `loadTimeout` is the maximum time for one
+load **including retry backoff**; on expiry the state becomes
+`AdLoadState.Failed` and a late ad is rejected and destroyed by
+the generation check, exactly as after a `clear()`.
+`presentationHandOffTimeout` bounds the time between committing an
+ad to presentation and the SDK reporting anything — it does
+**not** bound how long a user watches an ad.
+
+A note on why `presentationHandOffTimeout` exists. The platform
+SDKs present ads through a delegate-based pattern: the library
+hands the ad to the SDK and the SDK calls back when the
+presentation is complete. If the SDK never calls back — a real
+failure mode on iOS when the app is backgrounded mid-hand-off —
+the presentation token never releases, and the process-wide
+ad presence counter is permanently off-by-one. The timeout is
+the safety valve that releases the token after a bounded wait
+even if the SDK never reports.
+
+## How should I size all of this?
+
+Concrete recommendations rather than platitudes:
+
+- Interstitials at a natural break: `maxSize = 1`,
+  `reloadAfterShow = true`. One ad, always warm.
+- Rewarded ads behind a user-initiated button: `maxSize = 1` and
+  preload when the screen opens, so the button is never dead.
+- Bursty full-screen moments, such as end-of-level in a game:
+  `maxSize = 2` or `3`, but only if all of them can plausibly be
+  shown within the one-hour TTL.
+- Native feeds: size to the number of ad slots that can be on
+  screen at once, plus one.
+- Raise `loadTimeout` only for genuinely slow networks; lowering
+  it below about 10 seconds mostly converts fill into failures.
+
+The [native ads guide](/formats/native/) has the
+`maxSize`-for-native sizing in detail, because the same value
+budgets available plus in-use and the calculation is different.
+
+A note on "always warm". The recommendation
+`reloadAfterShow = true` makes the cache refill in the background
+after each show, so the next break has an ad ready. The cost is
+the same as a regular `load()` — the publisher pays the network
+round-trip for a request that may or may not be shown. For a
+placement that fires ten times a day, that is ten extra
+requests; for a placement that fires twice a day, that is two.
+The math favours `reloadAfterShow = true` whenever the
+placement is in a hot path, and `false` when the placement is
+shown at a moment the user is unlikely to reach twice.
+
+## Where to next?
+
+<CardGrid>
+  <LinkCard title="Interstitial ads" href="/formats/interstitial/" description="The shared full-screen controller contract." />
+  <LinkCard title="Native ads" href="/formats/native/" description="How maxSize budgets a pool." />
+  <LinkCard title="Architecture" href="/reference/architecture/" description="Generation counters and the state machine." />
+  <LinkCard title="Troubleshooting" href="/reference/troubleshooting/" description="No fill, timeouts, and error codes." />
+</CardGrid>

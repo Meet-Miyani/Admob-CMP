@@ -1,9 +1,239 @@
 ---
 title: "Rewarded ads"
-description: "Rewarded and rewarded interstitial ads, reward callbacks, and load/show sequencing."
+description: "Kotlin Multiplatform rewarded ads and rewarded interstitials — granting the reward exactly once, server-side verification, and load and show sequencing."
+faq:
+  - q: How do I grant a reward only once in Kotlin Multiplatform?
+    a: Grant from the onRewardEarned callback passed to show(), and do not also grant from AdEvent.RewardEarned. The event stream is telemetry; the callback is the single grant point on the client.
+  - q: When should I use server-side verification for rewarded ads?
+    a: Whenever the reward has real value. Pass ServerSideVerificationOptions with a userId and customData, and treat your server's callback as the authoritative grant rather than the client callback.
+  - q: What is a rewarded interstitial?
+    a: A full-screen format that offers a reward without an explicit opt-in prompt from your UI. It uses the same controller interface and the same show(onRewardEarned) signature as a rewarded ad.
 ---
 
-Plan 3 writes this page. Target length is 800–1,500 words with worked examples,
-question-based H2s, and explicit cross-links. The file path and the frontmatter
-`title` / `description` above are fixed by Plan 2 — the sidebar, the sitemap and
-the generated OpenGraph card all key off them.
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import FullScreenLifecycle from '../../../components/diagrams/FullScreenLifecycle.astro';
+
+## How do I show a rewarded ad in Kotlin Multiplatform?
+
+`RewardedAdController` and `RewardedInterstitialAdController` both
+extend `FullScreenAdController` and add exactly one thing: a `show()`
+overload that takes a reward callback. The [interstitial
+guide](/formats/interstitial/) covers the shared `load` /
+`availability` / `clear` semantics so they are not repeated here.
+
+```kotlin
+val placement = remember {
+    AdPlacement(
+        id = "rewarded_extra_life",
+        format = AdFormat.Rewarded,
+        androidAdUnitId = TestAdIds.ANDROID_REWARDED,
+        iosAdUnitId = TestAdIds.IOS_REWARDED,
+    )
+}
+val rewarded = remember(adManager) { adManager.rewarded(placement) }
+val scope = rememberCoroutineScope()
+
+scope.launch {
+    rewarded.load()
+
+    val result = rewarded.show(
+        onRewardEarned = { reward: AdReward ->
+            grantClientRewardOnce(reward.amountMicros, reward.type)
+        }
+    )
+
+    when (result) {
+        AdShowResult.Shown -> Unit
+        AdShowResult.NotReady -> showRetryUi()
+        is AdShowResult.Failed -> showAdError(result.error)
+    }
+}
+```
+
+`AdReward` carries exactly two fields — `amountMicros: Long` and
+`type: String` — and `type` is the reward name configured in the
+AdMob UI. Client code should treat it as an opaque identifier to
+match against, not a display string.
+
+The pattern above is the right shape for a button-driven flow:
+preload when the user reaches the screen, show when the button is
+tapped. The preloaded cache is exactly the cache described on the
+[interstitial guide](/formats/interstitial/) — the same FIFO, the
+same one-hour TTL, the same generation-counter invalidation. What
+rewarded adds is the per-show callback and the fact that the
+reward grant is part of the platform SDK's presentation lifecycle,
+not the consumer's coroutine.
+
+## When exactly is the reward earned?
+
+Four facts, because this is where money is lost:
+
+- The `onRewardEarned` callback may run **after** `show()` returns.
+- `AdShowResult.Shown` means presented-and-dismissed, not rewarded.
+- `AdEvent.RewardEarned` is also emitted on the event stream, but
+  events are telemetry and observation.
+- Therefore the client must grant from exactly one place.
+
+The reward is granted inside the presentation phase the lifecycle
+diagram shows, before the terminal dismissal callback fires. The
+`onRewardEarned` callback fires inside that window, which is why
+awaiting `show()` alone is not enough to know whether a reward was
+earned.
+
+A practical note on ordering: on iOS, the platform's
+`didRewardUserWithReward:` callback fires after the user has met
+the watch-through criterion. On Android, the equivalent callback
+fires inside the listener registered at load time. The library
+unifies both behind `onRewardEarned`, but the unified callback
+fires at the platform's natural moment — which is during the ad,
+not after it. UI that needs to react to a reward in real time
+should observe the callback, not `show()`'s result.
+
+## How do I make sure I grant the reward only once?
+
+```kotlin
+// Correct — one grant point
+rewarded.show(onRewardEarned = { reward -> grantClientRewardOnce(reward.amountMicros, reward.type) })
+
+// Wrong — this double-grants, because the callback already fired
+LaunchedEffect(Unit) {
+    adManager.events.collect { event ->
+        if (event is AdEvent.RewardEarned) grantClientRewardOnce(event.reward.amountMicros, event.reward.type)
+    }
+}
+```
+
+<Aside type="danger">
+Do not grant from both the callback and `AdEvent.RewardEarned`. Use
+the event stream for analytics only.
+</Aside>
+
+The double-grant is the most common rewarded-ad bug, and it usually
+shows up in production telemetry before anyone notices it in QA. The
+shape of the fix is to pick one grant point — and the callback
+parameter on `show()` is the one the API surfaces for that
+purpose — and treat the event stream as a side-channel.
+
+A related anti-pattern is the "fire and forget" `load()`: a
+coroutine that calls `load()` and never checks the result. The
+result is a cache that may be empty when `show()` is called, and
+an interstitial-shaped surprise on the user-facing path. The
+[caching, retry and timeouts guide](/advanced/caching-retry-timeouts/)
+has the recommended preload pattern.
+
+The full surface of `RewardedAdController` is therefore: the
+inherited `FullScreenAdController` methods (`load`, `show`,
+`isReady`, `preload`, `availability`, `clear`, `loadState`,
+`events`, `placement`) plus the reward-callback overload of
+`show`. There is no separate `onRewardEarned` field on the
+controller, no event-listener registration, and no global
+"reward granted" signal. The grant point is the callback
+parameter, and that is deliberate.
+
+## How do I set up server-side verification?
+
+```kotlin
+AdPlacement(
+    id = "rewarded_extra_life",
+    format = AdFormat.Rewarded,
+    adUnitIds = AdUnitIds(android = "…", ios = "…"),
+    fullScreenOptions = FullScreenAdOptions(
+        serverSideVerification = ServerSideVerificationOptions(
+            userId = "u123",
+            customData = "level-7",
+        ),
+    ),
+)
+```
+
+The model: `userId` identifies who to credit and `customData` carries
+whatever context the server needs to validate the grant. AdMob
+calls the verification URL configured on the ad unit; that URL
+receives a callback with the user id, the custom data, the reward
+type and amount, and a cryptographic signature.
+
+For anything of real value, the server callback should be the
+authoritative grant while the client callback merely updates the UI
+optimistically. The client callback can be wrong — a user with a
+modified app can grant themselves a reward locally — but a
+server-side callback cannot, because it depends on AdMob's signed
+verification. `FullScreenAdOptions` can also be passed per-call to
+`show()`, which is useful when the same placement serves different
+users or different game sessions.
+
+`customData` is opaque to AdMob — it is passed through to the
+verification URL untouched. The convention is to put whatever
+context the server needs to validate the grant: the level the user
+is on, the resource they were trying to buy, the campaign that
+triggered the offer. The library does not parse it; the server
+does.
+
+## How is a rewarded interstitial different?
+
+A rewarded interstitial is a full-screen format that offers a reward
+without an explicit opt-in prompt from your UI. It uses the same
+controller interface and the same `show(onRewardEarned)` signature
+as a rewarded ad. The product difference is the policy: a rewarded
+interstitial can appear at a natural transition without a button
+the user has to tap, so AdMob requires an introductory screen and
+the format has stricter policy expectations.
+
+The one-line difference:
+
+```kotlin
+val rewardedInterstitial = remember(adManager) {
+    adManager.rewardedInterstitial(
+        AdPlacement(
+            id = "rewarded_interstitial_level_end",
+            format = AdFormat.RewardedInterstitial,
+            androidAdUnitId = TestAdIds.ANDROID_REWARDED_INTERSTITIAL,
+            iosAdUnitId = TestAdIds.IOS_REWARDED_INTERSTITIAL,
+        )
+    )
+}
+```
+
+The mechanics — caching, retry, TTL, `show()` reentrancy — are
+identical to the rewarded ad. Both formats have the same load-side
+shape, the same show-side shape, and the same reward-callback
+contract. A rewarded interstitial is a placement-level decision
+(product and AdMob account configuration) rather than an
+integration-level decision, which is why the controller interface
+is identical.
+
+## What does the load and show cycle look like?
+
+<FullScreenLifecycle />
+
+The reward callback fires inside the presentation phase the diagram
+shows, before the terminal dismissal. That is why awaiting `show()`
+alone is not enough to know whether a reward was earned: the
+`Shown` result lands at dismissal, which can be tens of seconds
+after the reward was granted, depending on ad length. A separate
+suspend on the reward callback, or a separate effect on the
+`RewardEarned` event, is the right shape for any UI that needs to
+react to a successful reward in real time.
+
+A reminder of the non-reentrancy rule from the [interstitial
+guide](/formats/interstitial/): `show()` is not reentrant per
+controller. A second call while the first presentation is still on
+screen returns `AdShowResult.NotReady` rather than queueing. Await
+the first result before calling again.
+
+A reward that never fires — `onRewardEarned` never called, no
+`RewardEarned` event on the stream — is a different shape of bug.
+It is almost always one of three things: the user backed out
+before meeting the watch-through criterion, the ad unit has no
+fill and `show()` returned `NotReady`, or the platform reported
+the ad as failed and the terminal callback was the only outcome.
+None of these are bugs in the library; they are the platform
+SDKs behaving as documented.
+
+## Where to next?
+
+<CardGrid>
+  <LinkCard title="Interstitial ads" href="/formats/interstitial/" description="The shared full-screen controller contract." />
+  <LinkCard title="Caching, retry and timeouts" href="/advanced/caching-retry-timeouts/" description="Preloading rewarded inventory." />
+  <LinkCard title="Revenue and paid events" href="/advanced/revenue-events/" description="Attributing rewarded revenue." />
+  <LinkCard title="Test safety" href="/advanced/test-safety/" description="Never request live rewarded ads in debug." />
+</CardGrid>

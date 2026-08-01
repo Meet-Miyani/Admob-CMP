@@ -9,7 +9,7 @@ initialization flow, paid/revenue events, and mediation support.
 The API keeps AdMob's vocabulary (`AdValue`, `ResponseInfo`, adaptive banner
 sizes, UMP consent states, native asset names) but replaces the listener-style
 SDK surface with suspend functions, `StateFlow` state, and one sealed `AdEvent`
-stream. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.
+stream. See [Architecture](https://ads.avinya.dev/reference/architecture/) for the design.
 
 ## Installation
 
@@ -27,10 +27,12 @@ plugins {
 }
 ```
 
-See [docs/SETUP.md](docs/SETUP.md#kotlinnative-test-executables).
+See [Installation](https://ads.avinya.dev/start/installation/) and
+[Troubleshooting](https://ads.avinya.dev/reference/troubleshooting/).
 
 Platform setup (Android manifest entry, iOS SPM packages + Info.plist) is
-required — follow [docs/SETUP.md](docs/SETUP.md).
+required — follow [Android setup](https://ads.avinya.dev/start/android-setup/) and
+[iOS setup](https://ads.avinya.dev/start/ios-setup/).
 
 ## Version compatibility
 
@@ -90,17 +92,20 @@ fun App() {
 
 ## Documentation
 
-- [Setup & initialization](docs/SETUP.md) — dependency, platform setup, init, troubleshooting
-- [Interstitial & rewarded](docs/INTERSTITIAL.md)
-- [Banner ads](docs/BANNER.md) — adaptive sizes, collapsible, refresh policies
-- [Native ads](docs/NATIVE.md) — layout DSL, pooling, media info
-- [App-open ads](docs/APP_OPEN.md) — `AppOpenAdCoordinator`
-- [Consent & privacy](docs/CONSENT.md) — UMP modes, privacy options form
-- [Mediation](docs/MEDIATION.md) — adapters, initialization hooks
-- [Architecture](docs/ARCHITECTURE.md) — module map, threading, caching, decisions
-- [Publishing](docs/PUBLISHING.md) — maintainer guide
+Full documentation: <https://ads.avinya.dev>
 
-Integrating with an AI coding agent? Point it at [AGENTS.md](AGENTS.md).
+- [Quickstart](https://ads.avinya.dev/start/quickstart/) — a rendering test ad in five minutes
+- [Installation](https://ads.avinya.dev/start/installation/) — Gradle, version catalog, and the Gradle plugin
+- [Android setup](https://ads.avinya.dev/start/android-setup/) · [iOS setup](https://ads.avinya.dev/start/ios-setup/)
+- [Banner](https://ads.avinya.dev/formats/banner/) · [Interstitial](https://ads.avinya.dev/formats/interstitial/) · [Rewarded](https://ads.avinya.dev/formats/rewarded/) · [App-open](https://ads.avinya.dev/formats/app-open/) · [Native](https://ads.avinya.dev/formats/native/)
+- [UMP consent](https://ads.avinya.dev/privacy/consent/) · [App Tracking Transparency](https://ads.avinya.dev/privacy/app-tracking-transparency/) · [Play Data safety](https://ads.avinya.dev/privacy/play-data-safety/)
+- [Mediation](https://ads.avinya.dev/advanced/mediation/) · [Revenue events](https://ads.avinya.dev/advanced/revenue-events/) · [Caching, retry and timeouts](https://ads.avinya.dev/advanced/caching-retry-timeouts/) · [Test safety](https://ads.avinya.dev/advanced/test-safety/)
+- [Architecture](https://ads.avinya.dev/reference/architecture/) · [Compatibility](https://ads.avinya.dev/reference/compatibility/) · [Troubleshooting](https://ads.avinya.dev/reference/troubleshooting/) · [Changelog](https://ads.avinya.dev/reference/changelog/)
+- [Roadmap](https://ads.avinya.dev/project/roadmap/) · [Contributing](https://ads.avinya.dev/project/contributing/) · [Using with AI agents](https://ads.avinya.dev/project/ai-agents/)
+- [Publishing](docs/PUBLISHING.md) — maintainer guide, repository only
+
+Integrating with an AI coding agent? Point it at [AGENTS.md](AGENTS.md) and
+<https://ads.avinya.dev/llms.txt>.
 
 ## Requirements
 

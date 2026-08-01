@@ -1,9 +1,166 @@
 ---
 title: "Android setup"
-description: "Manifest entries, the AD_ID permission, and the Play Data safety declaration for Android."
+description: "Android setup for AdMob on Kotlin Multiplatform — the manifest APPLICATION_ID entry, the AD_ID permission, minSdk 26, and how to verify it works."
+faq:
+  - q: Why does my Android app crash at startup after adding AdMob?
+    a: The Google Mobile Ads SDK crashes on launch when the manifest has no com.google.android.gms.ads.APPLICATION_ID meta-data entry. Add it with your AdMob app id.
+  - q: Do I need the AD_ID permission for AdMob on Android?
+    a: The Google Mobile Ads SDK merges com.google.android.gms.permission.AD_ID into your manifest automatically. Apps targeting API 33 or higher that remove it cannot access the advertising ID, which reduces revenue.
+  - q: What is the minimum Android API level for AdMob CMP?
+    a: API 26. The library targets Android API 26 and above and depends on the Google Mobile Ads Next-Gen SDK.
 ---
 
-Plan 3 writes this page. Target length is 800–1,500 words with worked examples,
-question-based H2s, and explicit cross-links. The file path and the frontmatter
-`title` / `description` above are fixed by Plan 2 — the sidebar, the sitemap and
-the generated OpenGraph card all key off them.
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+## What does Android need beyond the Gradle dependency?
+
+Almost nothing. The Android side of the Kotlin Multiplatform AdMob
+integration needs exactly one manifest entry beyond the dependency added
+in [Installation](/start/installation/) — the AdMob **app id**. Omitting
+it is not a soft failure: the Google Mobile Ads SDK crashes at startup
+because it cannot tell which account to attribute impressions to.
+
+iOS, by contrast, has the longer setup story with SPM, Info.plist keys,
+and ATT. The Android side is the shortest page on the site for a reason.
+
+The Gradle dependency itself is already on the page you came from. What
+Android adds is the small set of values that the GMA Next-Gen SDK cannot
+infer from the Kotlin code: the app id, the build configuration
+(`minSdk`, `compileSdk`, `targetSdk`, Android Gradle Plugin), and the
+repository that hosts Cronet. Each is a one-liner and none of them are
+the Kotlin Multiplatform library's job.
+
+## How do I add the AdMob app id to the manifest?
+
+```xml
+<application>
+    <meta-data
+        android:name="com.google.android.gms.ads.APPLICATION_ID"
+        android:value="ca-app-pub-3940256099942544~3347511713" /> <!-- sample id; replace -->
+</application>
+```
+
+Three things to get right in that snippet:
+
+- This is the **app id** (`ca-app-pub-…~…`, tilde separator), not an
+  ad-unit id (`ca-app-pub-…/…`, slash separator). The shape is the
+  difference between GMA initialising and GMA throwing at startup.
+- The value shown is Google's public sample id and must be replaced with
+  the real id from the AdMob UI before release.
+- In a Kotlin Multiplatform project this entry belongs to the **Android
+  application module's** manifest, not the shared module. The shared
+  module is where the Gradle dependency lives, but manifest merging
+  happens in the app module.
+
+`admob-cmp` itself declares only `INTERNET`. Everything else below comes
+from the GMA and UMP transitive dependencies.
+
+The sample id in the snippet above is recognisable on sight: the
+`ca-app-pub-3940256099942544` publisher id is the same one Google uses
+across its own sample apps and the `~3347511713` suffix is the Android
+sample app id. The library's `TestAdIds.ANDROID_APP_ID` constant is the
+same value, so a quickstart using sample ids never needs to type it.
+
+## What is the AD_ID permission and do I need it?
+
+The Google Mobile Ads SDK merges
+`com.google.android.gms.permission.AD_ID` into the manifest. Apps
+targeting API 33 or above that remove this permission cannot access the
+advertising ID, which reduces ad revenue. The permission comes from GMA
+rather than from `admob-cmp`.
+
+To opt out — for a child-directed app, for instance — remove the
+permission explicitly:
+
+```xml
+<uses-permission
+    android:name="com.google.android.gms.permission.AD_ID"
+    tools:node="remove" />
+```
+
+The `tools:node="remove"` directive only works when the manifest root
+declares `xmlns:tools="http://schemas.android.com/tools"`. Most projects
+already have that, but it is the kind of thing that fails silently
+when missing. The merged manifest in Android Studio's "Merged Manifest"
+view is the fastest way to confirm the permission is gone.
+
+<Aside type="caution">
+Removing the AD_ID permission reduces ad revenue. It is not recommended
+unless the app is child-directed or there is another compliance reason.
+Removing the permission also changes what must be declared in the Play
+Data safety form — see [Play Data safety](/privacy/play-data-safety/).
+</Aside>
+
+## What are the Android build requirements?
+
+`admob-cmp` 1.1.0 is built and tested against these values:
+
+| Setting | Value |
+|---|---|
+| `minSdk` | 26 |
+| `compileSdk` | 37 |
+| `targetSdk` | 36 |
+| Android Gradle Plugin | 9.2.1 |
+| Google Mobile Ads Next-Gen SDK | 1.3.0 (transitive) |
+| User Messaging Platform | 4.0.0 (transitive, also pulled by GMA) |
+
+One repository gotcha that trips real builds: the GMA Next-Gen SDK pulls
+Cronet from `org.chromium.net`, which is served by Google's Maven
+repository rather than Maven Central. Without the `google()` repository
+declared, the build fails with a missing-artifact error that does not
+name the cause.
+
+```kotlin
+// settings.gradle.kts
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+```
+
+Add `google()` first so its resolution is preferred; the order is not
+strictly required but it makes the build configuration match how most
+AdMob projects are written. The library's own consumer apps declare both
+repositories; without `google()`, the build fails on the very first
+Kotlin file that references GMA.
+
+## How do I confirm Android is wired up correctly?
+
+Three short checks:
+
+- Build and install the Android app, gate the UI on
+  `AdManagerStatus.Ready`, and confirm a banner or interstitial renders.
+- Outside Compose, the manager is reachable as
+  `AdMob.manager(context)`. It is the same process-wide singleton
+  `rememberAdManager()` returns — never construct an `AdManager`
+  implementation directly.
+- If the app crashes at startup with a stack trace that does not name
+  AdMob, the most common cause is a missing
+  `com.google.android.gms.ads.APPLICATION_ID`. The full symptom table is
+  on [Troubleshooting](/reference/troubleshooting/).
+
+The most common path that takes a first-time integration off the happy
+path is `targetSdk` and `compileSdk` drifting away from the values the
+library was built against. If you raise either, the transitive
+dependencies may pick up behaviour the library does not yet account
+for — particularly the GMA Next-Gen SDK's StrictMode-sensitive code
+paths. The values in the table above are tested; raising them is your
+call and is not part of the supported compatibility window.
+
+A note on cross-platform parity: Android emits no native video events on
+native ads. iOS emits five (`VideoStarted`, `VideoPlayed`, `VideoPaused`,
+`VideoEnded`, `VideoMuted`); the Android GMA Next-Gen SDK exposes no
+equivalent callback surface on `NativeAd`, so cross-platform logic must
+not depend on them. The [native ads guide](/formats/native/) has the
+full explanation.
+
+## Where to next?
+
+<CardGrid>
+  <LinkCard title="iOS setup" href="/start/ios-setup/" description="SPM packages, Info.plist, ATT, and doctorIos." />
+  <LinkCard title="Play Data safety" href="/privacy/play-data-safety/" description="What to declare in the Play Console form." />
+  <LinkCard title="Test safety" href="/advanced/test-safety/" description="testMode versus strictTestMode." />
+  <LinkCard title="Troubleshooting" href="/reference/troubleshooting/" description="Symptom to cause to fix." />
+</CardGrid>

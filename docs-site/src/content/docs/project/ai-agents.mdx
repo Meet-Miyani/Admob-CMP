@@ -1,9 +1,142 @@
 ---
 title: "Using with AI agents"
-description: "AGENTS.md, llms.txt, and how to point a coding assistant at AdMob CMP."
+description: "Point an AI coding agent at AdMob Kotlin Multiplatform integration using AGENTS.md and llms.txt, so it writes code that compiles against the frozen API."
+faq:
+  - q: How do I make a coding agent write correct AdMob CMP code?
+    a: Point it at AGENTS.md in the repository, which is a condensed API guide with the entry points, the format-to-API table, the hard rules and the troubleshooting table. Add the site's llms.txt for the full guide text.
+  - q: Does ads.avinya.dev allow AI crawlers?
+    a: Yes. The documentation host allows AI crawlers and publishes an llms.txt bundle, because a large share of SDK integration now happens through a coding assistant.
 ---
 
-Plan 3 writes this page. Target length is 800–1,500 words with worked examples,
-question-based H2s, and explicit cross-links. The file path and the frontmatter
-`title` / `description` above are fixed by Plan 2 — the sidebar, the sitemap and
-the generated OpenGraph card all key off them.
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+## Why does this page exist?
+
+A large share of SDK integration now happens through a coding
+assistant, and an assistant that guesses at an API produces code
+that does not compile against a frozen ABI. So the repository
+ships a file written **for** that reader.
+
+The cost of getting this wrong is asymmetric. A developer who
+reads the docs once and writes code by hand can correct
+themselves at the keyboard; an agent that runs end-to-end
+without supervision can publish code that compiles only by
+accident, then the agent's next iteration drifts further from
+the real surface. The hard rules in `AGENTS.md` are the
+boundary that keeps an agent's output in the same shape as
+a developer's.
+
+## What is AGENTS.md?
+
+`AGENTS.md` is the agent-facing condensed guide. It contains the
+entry points (`rememberAdManager()` for Compose,
+`AdMob.manager(context)` for Android, `LocalAdPlacements` for
+shared placement lists), the canonical initialization snippet,
+a format-to-API table mapping each `AdFormat` to its controller,
+composable and test ad ids, the full-screen load/show pattern,
+the banner and native sections including geometry and pool
+accounting, the app-open coordinator, the consent and
+privacy-options rule, seven hard rules, the `testMode` versus
+`strictTestMode` distinction, executable iOS setup steps, and a
+symptom-to-fix troubleshooting table. The file lives at
+[`AGENTS.md`](https://github.com/Meet-Miyani/admob-compose-multiplatform/blob/master/admob-cmp/AGENTS.md).
+
+A note on what `AGENTS.md` is not. It is not a substitute for the
+full docs; it is a compressed, agent-targeted version that
+prioritises the things an agent gets wrong. The full
+[architecture reference](/reference/architecture/) has the
+design rationale; the
+[troubleshooting guide](/reference/troubleshooting/) has the
+symptom table; the per-format pages have the API patterns. An
+agent that has only `AGENTS.md` can write correct surface code
+but not correct diagnostic code — the full site is the source
+of truth, and `AGENTS.md` is the index into it.
+
+## How do I point my agent at it?
+
+The durable form is a project instruction file — a `CLAUDE.md`,
+an `AGENTS.md`, or the equivalent — containing this instruction
+so it applies to every session rather than one prompt:
+
+```
+Read https://github.com/Meet-Miyani/admob-compose-multiplatform/blob/master/admob-cmp/AGENTS.md
+before writing any AdMob CMP code. Follow its hard rules exactly.
+```
+
+For agents working inside a repository that depends on the
+library, the instruction lives in the project's own instruction
+file. For one-off integrations, paste the URL into the prompt.
+
+## What is llms.txt, and what does this site publish?
+
+`llms.txt` is a plain-text bundle of a site's documentation,
+published at predictable paths so a language model can ingest
+the whole thing without crawling and parsing HTML. This site
+publishes three:
+
+| File | Purpose |
+|---|---|
+| [`/llms.txt`](/llms.txt) | Index. The entry point and table of contents for an agent that wants to read selectively. |
+| [`/llms-full.txt`](/llms-full.txt) | Full bundle. Every page, in order, for an agent that wants a complete offline context. |
+| [`/llms-small.txt`](/llms-small.txt) | Trimmed bundle, with the project and changelog pages excluded. For a context window that is tight but still needs every guide page. |
+
+The crawler policy: the documentation host allows AI crawlers
+deliberately. The
+[troubleshooting guide](/reference/troubleshooting/) is the
+single most useful page to paste into an agent's context when a
+build is failing.
+
+Note that every diagram component ships with a prose equivalent
+that is included in the `llms.txt` bundle, so an agent reading
+the text bundle receives the content of every diagram even
+though it cannot see the SVG. The diagram is for the human
+reader; the prose equivalent is for the model.
+
+A practical note on which bundle to point an agent at. For a
+fresh integration, `/llms.txt` is enough — it gives the agent
+the index, the entry points, and the format table, and the
+agent can fetch specific pages by URL. For a focused
+troubleshooting session, paste the
+[troubleshooting page](/reference/troubleshooting/) directly
+into the context — the same content the bundle has, but with
+the surrounding context trimmed. For a session that needs
+every detail, `/llms-full.txt` is the right input; expect
+several hundred thousand tokens of context.
+
+## Which rules do agents get wrong most often?
+
+This is the section that makes the page genuinely useful rather
+than meta. A short list, each item one line, each drawn from
+the hard rules:
+
+- Constructing an `AdManager` implementation instead of using
+  `rememberAdManager()` or `AdMob.manager(context)`.
+- Generating per-item placement ids such as
+  `"feed_item_$index"`. Controllers are cached per id and
+  never auto-evicted; reuse one placement id and let the native
+  pool serve per-item ads.
+- Calling `show()` from `GlobalScope`. It suspends for the
+  ad's full on-screen lifetime and belongs in a UI-scoped
+  coroutine.
+- Writing `TestAdIds.Android.BANNER`. The constants are flat:
+  `TestAdIds.ANDROID_BANNER`.
+- Writing the `adLayout` DSL as property assignments. The nodes
+  are functions with named arguments: `headline(maxLines = 2)`.
+- Assuming `testMode = true` serves test ads. It configures
+  UMP consent debugging only.
+- Gating a privacy-settings button on `ConsentStatus.Obtained`
+  instead of `PrivacyOptionsRequirementStatus.Required`.
+- Calling `pool.peek(...)`. It is not public API.
+- Relying on native video events on Android. Only iOS emits
+  them.
+
+The full set of hard rules is in `AGENTS.md`; the troubleshooting
+table covers the common runtime errors.
+
+## Where to next?
+
+<CardGrid>
+  <LinkCard title="Troubleshooting" href="/reference/troubleshooting/" description="The best page to paste into an agent's context." />
+  <LinkCard title="Contributing" href="/project/contributing/" description="The frozen ABI an agent must respect." />
+  <LinkCard title="Quickstart" href="/start/quickstart/" description="The canonical integration shape." />
+</CardGrid>

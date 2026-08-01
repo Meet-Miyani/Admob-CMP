@@ -1,9 +1,250 @@
 ---
 title: "UMP consent"
-description: "UMP consent modes, the privacy options form, and canRequestAds in the initialization flow."
+description: "AdMob consent on Kotlin Multiplatform — UMP consent modes, canRequestAds, the privacy options form, debug geography, and resetting consent in development."
+faq:
+  - q: How does UMP consent work with AdMob on Kotlin Multiplatform?
+    a: Consent is part of initialization. gatherConsentAndInitialize runs the UMP flow, then starts Mobile Ads. Until consent allows requests, every ad load fails fast with AdErrorCode.CONSENT_REQUIRED and nothing reaches the network.
+  - q: When should I show a Privacy Settings button?
+    a: Only when adManager.consent.privacyOptionsRequirementStatus is PrivacyOptionsRequirementStatus.Required. Do not gate it on ConsentStatus.Obtained, because users who declined must still be able to reopen the form.
+  - q: How do I test the EEA consent flow?
+    a: Set testMode to true and debugGeography to ConsentDebugGeography.Eea, and register the device hash in AdDebugOptions.consentTestDeviceIds. Debug settings only apply when testMode is true.
 ---
 
-Plan 3 writes this page. Target length is 800–1,500 words with worked examples,
-question-based H2s, and explicit cross-links. The file path and the frontmatter
-`title` / `description` above are fixed by Plan 2 — the sidebar, the sitemap and
-the generated OpenGraph card all key off them.
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import ConsentDecisionTree from '../../../components/diagrams/ConsentDecisionTree.astro';
+
+## How does UMP consent work in AdMob CMP?
+
+Consent is integrated into initialization rather than bolted beside
+it, which makes requesting ads before consent impossible by
+construction. The User Messaging Platform SDK is what presents the
+consent form on both platforms, but the orchestration — gather
+consent, present the form if required, then start Mobile Ads — is
+the library's responsibility. The result is a single
+`gatherConsentAndInitialize` call that handles the whole flow.
+
+The "impossible by construction" point matters. A naive integration
+that runs `MobileAds.initialize()` and then calls `requestConsentInfoUpdate`
+admits a window of time during which ad requests are sent to a user
+who has not been asked for consent. The window is short, but it
+exists, and AdMob's policy treats any request to a user who has not
+been prompted as a violation. The library's init order closes the
+window by design.
+
+```kotlin
+adManager.gatherConsentAndInitialize(
+    AdConfig(
+        androidAppId = "ca-app-pub-…",
+        iosAppId = "ca-app-pub-…",
+    )
+)
+```
+
+<ConsentDecisionTree />
+
+`ConsentStatus` is a sealed interface with five cases:
+
+| `ConsentStatus` | Meaning |
+|---|---|
+| `Unknown` | Not determined yet. |
+| `Required` | A form must be shown. |
+| `Obtained` | The user answered — which does not necessarily mean they consented. |
+| `NotRequired` | The regulation does not apply to this user. |
+| `Failed(error)` | The consent-info update failed; the error is attached. |
+
+A practical note on `Failed(error)`: the error is a regular
+`AdError` carrying the same fields as load errors — `code`,
+`message`, `domain`, `responseInfo`. The most common cause is a
+network failure on the consent-info update endpoint, which is a
+transient condition and can be retried. A persistent `Failed`
+state usually points at a misconfigured AdMob account id.
+
+## Which ConsentMode should I use?
+
+```kotlin
+adManager.initialize(config, ConsentMode.GatherBeforeInitialize)
+```
+
+| `ConsentMode` | Behaviour |
+|---|---|
+| `GatherBeforeInitialize` | Request consent info, present the UMP form if required, then initialize. Recommended. |
+| `InitializeOnlyIfAlreadyAllowed` | No form. Initialize only if consent already permits requests; otherwise the status becomes `ConsentRequired`. |
+| `SkipConsent` | Bypass UMP entirely. |
+
+`gatherConsentAndInitialize(config)` is `GatherBeforeInitialize` with
+the ergonomics of a single call and is the right default. Use
+`InitializeOnlyIfAlreadyAllowed` when the app drives the consent
+flow itself — for instance to sequence App Tracking Transparency
+between consent and initialization on iOS. Do **not** substitute
+`SkipConsent` there, because it ignores future UMP revocation.
+`SkipConsent` is for apps that genuinely have no UMP obligation.
+
+The three modes exist because the consent flow has three realistic
+shapes. Apps that present the UMP form as their only consent UI
+use `GatherBeforeInitialize`. Apps that have their own consent
+flow (a settings screen, a TCF v2 string built outside the
+platform) and need the platform only as a fallback use
+`InitializeOnlyIfAlreadyAllowed`. Apps that have no GDPR
+obligation at all (region-locked apps, B2B apps with no
+consumer-facing traffic) use `SkipConsent`. The wrong mode is
+almost always `SkipConsent` chosen for convenience rather than
+compliance.
+
+## What is canRequestAds and why does it gate everything?
+
+```kotlin
+val consentStatus by adManager.consent.status.collectAsState()
+val canRequestAds by adManager.consent.canRequestAds.collectAsState()
+```
+
+The rule once and clearly: `canRequestAds` is the gate that matters.
+The SDK refuses ad requests with `AdErrorCode.CONSENT_REQUIRED`
+until it is `true`, unless the mode is `SkipConsent`. Before
+initialization succeeds, loads fail fast with
+`AdErrorCode.SDK_NOT_READY`. In both cases **nothing reaches the
+network** — a failed load here is the gate working, not a bug. The
+[troubleshooting guide](/reference/troubleshooting/) has the full
+symptom table.
+
+The point most apps get wrong: `ConsentStatus.Obtained` means the
+user answered the form, not that they said yes. Branch on
+`canRequestAds`, never on `Obtained`.
+
+A second point: `canRequestAds` is a derived state, not an input.
+It is the AND of "UMP says the user has made a choice", "the
+choice is on the allow list for ad requests", and "no publisher-
+side block is in effect". The first two are UMP's; the third is
+yours. If you set `AdConfig.skipConsent = true` but you also
+want to gate requests on a publisher-side flag, do not gate on
+`canRequestAds` because the skip bypasses UMP's contribution to
+it. Gate on your own flag and use `canRequestAds` as a
+secondary check.
+
+## When should I show a Privacy Settings button?
+
+```kotlin
+val privacyRequirement by adManager.consent.privacyOptionsRequirementStatus.collectAsState()
+
+if (privacyRequirement == PrivacyOptionsRequirementStatus.Required) {
+    Button(onClick = { scope.launch { adManager.consent.showPrivacyOptions() } }) {
+        Text("Privacy Settings")
+    }
+}
+```
+
+This is the GDPR re-consent affordance.
+`PrivacyOptionsRequirementStatus` is `Unknown`, `Required` or
+`NotRequired`, and `showPrivacyOptions()` returns a `Boolean`
+indicating whether the form was presented.
+
+<Aside type="caution">
+Do **not** gate this button on `ConsentStatus.Obtained`. Users who
+declined consent still must be able to reopen the form, and gating
+on `Obtained` hides the entry point from exactly the users who
+need it.
+</Aside>
+
+A related point on `showPrivacyOptions()`: the call is suspending
+and may show the form synchronously or fall through to a no-op
+return when the user has nothing to manage. The boolean return
+distinguishes the two, so a settings screen that wants to confirm
+"the form was shown" can branch on it; most code paths simply
+ignore the return value.
+
+The `Required` value of `PrivacyOptionsRequirementStatus` is what
+drives the GDPR's "the user must always be able to revisit their
+choice" rule. UMP exposes it as a status, and the library exposes
+it on the consent object. Showing the button only when the status
+is `Required` keeps the UI consistent with the platform's
+expectation: the button does not appear when there is nothing to
+manage, and it always appears when there is.
+
+## How do I test the EEA consent flow?
+
+This section must correct a real ambiguity in the API surface. The
+convenience `AdConfig(androidAppId = …, iosAppId = …, testDeviceIds = …)`
+constructor routes `testDeviceIds` into
+`GlobalRequestConfiguration.testDeviceIds`, which registers **GMA
+test devices** — the thing that makes Google serve test ads. **UMP
+consent-form test devices are a different field**:
+`AdDebugOptions.consentTestDeviceIds`. To force the EEA flow on a
+physical device, use the primary constructor:
+
+```kotlin
+adManager.gatherConsentAndInitialize(
+    AdConfig(
+        appIds = AdAppIds(android = "ca-app-pub-…", ios = "ca-app-pub-…"),
+        debugOptions = AdDebugOptions(
+            testMode = true,
+            consentDebugGeography = ConsentDebugGeography.Eea,
+            consentTestDeviceIds = listOf("YOUR-DEVICE-HASH"),
+        ),
+        globalRequestConfiguration = GlobalRequestConfiguration(
+            testDeviceIds = listOf("YOUR-DEVICE-HASH"),
+        ),
+    )
+)
+```
+
+`ConsentDebugGeography` is `Disabled`, `Eea` or `NotEea`; debug
+settings apply only when `testMode = true`; and the device hash is
+printed to logcat or the Xcode console on the first unregistered
+request. The [test safety guide](/advanced/test-safety/) covers the
+full `testMode` versus `strictTestMode` distinction.
+
+A practical note on the device hash: it is the SHA-1 of a
+device-derived seed, not the advertising ID. The hash is stable
+for the lifetime of the device's local data and rotates when the
+user resets the device. It is safe to log in development because
+the hash cannot be reversed to the device; do not, however, ship
+a list of hashes to a third party.
+
+## How do I reset consent during development?
+
+```kotlin
+scope.launch { adManager.consent.resetConsentForDebug() }
+```
+
+`resetConsentForDebug` is a debug-only escape hatch that wipes the
+cached consent decision and re-prompts on the next gather. The
+method is named for what it is: it exists for development and
+should never be called from production code. The
+[test safety guide](/advanced/test-safety/) covers the full set of
+debug-only APIs.
+
+## How do I refresh consent state without showing a form?
+
+```kotlin
+scope.launch { adManager.consent.requestConsentInfoUpdate(config) }
+```
+
+`requestConsentInfoUpdate` updates `status`, `canRequestAds` and
+`privacyOptionsRequirementStatus` without presenting a form, which
+is what a settings screen should call on open. `gatherConsent(config)`
+is the variant that *may* present the form. The two are
+distinguished by what the caller is willing to interrupt the user
+with.
+
+A common related pattern: a "Manage privacy" entry in the settings
+menu that calls `requestConsentInfoUpdate` on open, then reads
+`privacyOptionsRequirementStatus` to decide whether to show the
+"Privacy Settings" button. That keeps the settings screen
+non-blocking and lets the button only appear when there is
+something to manage.
+
+The `requestConsentInfoUpdate` call is suspending and returns
+once the platform SDK has finished its update. It does not present
+UI, so it is safe to call from a screen's `LaunchedEffect` without
+worrying about interrupting the user. The cost is a single
+network round-trip to the consent-info endpoint, which is cheap
+enough for a settings-screen-on-open pattern but too expensive
+for a per-frame pattern.
+
+## Where to next?
+
+<CardGrid>
+  <LinkCard title="App Tracking Transparency" href="/privacy/app-tracking-transparency/" description="The iOS consent, ATT, initialize order." />
+  <LinkCard title="Play Data safety" href="/privacy/play-data-safety/" description="What to declare in the Play Console." />
+  <LinkCard title="Test safety" href="/advanced/test-safety/" description="testMode versus strictTestMode." />
+  <LinkCard title="Troubleshooting" href="/reference/troubleshooting/" description="CONSENT_REQUIRED and SDK_NOT_READY." />
+</CardGrid>

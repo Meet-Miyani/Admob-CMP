@@ -1,9 +1,196 @@
 ---
 title: "Revenue and paid events"
-description: "AdValue, ResponseInfo, and consuming paid events for revenue analytics."
+description: "Track the AdMob paid event on Kotlin Multiplatform — AdValue micros, precision, response info, and sending impression-level revenue to your analytics."
+faq:
+  - q: How do I get impression-level ad revenue in Kotlin Multiplatform?
+    a: Collect AdEvent.Paid from adManager.events or from a controller's events flow. Each event carries a PaidEvent with an AdValue holding valueMicros, currencyCode and precision.
+  - q: What does AdValuePrecision mean?
+    a: It says how trustworthy the number is — Precise, Estimated, PublisherProvided or Unknown. Aggregate estimated values with care and never present them as billed revenue.
+  - q: Which ad network won an impression?
+    a: Read responseInfo.loadedAdNetworkResponseInfo from the load event or the paid event. The full waterfall, including failures, is in adNetworkResponseInfos.
 ---
 
-Plan 3 writes this page. Target length is 800–1,500 words with worked examples,
-question-based H2s, and explicit cross-links. The file path and the frontmatter
-`title` / `description` above are fixed by Plan 2 — the sidebar, the sitemap and
-the generated OpenGraph card all key off them.
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+## How do I observe ad events at all?
+
+There are two collection points. `adManager.events` is a global
+`SharedFlow<AdEvent>` covering every placement, while each
+controller and pool exposes its own `events` for a single
+placement. Every `AdEvent` carries a `placementId`, which is what
+makes the global stream usable.
+
+```kotlin
+LaunchedEffect(Unit) {
+    adManager.events.collect { event ->
+        when (event) {
+            is AdEvent.Loaded -> println("loaded: ${event.placementId}")
+            is AdEvent.LoadFailed -> println("failed: ${event.error}")
+            is AdEvent.Impression -> println("impression: ${event.placementId}")
+            is AdEvent.Clicked -> println("click: ${event.placementId}")
+            is AdEvent.Paid -> println("revenue: ${event.paidEvent.value.valueMicros}")
+            is AdEvent.RewardEarned -> println("reward: ${event.reward.type}")
+            else -> Unit
+        }
+    }
+}
+```
+
+The full sealed set, once so readers stop guessing: `Loaded`,
+`LoadFailed`, `ShowFailed`, `Impression`, `Clicked`,
+`OpenedFullScreen`, `ClosedFullScreen`, `RewardEarned`, `Paid`,
+and the iOS-only `VideoStarted`, `VideoPlayed`, `VideoPaused`,
+`VideoEnded`, `VideoMuted`. Note that `Impression`, `Clicked` and
+`Paid` also carry an optional `adInstanceId`, which is what lets
+a paid event be joined to the impression it belongs to.
+
+A common pattern that does not work: collecting from a
+controller's `events` flow inside the same composable that
+holds the controller. The collector's `LaunchedEffect` outlives
+the controller on a screen exit, and the
+`events: SharedFlow<AdEvent>` is tied to the controller's
+lifetime, so the collector silently stops receiving. The
+right shape is to collect from `adManager.events` (the global
+stream) at the root, and let the collector live for the
+lifetime of the manager. The per-controller `events` flow is
+useful for tests, where the controller's lifetime is the test's
+lifetime.
+
+## How do I read impression-level revenue?
+
+```kotlin
+LaunchedEffect(Unit) {
+    adManager.events.filterIsInstance<AdEvent.Paid>().collect { event ->
+        val value = event.paidEvent.value
+        analytics.logAdRevenue(
+            placementId = event.placementId,
+            valueMicros = value.valueMicros,
+            currency = value.currencyCode,
+            precision = value.precision.name,
+            adSource = event.paidEvent.responseInfo?.loadedAdNetworkResponseInfo?.adSourceName,
+        )
+    }
+}
+```
+
+The data shapes, stated exactly:
+
+- `PaidEvent` has `placementId`, `value: AdValue`, and
+  `responseInfo: AdResponseInfo?`.
+- `AdValue` has `valueMicros: Long`, `currencyCode: String`, and
+  `precision: AdValuePrecision`.
+- `AdValuePrecision` is `Unknown`, `Estimated`,
+  `PublisherProvided` or `Precise`.
+
+The unit warning explicitly, because it is the most common
+analytics bug in this area: `valueMicros` is **millionths of a
+currency unit**. Dividing by 1,000,000 gives the value in
+`currencyCode`. Do not sum micros across currencies.
+
+A note on precision: `Estimated` values are modelled, not billed.
+Aggregating them is legitimate for pacing and LTV models, but they
+must never be presented to a user or a finance team as revenue.
+`PublisherProvided` is the value the publisher passed in via
+`AdValue(currencyCode, valueMicros, precision =
+PublisherProvided)` — a legitimate path for non-AdMob networks,
+and a value the library forwards untouched. `Precise` is the
+floor of trustworthy revenue; anything below is a model.
+
+A note on currency conversion. Each `AdValue` carries a
+`currencyCode` — a three-letter ISO 4217 code. Two paid events
+from different networks may have different `currencyCode`s; the
+right aggregation is to convert both to a single reporting
+currency at the moment of logging, not to mix micros across
+currencies. Mixing USD micros with EUR micros is the most
+common cause of "the eCPM went up by 30% after we changed
+networks" bugs.
+
+## What does ResponseInfo tell me?
+
+```kotlin
+val info: AdResponseInfo? = event.paidEvent.responseInfo
+println(info?.responseId)                                  // unique response identifier
+println(info?.adapterClassName)                            // adapter that loaded it
+println(info?.loadedAdNetworkResponseInfo?.adSourceName)   // winning network
+info?.adNetworkResponseInfos?.forEach { network ->
+    println("${network.adSourceName}: ${network.latencyMillis} ms, error=${network.error?.message}")
+}
+```
+
+`AdResponseInfo` carries `responseId`, `adapterClassName`,
+`extras`, `loadedAdNetworkResponseInfo` and
+`adNetworkResponseInfos`. Each `AdNetworkResponseInfo` carries
+`adapterClassName`, `latencyMillis`, `error`, `adSourceName`,
+`adSourceId`, `adSourceInstanceName` and `adSourceInstanceId`.
+The failure entries in the chain are the fastest way to diagnose
+a mediation waterfall that is not filling — see the
+[mediation guide](/advanced/mediation/) for the chain shape and
+the failure interpretation.
+
+A note on `extras`: it is a `Map<String, String>` of
+adapter-specific metadata. Some networks use it to attach
+internal trace ids; Google's own GMA uses it for the response's
+correlation id under the key `ResponseInfo`. Treat it as opaque
+metadata, but never log the full map to production analytics —
+some adapters put personally identifying information in it, and
+that data is yours, not Google's.
+
+A common use of `extras` is to forward the winning network's
+internal id into the app's analytics pipeline. The
+[mediation guide](/advanced/mediation/) has the matching
+configuration step. A `Map<String, String>` of unknown shape
+should be flattened into a typed structure before forwarding —
+analytics systems that accept free-form fields tend to grow
+untyped schemas that are hard to evolve.
+
+The recommended shape for an in-house analytics target is a
+schema migration per network: a v1 entry for AdMob, a v2 entry
+for Meta, a v3 entry for the next network, and the analytics
+upstream keeps the historical records. Free-form forwarding is
+faster to ship and slower to retire.
+
+## How should I send this to analytics?
+
+Three short points, drawn from production patterns:
+
+- Collect in one place rather than per-composable so events are
+  not double-counted across recompositions. The natural shape is
+  a single `LaunchedEffect(Unit)` that subscribes to
+  `adManager.events` for the lifetime of the root composition.
+- Key on `placementId` plus `adInstanceId` when correlating
+  impressions and revenue. The same `adInstanceId` appears on
+  the `Impression` event and on the `Paid` event for the same
+  ad, which is what makes the join exact.
+- These events are observation — they are not the mechanism for
+  granting rewards, which is covered on
+  [Rewarded ads](/formats/rewarded/). The double-grant warning
+  there applies here in a milder form: do not pay out from both
+  a paid event and a callback.
+
+A practical note on `Loaded` versus `Paid` for revenue
+attribution. `Loaded` fires when the platform SDK reports a
+successful load; `Paid` fires when the user has actually seen the
+ad. The two are not the same moment, and the gap between them
+can be many seconds for video. Analytics that join "loads" to
+"revenue" without a window will over-count; the right join key
+is `adInstanceId`, and the right window is the lifetime of the
+ad.
+
+A second practical note: `Paid` events are delivered to the
+collector in order, but `Paid` for one ad can race with
+`Impression` for the same ad. The collector's coroutine
+context determines which is observed first, and "first" is
+not necessarily "emitted first" — the platform SDKs are
+free to fire callbacks on background threads, and the library
+serialises them on `Dispatchers.Main.immediate`. The ordering
+guarantee is that callbacks for the same ad arrive in causal
+order (Loaded before Impression before Paid); cross-ad
+ordering is not guaranteed.
+
+## Where to next?
+
+<CardGrid>
+  <LinkCard title="Mediation" href="/advanced/mediation/" description="Reading the waterfall behind a paid event." />
+  <LinkCard title="Rewarded ads" href="/formats/rewarded/" description="Why events are not the grant point." />
+  <LinkCard title="Architecture" href="/reference/architecture/" description="How events flow from the platform SDKs." />
+</CardGrid>
