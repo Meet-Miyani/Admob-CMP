@@ -1,25 +1,79 @@
 ---
-// docs-site/src/components/diagrams/ModuleMap.astro
-//
-// PLACEHOLDER. Plan 4 (visual system) replaces this body with the real
-// theme-aware diagram. The file name and the zero-prop contract are fixed by
-// Plan 3 and must not change — 24 content pages import it as <ModuleMap />.
-//
-// Plan 3's final audit (Task 27) fails if this placeholder is still present,
-// so a stub can never ship to ads.avinya.dev.
+import DiagramFrame from './DiagramFrame.astro';
 ---
 
-<figure class="diagram-placeholder" data-diagram="ModuleMap">
-  <p>Diagram <code>ModuleMap</code> is not authored yet.</p>
-</figure>
+<DiagramFrame id="module-map" width={920} height={570}>
+  {/* published artifacts */}
+  <rect class="dg-node dg-node--accent" x="330" y="16" width="260" height="54" rx="8" />
+  <text class="dg-title" x="460" y="40" text-anchor="middle">dev.avinya.ads:admob-cmp</text>
+  <text class="dg-sub" x="460" y="58" text-anchor="middle">umbrella — api(core) + api(compose)</text>
 
-<style>
-  .diagram-placeholder {
-    margin: 1.5rem 0;
-    padding: 1rem;
-    border: 2px dashed var(--sl-color-gray-4);
-    border-radius: 0.5rem;
-    text-align: center;
-    color: var(--sl-color-gray-3);
-  }
-</style>
+  <path class="dg-edge" d="M460 70 V92 H200 V112" marker-end="url(#module-map-arrow)" />
+  <path class="dg-edge" d="M460 70 V92 H720 V112" marker-end="url(#module-map-arrow)" />
+
+  <rect class="dg-node" x="60" y="116" width="280" height="54" rx="8" />
+  <text class="dg-title" x="200" y="140" text-anchor="middle">admob-cmp-core</text>
+  <text class="dg-sub" x="200" y="158" text-anchor="middle">no Compose dependency</text>
+
+  <rect class="dg-node" x="580" y="116" width="280" height="54" rx="8" />
+  <text class="dg-title" x="720" y="140" text-anchor="middle">admob-cmp-compose</text>
+  <text class="dg-sub" x="720" y="158" text-anchor="middle">Compose UI + adLayout DSL</text>
+
+  {/* source-set band */}
+  <text class="dg-note" x="24" y="193">source sets — both library modules</text>
+  <path class="dg-grid" d="M24 200 H896" />
+
+  {/* commonMain */}
+  <rect class="dg-node" x="24" y="222" width="300" height="280" rx="8" />
+  <text class="dg-title" x="40" y="250">commonMain</text>
+  <text class="dg-sub" x="40" y="268">shared, platform-free</text>
+  <text class="dg-mono" x="40" y="294">core · dev.avinya.ads</text>
+  <text class="dg-sub" x="40" y="312">AdManager, controllers, AdPlacement,</text>
+  <text class="dg-sub" x="40" y="330">AdConfig, AdEvent, AdError, consent</text>
+  <text class="dg-mono" x="40" y="348">core · …ads.internal</text>
+  <text class="dg-sub" x="40" y="366">FullScreenSlotCore, BannerCore,</text>
+  <text class="dg-sub" x="40" y="384">NativePoolCore, AdRetry</text>
+  <text class="dg-mono" x="40" y="402">core · …appopen / …nativead</text>
+  <text class="dg-mono" x="40" y="420">compose · …ads.ui</text>
+  <text class="dg-sub" x="40" y="438">BannerAdView, NativeAdView</text>
+  <text class="dg-mono" x="40" y="456">compose · …nativead.layout</text>
+  <text class="dg-sub" x="40" y="474">adLayout {'{}'} DSL, validator, templates</text>
+
+  {/* androidMain */}
+  <rect class="dg-node dg-node--android" x="340" y="222" width="264" height="280" rx="8" />
+  <text class="dg-title" x="356" y="250">androidMain</text>
+  <text class="dg-sub" x="356" y="268">thin adapter</text>
+  <text class="dg-mono" x="356" y="294">AndroidGoogleAdManager</text>
+  <text class="dg-sub" x="356" y="312">slots / pool / banner over the</text>
+  <text class="dg-sub" x="356" y="330">GMA Next-Gen SDK (API 26+)</text>
+  <text class="dg-mono" x="356" y="348">AdMob.manager(context)</text>
+  <text class="dg-sub" x="356" y="366">ProcessLifecycleOwner foreground</text>
+  <text class="dg-sub" x="356" y="384">signal</text>
+  <text class="dg-sub" x="356" y="402">batch-assembly locking stays</text>
+  <text class="dg-sub" x="356" y="420">platform-side (invariant 3)</text>
+  <text class="dg-sub" x="356" y="438">implements loadAd · presentAd ·</text>
+  <text class="dg-sub" x="356" y="456">destroyAd · canPresent</text>
+
+  {/* iosMain */}
+  <rect class="dg-node dg-node--ios" x="620" y="222" width="276" height="280" rx="8" />
+  <text class="dg-title" x="636" y="250">iosMain</text>
+  <text class="dg-sub" x="636" y="268">thin adapter</text>
+  <text class="dg-mono" x="636" y="294">IosGoogleAdManager</text>
+  <text class="dg-sub" x="636" y="312">slots / pool / banner / consent over</text>
+  <text class="dg-sub" x="636" y="330">cinterop bindings (GMA 13.x, iOS 15+)</text>
+  <text class="dg-sub" x="636" y="348">UIKit native-ad renderer</text>
+  <text class="dg-sub" x="636" y="366">NSNotificationCenter foreground signal</text>
+  <text class="dg-sub" x="636" y="384">strong Kotlin refs hold the weak</text>
+  <text class="dg-sub" x="636" y="402">ObjC delegates (invariant 4)</text>
+  <text class="dg-sub" x="636" y="420">activeLoad / activeLoads registries</text>
+  <text class="dg-sub" x="636" y="438">stay platform-side (invariant 7)</text>
+
+  <text class="dg-note" x="24" y="528">
+    Platform classes implement only loadAd / presentAd / destroyAd / canPresent, plus the
+    BannerPlatform and NativePoolPlatform interfaces.
+  </text>
+  <text class="dg-note" x="24" y="546">
+    Load, show, cache, retry and consent gating all live in the shared core — CLAUDE.md invariants
+    #1 and #7.
+  </text>
+</DiagramFrame>

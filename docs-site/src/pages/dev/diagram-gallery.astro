@@ -1,0 +1,64 @@
+---
+/**
+ * Internal review surface for the diagram set. noindex, excluded from the
+ * sitemap, and never linked from the site.
+ *
+ * To review the light theme, edit the `data-theme` attribute on <html> in
+ * devtools. Nothing here reads it at runtime — the diagrams re-theme purely
+ * through tokens.css, which is exactly what makes that swap sufficient.
+ */
+import '../../styles/tokens.css';
+import ModuleMap from '../../components/diagrams/ModuleMap.astro';
+import InitSequence from '../../components/diagrams/InitSequence.astro';
+import FullScreenLifecycle from '../../components/diagrams/FullScreenLifecycle.astro';
+import NativePoolLifecycle from '../../components/diagrams/NativePoolLifecycle.astro';
+import BannerGeometry from '../../components/diagrams/BannerGeometry.astro';
+import ConsentDecisionTree from '../../components/diagrams/ConsentDecisionTree.astro';
+import RetryTimeline from '../../components/diagrams/RetryTimeline.astro';
+import PlatformMatrix from '../../components/diagrams/PlatformMatrix.astro';
+---
+
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Diagram gallery (internal review)</title>
+    <style is:global>
+      body {
+        margin: 0;
+        padding: 2rem 1rem 6rem;
+        background: var(--admob-paper);
+        color: var(--admob-ink);
+        font-family: var(--admob-font-body);
+      }
+      main {
+        max-width: var(--admob-content-max);
+        margin: 0 auto;
+      }
+      h1 {
+        font-family: var(--admob-font-display);
+        letter-spacing: var(--admob-tracking-tight);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Diagram gallery</h1>
+      <p>
+        Internal review page. Flip the <code>data-theme</code> attribute on
+        <code>&lt;html&gt;</code> between <code>dark</code> and <code>light</code> in devtools to
+        check both themes.
+      </p>
+      <ModuleMap />
+      <InitSequence />
+      <FullScreenLifecycle />
+      <NativePoolLifecycle />
+      <BannerGeometry />
+      <ConsentDecisionTree />
+      <RetryTimeline />
+      <PlatformMatrix />
+    </main>
+  </body>
+</html>

@@ -1,25 +1,91 @@
 ---
-// docs-site/src/components/diagrams/RetryTimeline.astro
-//
-// PLACEHOLDER. Plan 4 (visual system) replaces this body with the real
-// theme-aware diagram. The file name and the zero-prop contract are fixed by
-// Plan 3 and must not change — 24 content pages import it as <RetryTimeline />.
-//
-// Plan 3's final audit (Task 27) fails if this placeholder is still present,
-// so a stub can never ship to ads.avinya.dev.
+import DiagramFrame from './DiagramFrame.astro';
 ---
 
-<figure class="diagram-placeholder" data-diagram="RetryTimeline">
-  <p>Diagram <code>RetryTimeline</code> is not authored yet.</p>
-</figure>
+<DiagramFrame id="retry-timeline" width={920} height={520}>
+  <text class="dg-sub" x="24" y="34">
+    AdRetryPolicy defaults — maxAttempts 2, initialDelay 2s, backoffMultiplier 2.0, maxDelay 30s
+  </text>
 
-<style>
-  .diagram-placeholder {
-    margin: 1.5rem 0;
-    padding: 1rem;
-    border: 2px dashed var(--sl-color-gray-4);
-    border-radius: 0.5rem;
-    text-align: center;
-    color: var(--sl-color-gray-3);
-  }
-</style>
+  {/* default policy */}
+  <text class="dg-note" x="24" y="56">maxAttempts = 2 (default): initial attempt + one retry</text>
+  <rect class="dg-node" x="58" y="64" width="64" height="32" rx="6" />
+  <text class="dg-sub" x="90" y="84" text-anchor="middle">attempt 1</text>
+  <rect class="dg-node" x="146" y="64" width="64" height="32" rx="6" />
+  <text class="dg-sub" x="178" y="84" text-anchor="middle">retry 1</text>
+
+  {/* a longer configured policy, to show the shape of the backoff */}
+  <text class="dg-note" x="24" y="116">maxAttempts = 4 (configured)</text>
+  <rect class="dg-node" x="58" y="124" width="64" height="32" rx="6" />
+  <text class="dg-sub" x="90" y="144" text-anchor="middle">attempt 1</text>
+  <rect class="dg-node" x="146" y="124" width="64" height="32" rx="6" />
+  <text class="dg-sub" x="178" y="144" text-anchor="middle">retry 1</text>
+  <rect class="dg-node" x="322" y="124" width="64" height="32" rx="6" />
+  <text class="dg-sub" x="354" y="144" text-anchor="middle">retry 2</text>
+  <rect class="dg-node" x="674" y="124" width="64" height="32" rx="6" />
+  <text class="dg-sub" x="706" y="144" text-anchor="middle">retry 3</text>
+
+  <path class="dg-grid" d="M90 156 V190 M178 156 V190 M354 156 V190 M706 156 V190" />
+
+  {/* time axis */}
+  <path class="dg-axis" d="M90 190 H838" />
+  <path class="dg-axis" d="M90 190 V196 M178 190 V196 M354 190 V196 M706 190 V196" />
+  <text class="dg-note" x="90" y="210" text-anchor="middle">0s</text>
+  <text class="dg-note" x="178" y="210" text-anchor="middle">2s</text>
+  <text class="dg-note" x="354" y="210" text-anchor="middle">6s</text>
+  <text class="dg-note" x="706" y="210" text-anchor="middle">14s</text>
+
+  {/* the backoff itself */}
+  <path
+    class="dg-edge"
+    d="M90 228 H178"
+    marker-start="url(#retry-timeline-arrow)"
+    marker-end="url(#retry-timeline-arrow)"
+  />
+  <path
+    class="dg-edge"
+    d="M178 228 H354"
+    marker-start="url(#retry-timeline-arrow)"
+    marker-end="url(#retry-timeline-arrow)"
+  />
+  <path
+    class="dg-edge"
+    d="M354 228 H706"
+    marker-start="url(#retry-timeline-arrow)"
+    marker-end="url(#retry-timeline-arrow)"
+  />
+  <text class="dg-sub" x="134" y="246" text-anchor="middle">+2s</text>
+  <text class="dg-sub" x="266" y="246" text-anchor="middle">+4s</text>
+  <text class="dg-sub" x="530" y="246" text-anchor="middle">+8s</text>
+  <text class="dg-note" x="838" y="246" text-anchor="end">then capped at maxDelay = 30s</text>
+
+  {/* the bound on the whole sequence */}
+  <path class="dg-edge dg-edge--accent" d="M90 280 V272 H838 V280" />
+  <text class="dg-sub" x="464" y="300" text-anchor="middle">
+    withTimeoutOrNull(loadTimeout) bounds the whole sequence, backoff included
+  </text>
+
+  {/* classification panels */}
+  <rect class="dg-panel" x="24" y="320" width="430" height="170" rx="8" />
+  <text class="dg-title" x="40" y="346">Retried — transient failures</text>
+  <text class="dg-sub" x="40" y="372">Android (enum names): NETWORK_ERROR,</text>
+  <text class="dg-sub" x="40" y="390">TIMEOUT, INTERNAL_ERROR</text>
+  <text class="dg-sub" x="40" y="408">iOS (numeric codes): 2 network, 5 timeout,</text>
+  <text class="dg-sub" x="40" y="426">11 internal</text>
+  <text class="dg-sub" x="40" y="444">delay(n) = min(initialDelay × 2^(n−1), maxDelay)</text>
+
+  <rect class="dg-panel" x="474" y="320" width="422" height="170" rx="8" />
+  <text class="dg-title" x="490" y="346">Never retried</text>
+  <text class="dg-sub" x="490" y="372">NO_FILL (Android) / code 1 (iOS) — no</text>
+  <text class="dg-sub" x="490" y="390">inventory; retrying burns requests and</text>
+  <text class="dg-sub" x="490" y="408">depresses fill rate.</text>
+  <text class="dg-sub" x="490" y="426">INVALID_REQUEST, APP_ID_MISSING,</text>
+  <text class="dg-sub" x="490" y="444">INVALID_AD_RESPONSE — configuration.</text>
+  <text class="dg-sub" x="490" y="462">consent_required, sdk_not_ready — gates,</text>
+  <text class="dg-sub" x="490" y="480">not load failures.</text>
+
+  <text class="dg-note" x="24" y="510">
+    maxAttempts counts the initial attempt, so the default of 2 means one initial attempt plus one
+    retry — CLAUDE.md invariant #9.
+  </text>
+</DiagramFrame>

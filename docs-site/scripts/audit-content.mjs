@@ -36,6 +36,13 @@ const validUrls = new Set(
 validUrls.add('/');
 validUrls.add('/api/');
 
+/**
+ * Pages exempt from the "every H2 is a question" rule. The generated
+ * diagrams-in-words reference intentionally mirrors the diagram titles, which
+ * are statements; it is a prose reference, not a guide.
+ */
+const REFERENCE_PAGES = new Set(['/reference/diagrams-in-words/']);
+
 for (const file of files) {
   const raw = readFileSync(file, 'utf8');
   const fm = raw.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -51,16 +58,20 @@ for (const file of files) {
     problems.push(`${file}: description is ${desc[1].trim().length} chars (max 160)`);
 
   const body = raw.slice(fm[0].length);
+  const pageUrl = '/' + file.slice(DOCS.length + 1).replace(/\.mdx$/, '') + '/';
+  const isReference = REFERENCE_PAGES.has(pageUrl);
 
-  // Every H2 must be a question, except the standard closing section.
-  for (const line of body.split('\n')) {
-    if (!line.startsWith('## ')) continue;
-    const heading = line.slice(3).trim();
-    if (heading === 'Where to next?') continue;
-    if (!heading.endsWith('?')) problems.push(`${file}: H2 is not a question — "${heading}"`);
+  if (!isReference) {
+    // Every H2 must be a question, except the standard closing section.
+    for (const line of body.split('\n')) {
+      if (!line.startsWith('## ')) continue;
+      const heading = line.slice(3).trim();
+      if (heading === 'Where to next?') continue;
+      if (!heading.endsWith('?')) problems.push(`${file}: H2 is not a question — "${heading}"`);
+    }
+
+    if (!body.includes('## Where to next?')) problems.push(`${file}: no "Where to next?" section`);
   }
-
-  if (!body.includes('## Where to next?')) problems.push(`${file}: no "Where to next?" section`);
 
   // Internal links must resolve to a real page and end in a slash.
   for (const m of body.matchAll(/href="(\/[^"]*)"|\]\((\/[^)]*)\)/g)) {
@@ -73,8 +84,9 @@ for (const file of files) {
 
 // No diagram may still be a Plan 3 placeholder.
 if (existsSync(DIAGRAMS)) {
-  for (const name of readdirSync(DIAGRAMS)) {
-    const path = join(DIAGRAMS, name);
+  for (const entry of readdirSync(DIAGRAMS, { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    const path = join(DIAGRAMS, entry.name);
     if (readFileSync(path, 'utf8').includes('diagram-placeholder'))
       problems.push(`${path}: still a Plan 3 placeholder — Plan 4 must replace it`);
   }

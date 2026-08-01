@@ -1,25 +1,72 @@
 ---
-// docs-site/src/components/diagrams/BannerGeometry.astro
-//
-// PLACEHOLDER. Plan 4 (visual system) replaces this body with the real
-// theme-aware diagram. The file name and the zero-prop contract are fixed by
-// Plan 3 and must not change — 24 content pages import it as <BannerGeometry />.
-//
-// Plan 3's final audit (Task 27) fails if this placeholder is still present,
-// so a stub can never ship to ads.avinya.dev.
+import DiagramFrame from './DiagramFrame.astro';
 ---
 
-<figure class="diagram-placeholder" data-diagram="BannerGeometry">
-  <p>Diagram <code>BannerGeometry</code> is not authored yet.</p>
-</figure>
+<DiagramFrame id="banner-geometry" width={920} height={650}>
+  {/* the two ways a width arrives */}
+  <rect class="dg-node" x="24" y="26" width="240" height="72" rx="8" />
+  <text class="dg-title" x="144" y="56" text-anchor="middle">BannerAdView</text>
+  <text class="dg-sub" x="144" y="74" text-anchor="middle">measures its own container</text>
 
-<style>
-  .diagram-placeholder {
-    margin: 1.5rem 0;
-    padding: 1rem;
-    border: 2px dashed var(--sl-color-gray-4);
-    border-radius: 0.5rem;
-    text-align: center;
-    color: var(--sl-color-gray-3);
-  }
-</style>
+  <rect class="dg-node" x="24" y="128" width="240" height="72" rx="8" />
+  <text class="dg-title" x="144" y="158" text-anchor="middle">Headless caller</text>
+  <text class="dg-sub" x="144" y="176" text-anchor="middle">load(geometry = null)</text>
+
+  {/* the core's spine */}
+  <rect class="dg-node" x="560" y="26" width="330" height="72" rx="8" />
+  <text class="dg-title" x="725" y="54" text-anchor="middle">BannerCore.load()</text>
+  <text class="dg-sub" x="725" y="74" text-anchor="middle">geometry · sizePolicy · requestOptions</text>
+
+  <rect class="dg-node" x="560" y="128" width="330" height="72" rx="8" />
+  <text class="dg-title" x="725" y="154" text-anchor="middle">resolve the width</text>
+  <text class="dg-mono" x="725" y="178" text-anchor="middle">geometry?.widthDp ?: fallbackWidthDp()</text>
+
+  <path class="dg-edge" d="M264 62 H554" marker-end="url(#banner-geometry-arrow)" />
+  <path class="dg-edge" d="M264 164 H554" marker-end="url(#banner-geometry-arrow)" />
+  <path class="dg-edge" d="M725 98 V122" marker-end="url(#banner-geometry-arrow)" />
+
+  {/* the decision the CORE owns */}
+  <polygon class="dg-node" points="725,210 835,246 725,282 615,246" />
+  <text class="dg-label" x="725" y="250" text-anchor="middle">widthDp resolved?</text>
+  <path class="dg-edge" d="M725 200 V206" marker-end="url(#banner-geometry-arrow)" />
+
+  <rect class="dg-node dg-node--accent" x="180" y="214" width="300" height="64" rx="8" />
+  <text class="dg-label" x="330" y="240" text-anchor="middle">load fails with an explicit error</text>
+  <text class="dg-sub" x="330" y="260" text-anchor="middle">BannerCore owns the failure policy</text>
+  <path class="dg-edge" d="M615 246 H484" marker-end="url(#banner-geometry-arrow)" />
+  <text class="dg-sub" x="550" y="238" text-anchor="middle">no</text>
+
+  <rect class="dg-node" x="560" y="296" width="330" height="64" rx="8" />
+  <text class="dg-title" x="725" y="320" text-anchor="middle">platform.resolveSize()</text>
+  <text class="dg-sub" x="725" y="340" text-anchor="middle">sizePolicy + widthDp → platform ad size</text>
+  <path class="dg-edge" d="M725 282 V290" marker-end="url(#banner-geometry-arrow)" />
+  <text class="dg-sub" x="737" y="294">yes</text>
+
+  <rect class="dg-node" x="560" y="390" width="330" height="64" rx="8" />
+  <text class="dg-title" x="725" y="414" text-anchor="middle">platform.loadBanner()</text>
+  <text class="dg-sub" x="725" y="434" text-anchor="middle">size · sizePolicy · options · generation</text>
+  <path class="dg-edge" d="M725 360 V384" marker-end="url(#banner-geometry-arrow)" />
+
+  {/* explanatory panels */}
+  <rect class="dg-panel" x="24" y="474" width="430" height="150" rx="8" />
+  <text class="dg-title" x="40" y="500">The fallback is nullable on both platforms</text>
+  <text class="dg-sub" x="40" y="524">Android: the current Activity; null when</text>
+  <text class="dg-sub" x="40" y="542">there is none.</text>
+  <text class="dg-sub" x="40" y="560">iOS: the key window's bounds — never</text>
+  <text class="dg-sub" x="40" y="578">UIScreen.mainScreen, which sized banners</text>
+  <text class="dg-sub" x="40" y="596">wrong in Split View, Slide Over, popovers.</text>
+
+  <rect class="dg-panel" x="474" y="474" width="422" height="150" rx="8" />
+  <text class="dg-title" x="490" y="500">refresh() and registerGeometry()</text>
+  <text class="dg-sub" x="490" y="524">refresh() replays the WHOLE resolved</text>
+  <text class="dg-sub" x="490" y="542">request: geometry + size policy + options.</text>
+  <text class="dg-sub" x="490" y="560">registerGeometry() records a measured width</text>
+  <text class="dg-sub" x="490" y="578">without loading, for the Manual policy.</text>
+  <text class="dg-sub" x="490" y="596">A controller never reaches for an Activity</text>
+  <text class="dg-sub" x="490" y="614">or a UIScreen.</text>
+
+  <text class="dg-note" x="24" y="642">
+    CLAUDE.md invariant #6 — geometry is a host-supplied input, never something the controller
+    reaches for.
+  </text>
+</DiagramFrame>

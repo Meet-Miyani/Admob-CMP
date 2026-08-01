@@ -1,25 +1,20 @@
 ---
-// docs-site/src/components/diagrams/ConsentDecisionTree.astro
-//
-// PLACEHOLDER. Plan 4 (visual system) replaces this body with the real
-// theme-aware diagram. The file name and the zero-prop contract are fixed by
-// Plan 3 and must not change — 24 content pages import it as <ConsentDecisionTree />.
-//
-// Plan 3's final audit (Task 27) fails if this placeholder is still present,
-// so a stub can never ship to ads.avinya.dev.
+/**
+ * Rendered to inline SVG at build time by Plan 2's rehype-mermaid pipeline. See
+ * InitSequence.astro for why the Mermaid source lives in a .md file.
+ */
+import DiagramFigure from './DiagramFigure.astro';
+import { getDiagram } from './descriptions';
+import { Content as MermaidDiagram } from './mermaid/consent-decision-tree.md';
+
+const id = 'consent-decision-tree';
+const diagram = getDiagram(id);
 ---
 
-<figure class="diagram-placeholder" data-diagram="ConsentDecisionTree">
-  <p>Diagram <code>ConsentDecisionTree</code> is not authored yet.</p>
-</figure>
-
-<style>
-  .diagram-placeholder {
-    margin: 1.5rem 0;
-    padding: 1rem;
-    border: 2px dashed var(--sl-color-gray-4);
-    border-radius: 0.5rem;
-    text-align: center;
-    color: var(--sl-color-gray-3);
-  }
-</style>
+<DiagramFigure id={id} minWidth={820}>
+  <div class="dg-mermaid" role="img" aria-labelledby={`${id}-title ${id}-desc`}>
+    <span id={`${id}-title`} hidden>{diagram.title}</span>
+    <span id={`${id}-desc`} hidden>{diagram.desc}</span>
+    <MermaidDiagram />
+  </div>
+</DiagramFigure>

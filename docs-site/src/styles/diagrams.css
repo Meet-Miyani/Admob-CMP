@@ -1,0 +1,360 @@
+/* docs-site/src/styles/diagrams.css
+ *
+ * The shared visual language for every component in src/components/diagrams/.
+ * Imported once, by DiagramFigure.astro.
+ *
+ * COLOUR: this file declares no literal colour. Every diagram role is a bare
+ * var() reference to one of Plan 2's 19 --admob-* tokens, which are themselves
+ * defined per theme in tokens.css. Diagrams therefore re-theme with Starlight's
+ * data-theme switch and need no theme-specific rules of their own.
+ * test/diagram-contrast.test.ts re-derives the WCAG ratios from tokens.css for
+ * BOTH themes and fails on a literal colour.
+ *
+ * The token contract exposes exactly one accent, so diagrams never encode a
+ * category by hue: platform and role differences are carried by stroke dash
+ * pattern PLUS an explicit text label (WCAG 1.4.1 by construction).
+ */
+
+/* ------------------------------------------------------------ colour roles */
+
+:root {
+  /* Diagram background. Matches the page so a diagram reads as part of it. */
+  --dg-paper: var(--admob-paper);
+  /* Node fill. Decorative only — 1.07:1 against paper. The informational
+     boundary is always the --dg-stroke border, never this fill. */
+  --dg-node: var(--admob-surface);
+  /* Primary text. 16.13:1 light / 16.48:1 dark on paper. */
+  --dg-ink: var(--admob-ink);
+  /* Secondary text. 5.85:1 light / 7.14:1 dark on paper. */
+  --dg-muted: var(--admob-slate);
+  /* Every informational boundary. 5.85:1 light / 7.14:1 dark on paper. */
+  --dg-stroke: var(--admob-slate);
+  /* Emphasis. 3.62:1 light / 4.81:1 dark on paper — STROKES AND LARGE TEXT
+     ONLY. It fails AA for normal-size text in the light theme. */
+  --dg-accent: var(--admob-accent);
+  /* Decorative gridlines that carry no information on their own. */
+  --dg-hair: var(--admob-hair);
+}
+
+/* ----------------------------------------------------------------- metrics */
+
+:root {
+  --dg-sw: 1.5;
+  --dg-sw-strong: 2.25;
+  --dg-sw-hair: 1;
+  --dg-r: 8;
+  --dg-fs-title: 14px;
+  --dg-fs-label: 13px;
+  --dg-fs-body: 12px;
+  --dg-fs-caption: 11px;
+  --dg-dash-android: 6 4;
+  --dg-dash-ios: 2 4;
+  --dg-dash-flow: 4 4;
+}
+
+/* -------------------------------------------------------------- the figure */
+
+.dg-figure {
+  margin: 2rem 0;
+}
+
+/* The overflow contract. The scroll region — never the page body — absorbs a
+   diagram wider than the viewport. `tabindex` makes it keyboard-scrollable,
+   which a focusable scrollable region needs to satisfy WCAG 2.1.1. */
+.dg-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  background: var(--dg-paper);
+  border: var(--admob-border);
+  border-radius: var(--admob-radius);
+  padding: 1rem;
+}
+
+.dg-scroll:focus-visible {
+  outline: 2px solid var(--dg-accent);
+  outline-offset: 2px;
+}
+
+/* `min-width` is the authored viewBox width, set per diagram as --dg-min-w.
+   min-width beats max-width in CSS, so the SVG never renders below its authored
+   size and its text never shrinks — the container scrolls instead. */
+.dg-svg {
+  display: block;
+  width: 100%;
+  min-width: var(--dg-min-w, 0px);
+  height: auto;
+}
+
+.dg-caption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+  margin-top: 0.6rem;
+  color: var(--dg-muted);
+  font-family: var(--admob-font-body);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.dg-caption-title {
+  color: var(--dg-ink);
+  font-weight: 600;
+}
+
+.dg-caption-invariants {
+  font-family: var(--admob-font-mono);
+  font-size: 0.78rem;
+}
+
+/* Ink, not accent: this is normal-size text and accent fails AA in light. */
+.dg-alt-link {
+  color: var(--dg-ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* --------------------------------------------------------- SVG primitives */
+
+.dg-node {
+  fill: var(--dg-node);
+  stroke: var(--dg-stroke);
+  stroke-width: var(--dg-sw);
+}
+
+.dg-node--android {
+  stroke-dasharray: var(--dg-dash-android);
+}
+
+.dg-node--ios {
+  stroke-dasharray: var(--dg-dash-ios);
+}
+
+.dg-node--accent {
+  stroke: var(--dg-accent);
+  stroke-width: var(--dg-sw-strong);
+}
+
+.dg-panel {
+  fill: var(--dg-node);
+  stroke: var(--dg-stroke);
+  stroke-width: var(--dg-sw-hair);
+}
+
+.dg-title {
+  fill: var(--dg-ink);
+  font-family: var(--admob-font-display);
+  font-size: var(--dg-fs-title);
+  font-weight: 600;
+  letter-spacing: var(--admob-tracking-tight);
+}
+
+.dg-label {
+  fill: var(--dg-ink);
+  font-family: var(--admob-font-body);
+  font-size: var(--dg-fs-label);
+  font-weight: 500;
+}
+
+.dg-sub {
+  fill: var(--dg-muted);
+  font-family: var(--admob-font-body);
+  font-size: var(--dg-fs-body);
+  font-weight: 400;
+}
+
+.dg-note {
+  fill: var(--dg-muted);
+  font-family: var(--admob-font-body);
+  font-size: var(--dg-fs-caption);
+  font-weight: 400;
+}
+
+.dg-mono {
+  fill: var(--dg-ink);
+  font-family: var(--admob-font-mono);
+  font-size: var(--dg-fs-body);
+}
+
+.dg-edge {
+  fill: none;
+  stroke: var(--dg-stroke);
+  stroke-width: var(--dg-sw);
+}
+
+.dg-edge--flow {
+  stroke-dasharray: var(--dg-dash-flow);
+}
+
+.dg-edge--accent {
+  stroke: var(--dg-accent);
+  stroke-width: var(--dg-sw-strong);
+}
+
+.dg-axis {
+  fill: none;
+  stroke: var(--dg-stroke);
+  stroke-width: var(--dg-sw-hair);
+}
+
+.dg-grid {
+  fill: none;
+  stroke: var(--dg-hair);
+  stroke-width: var(--dg-sw-hair);
+}
+
+.dg-arrow {
+  fill: var(--dg-stroke);
+}
+
+.dg-arrow--accent {
+  fill: var(--dg-accent);
+}
+
+.dg-fill-hair {
+  fill: var(--dg-hair);
+}
+
+.dg-fill-accent-soft {
+  fill: var(--admob-accent-soft);
+}
+
+/* -------------------------------------------------------------- the table */
+/* PlatformMatrix is tabular data, so it ships as a real <table>: better for
+   assistive technology and better for indexing than SVG text in a grid. */
+
+.dg-table {
+  width: 100%;
+  /* Same overflow contract as the SVGs: below --dg-min-w the scroll region
+     scrolls rather than crushing the columns. */
+  min-width: var(--dg-min-w, 0px);
+  border-collapse: collapse;
+  color: var(--dg-ink);
+  font-family: var(--admob-font-body);
+  font-size: 0.9rem;
+}
+
+.dg-table + .dg-table {
+  margin-top: 1.5rem;
+}
+
+.dg-table caption {
+  caption-side: top;
+  padding-bottom: 0.5rem;
+  color: var(--dg-muted);
+  font-size: 0.85rem;
+  text-align: left;
+}
+
+.dg-table th,
+.dg-table td {
+  border: 1px solid var(--dg-stroke);
+  padding: 0.5rem 0.7rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.dg-table thead th {
+  background: var(--dg-node);
+  font-weight: 600;
+}
+
+.dg-table tbody th {
+  background: var(--dg-node);
+  font-weight: 500;
+}
+
+/* The glyph is decoration; the adjacent word carries the meaning. */
+.dg-mark {
+  font-family: var(--admob-font-mono);
+}
+
+/* ------------------------------------------------------- the Mermaid bridge */
+/* Plan 2 configures rehype-mermaid with `strategy: 'inline-svg'` and light-theme
+   themeVariables, so Mermaid bakes light colours into the SVG at build time and
+   they would survive a switch to the dark theme.
+ *
+ * Because the SVG is INLINE in the document, our CSS cascades into it, so these
+ * rules re-point every painted surface at the --dg-* roles.
+ *
+ * `!important` is required, not stylistic: Mermaid emits an in-SVG <style> whose
+ * selectors are id-scoped (`#mermaid-0 .node rect`) and would otherwise win.
+ *
+ * font-family is deliberately NOT overridden. Mermaid measured every label with
+ * Inter in a headless Chromium at build time; changing the family afterwards
+ * would desynchronise the text from the boxes drawn around it. */
+
+.dg-mermaid svg {
+  display: block;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: var(--dg-min-w, 0px);
+  height: auto !important;
+  background: transparent !important;
+}
+
+.dg-mermaid .node rect,
+.dg-mermaid .node polygon,
+.dg-mermaid .node circle,
+.dg-mermaid .node path,
+.dg-mermaid .cluster rect,
+.dg-mermaid .actor,
+.dg-mermaid rect.actor,
+.dg-mermaid .labelBox,
+.dg-mermaid .note,
+.dg-mermaid rect.note,
+.dg-mermaid .activation0,
+.dg-mermaid .activation1,
+.dg-mermaid .activation2 {
+  fill: var(--dg-node) !important;
+  stroke: var(--dg-stroke) !important;
+  stroke-width: 1.5px !important;
+}
+
+.dg-mermaid .nodeLabel,
+.dg-mermaid .edgeLabel,
+.dg-mermaid .label,
+.dg-mermaid text.actor,
+.dg-mermaid text.actor > tspan,
+.dg-mermaid .messageText,
+.dg-mermaid .noteText,
+.dg-mermaid .noteText > tspan,
+.dg-mermaid .labelText,
+.dg-mermaid .loopText,
+.dg-mermaid .loopText > tspan,
+.dg-mermaid .cluster-label text,
+.dg-mermaid .titleText,
+.dg-mermaid foreignObject div {
+  fill: var(--dg-ink) !important;
+  color: var(--dg-ink) !important;
+}
+
+/* Edge labels sit on top of their line, so their backing plate must be paper. */
+.dg-mermaid .edgeLabel rect,
+.dg-mermaid .labelBkg {
+  fill: var(--dg-paper) !important;
+  background-color: var(--dg-paper) !important;
+  opacity: 1 !important;
+}
+
+.dg-mermaid .edgePath .path,
+.dg-mermaid .flowchart-link,
+.dg-mermaid .messageLine0,
+.dg-mermaid .messageLine1,
+.dg-mermaid .actor-line,
+.dg-mermaid .loopLine,
+.dg-mermaid line {
+  stroke: var(--dg-stroke) !important;
+}
+
+.dg-mermaid .messageLine1,
+.dg-mermaid .actor-line {
+  stroke-dasharray: 3 3 !important;
+}
+
+.dg-mermaid .arrowheadPath,
+.dg-mermaid marker path,
+.dg-mermaid .marker {
+  fill: var(--dg-stroke) !important;
+  stroke: var(--dg-stroke) !important;
+}

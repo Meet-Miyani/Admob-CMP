@@ -1,0 +1,45 @@
+---
+/**
+ * Outer chrome shared by every diagram: the figure, the overflow-x scroll
+ * region, the caption, the invariant citation, and the link to the diagram's
+ * prose equivalent.
+ *
+ * This is the only place diagrams.css is imported. Astro emits it as a normal
+ * unlayered stylesheet, so it beats Starlight's own layered rules.
+ */
+import '../../styles/diagrams.css';
+import { getDiagram } from './descriptions';
+
+interface Props {
+  /** Key in descriptions.json. */
+  id: string;
+  /** Authored viewBox width in SVG user units. Below this the frame scrolls
+   *  rather than shrinking the text. Omit for non-SVG content. */
+  minWidth?: number;
+}
+
+const { id, minWidth } = Astro.props;
+const diagram = getDiagram(id);
+const invariants = diagram.invariants.map((n) => `#${n}`).join(', ');
+// Custom properties inherit, so setting this on the scroll region reaches the SVG.
+const scrollStyle = minWidth ? `--dg-min-w:${minWidth}px` : undefined;
+---
+
+<figure class="dg-figure" data-diagram={id}>
+  <div
+    class="dg-scroll"
+    tabindex="0"
+    role="group"
+    aria-label={`${diagram.title} — scrollable diagram`}
+    style={scrollStyle}
+  >
+    <slot />
+  </div>
+  <figcaption class="dg-caption">
+    <span class="dg-caption-title">{diagram.title}</span>
+    <span class="dg-caption-invariants">CLAUDE.md invariants {invariants}</span>
+    <a class="dg-alt-link" href={`/reference/diagrams-in-words/#${id}`}>
+      Read this diagram in words
+    </a>
+  </figcaption>
+</figure>

@@ -1,25 +1,93 @@
 ---
-// docs-site/src/components/diagrams/NativePoolLifecycle.astro
-//
-// PLACEHOLDER. Plan 4 (visual system) replaces this body with the real
-// theme-aware diagram. The file name and the zero-prop contract are fixed by
-// Plan 3 and must not change — 24 content pages import it as <NativePoolLifecycle />.
-//
-// Plan 3's final audit (Task 27) fails if this placeholder is still present,
-// so a stub can never ship to ads.avinya.dev.
+import DiagramFrame from './DiagramFrame.astro';
 ---
 
-<figure class="diagram-placeholder" data-diagram="NativePoolLifecycle">
-  <p>Diagram <code>NativePoolLifecycle</code> is not authored yet.</p>
-</figure>
+<DiagramFrame id="native-pool-lifecycle" width={940} height={620}>
+  {/* load path */}
+  <rect class="dg-node" x="24" y="56" width="170" height="54" rx="8" />
+  <text class="dg-title" x="109" y="80" text-anchor="middle">pool.preload(count)</text>
+  <text class="dg-sub" x="109" y="98" text-anchor="middle">one batch requested</text>
 
-<style>
-  .diagram-placeholder {
-    margin: 1.5rem 0;
-    padding: 1rem;
-    border: 2px dashed var(--sl-color-gray-4);
-    border-radius: 0.5rem;
-    text-align: center;
-    color: var(--sl-color-gray-3);
-  }
-</style>
+  <rect class="dg-node" x="234" y="56" width="210" height="54" rx="8" />
+  <text class="dg-title" x="339" y="80" text-anchor="middle">platform.loadBatch()</text>
+  <text class="dg-sub" x="339" y="98" text-anchor="middle">locking stays platform-side</text>
+
+  <rect class="dg-node" x="484" y="56" width="170" height="54" rx="8" />
+  <text class="dg-title" x="569" y="80" text-anchor="middle">pool inventory</text>
+  <text class="dg-sub" x="569" y="98" text-anchor="middle">TTL 1h, FIFO</text>
+
+  <rect class="dg-node dg-node--accent" x="694" y="56" width="170" height="54" rx="8" />
+  <text class="dg-title" x="779" y="80" text-anchor="middle">pool.acquire()</text>
+  <text class="dg-sub" x="779" y="98" text-anchor="middle">returns a token</text>
+
+  <path class="dg-edge" d="M194 83 H228" marker-end="url(#native-pool-lifecycle-arrow)" />
+  <path class="dg-edge" d="M444 83 H478" marker-end="url(#native-pool-lifecycle-arrow)" />
+  <path class="dg-edge" d="M654 83 H688" marker-end="url(#native-pool-lifecycle-arrow)" />
+
+  {/* the maxSize budget */}
+  <rect class="dg-node" x="444" y="134" width="250" height="26" rx="4" />
+  <rect class="dg-fill-accent-soft" x="446" y="136" width="136" height="22" rx="3" />
+  <path class="dg-edge" d="M584 134 V160" />
+  <text class="dg-note" x="514" y="178" text-anchor="middle">available</text>
+  <text class="dg-note" x="639" y="178" text-anchor="middle">in-use (leased)</text>
+  <text class="dg-note" x="569" y="196" text-anchor="middle">maxSize = available + in-use</text>
+
+  {/* render and release */}
+  <path class="dg-edge" d="M779 110 V224" marker-end="url(#native-pool-lifecycle-arrow)" />
+  <text class="dg-sub" x="789" y="170">token</text>
+
+  <rect class="dg-node" x="694" y="230" width="170" height="54" rx="8" />
+  <text class="dg-title" x="779" y="254" text-anchor="middle">NativeAdView</text>
+  <text class="dg-sub" x="779" y="272" text-anchor="middle">renders the leased ad</text>
+
+  <rect class="dg-node" x="454" y="230" width="180" height="54" rx="8" />
+  <text class="dg-title" x="544" y="254" text-anchor="middle">pool.release(token)</text>
+  <text class="dg-sub" x="544" y="272" text-anchor="middle">destroys the ad</text>
+
+  <rect class="dg-node" x="214" y="230" width="200" height="54" rx="8" />
+  <text class="dg-title" x="314" y="254" text-anchor="middle">slot freed</text>
+  <text class="dg-sub" x="314" y="272" text-anchor="middle">availableAds unchanged</text>
+
+  <path class="dg-edge" d="M694 257 H638" marker-end="url(#native-pool-lifecycle-arrow)" />
+  <path class="dg-edge" d="M454 257 H418" marker-end="url(#native-pool-lifecycle-arrow)" />
+
+  <path
+    class="dg-edge dg-edge--flow"
+    d="M314 230 V204 H109 V114"
+    marker-end="url(#native-pool-lifecycle-arrow)"
+  />
+  <text class="dg-sub" x="120" y="200">re-run preload(), not just acquire()</text>
+
+  {/* explanatory panels */}
+  <rect class="dg-panel" x="24" y="320" width="440" height="230" rx="8" />
+  <text class="dg-title" x="40" y="346">maxSize accounting</text>
+  <text class="dg-sub" x="40" y="372">AdCachePolicy.maxSize budgets available</text>
+  <text class="dg-sub" x="40" y="390">plus in-use ads. Do not redefine it.</text>
+  <text class="dg-sub" x="40" y="408">{'pool.availableAds: StateFlow<Int> publishes'}</text>
+  <text class="dg-sub" x="40" y="426">the available half only.</text>
+  <text class="dg-sub" x="40" y="444">release() destroys the ad — native ads are</text>
+  <text class="dg-sub" x="40" y="462">single-use — so it frees a maxSize slot</text>
+  <text class="dg-sub" x="40" y="480">without incrementing availableAds.</text>
+  <text class="dg-sub" x="40" y="498">Views key their acquisition effect on</text>
+  <text class="dg-sub" x="40" y="516">availableAds and re-run preload().</text>
+
+  <rect class="dg-panel" x="484" y="320" width="430" height="230" rx="8" />
+  <text class="dg-title" x="500" y="346">clear() contract</text>
+  <text class="dg-sub" x="500" y="372">clear() drains and destroys available</text>
+  <text class="dg-sub" x="500" y="390">inventory only.</text>
+  <text class="dg-sub" x="500" y="408">Leased ads stay alive until their release()</text>
+  <text class="dg-sub" x="500" y="426">— peek(token) keeps resolving afterwards.</text>
+  <text class="dg-sub" x="500" y="444">Clearing a fully-leased pool frees no</text>
+  <text class="dg-sub" x="500" y="462">capacity until those views dispose.</text>
+  <text class="dg-sub" x="500" y="480">A generation counter invalidates in-flight</text>
+  <text class="dg-sub" x="500" y="498">batches, so a completing load cannot</text>
+  <text class="dg-sub" x="500" y="516">repopulate a pool that was just cleared.</text>
+
+  <text class="dg-note" x="24" y="576">
+    Batch-assembly locking (the pending list and the cancelled flag) and iOS delegate retention stay
+    platform-side by construction;
+  </text>
+  <text class="dg-note" x="24" y="594">
+    the core never sees a delegate — CLAUDE.md invariants #3, #4 and #8.
+  </text>
+</DiagramFrame>
