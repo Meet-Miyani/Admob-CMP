@@ -95,7 +95,7 @@ function listFilesRecursive(dir: string): string[] {
 
 const STYLING_VIOLATION_CHECKS = {
   color: /#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(|oklch\(|oklab\(/,
-  transform: /\btransform\s*:/,
+  transform: /(?<![\w-])transform\s*:/,
   animation: /\banimation\s*:|@keyframes\b/,
   gradient: /linear-gradient\(|radial-gradient\(|conic-gradient\(|\bgradient\(/,
   textTransformUpper: /\btext-transform\s*:\s*uppercase\b/i,
@@ -116,14 +116,9 @@ function collectStyleContexts(source: string, isAstro: boolean): string {
   return contexts.join('\n');
 }
 
-function checkFileForStylingViolations(filePath: string): string[] {
-  const raw = readFileSync(filePath, 'utf8');
-  const isAstro = filePath.endsWith('.astro');
-  const isCss = filePath.endsWith('.css');
-  if (!isAstro && !isCss) return [];
-
-  const cssOnly = collectStyleContexts(raw, isAstro).replace(CSS_COMMENT, '');
-  const blocks = isAstro ? extractStyleBlocks(raw) : extractCssBlocks(cssOnly);
+function findStylingViolations(source: string, isAstro: boolean): string[] {
+  const cssOnly = collectStyleContexts(source, isAstro).replace(CSS_COMMENT, '');
+  const blocks = isAstro ? extractStyleBlocks(source) : extractCssBlocks(cssOnly);
   const violations: string[] = [];
 
   const colorHit = cssOnly.match(STYLING_VIOLATION_CHECKS.color);
@@ -165,6 +160,14 @@ function checkFileForStylingViolations(filePath: string): string[] {
   }
 
   return violations;
+}
+
+function checkFileForStylingViolations(filePath: string): string[] {
+  const raw = readFileSync(filePath, 'utf8');
+  const isAstro = filePath.endsWith('.astro');
+  const isCss = filePath.endsWith('.css');
+  if (!isAstro && !isCss) return [];
+  return findStylingViolations(raw, isAstro);
 }
 
 describe('landing.ts data module exports are wired', () => {
@@ -325,6 +328,16 @@ describe('landing component styling-boundary rules', () => {
       const violations = checkFileForStylingViolations(file);
       expect(violations, `${file} contains ${violations.join(', ')}`).toEqual([]);
     }
+  });
+
+  it('transform scan does not flag text-transform: lowercase (anchor against hyphen lookalike)', () => {
+    const violations = findStylingViolations('.x { text-transform: lowercase; }', false);
+    expect(violations).toEqual([]);
+  });
+
+  it('transform scan still flags a real transform: rotate(...) declaration', () => {
+    const violations = findStylingViolations('.x { transform: rotate(5deg); }', false);
+    expect(violations.some((v) => v.startsWith('transform declaration'))).toBe(true);
   });
 });
 
