@@ -218,7 +218,35 @@ Tests:
 
 Issues and pull requests are welcome. Questions, integration help, and feature ideas belong in [Discussions](https://github.com/Meet-Miyani/admob-compose-multiplatform/discussions).
 
-The public ABI is frozen. Additive changes are fine; any breaking change needs a written migration plan. After any public API change, run `./gradlew :admob-cmp-core:updateKotlinAbi` and commit the regenerated `api/*.klib.api` dump, or CI will fail.
+The public ABI is frozen. Additive changes are fine; any breaking change needs a written migration plan. After any public API change, run `./gradlew :admob-cmp-core:updateKotlinAbi` and commit the regenerated `api/*.klib.api` dump. Nothing in CI checks this — `checkKotlinAbi` runs only in `./scripts/release-readiness.sh`.
+
+### Before you open a PR
+
+This repository runs **no SDK tests in CI**, by design. The single
+[`.github/workflows/release.yml`](.github/workflows/release.yml) workflow runs
+only on `master` and on `workflow_dispatch`, and it only publishes, tags, and
+deploys. There is no pull-request CI and no verification job in the pipeline,
+so nothing checks a branch before *or* after merge. Verification is local and
+is the contributor's responsibility:
+
+1. Run `./scripts/release-readiness.sh` on macOS with **Xcode 26** installed.
+   It runs the Android host tests, the publication-metadata and Central
+   task-graph checks, the iOS tests and klib ABI check, the Maven Local
+   round trip, the Xcode consumer build, and the docs build. It exits with
+   `READINESS: PASS` on success and names the first failing section on
+   failure. Use `--skip-docs` for changes that do not touch the published
+   modules, `gradle/libs.versions.toml`, `gradle.properties`, or
+   `docs-site/`.
+2. There is no remote fallback. If you cannot run the script (no macOS, no
+   Xcode 26), say so in the PR rather than describing it as verified.
+3. Tagging, GitHub release creation, Maven Central publishing, and Cloudflare
+   deployment all happen automatically on merge to `master` when
+   `VERSION_NAME` has been bumped in both `gradle.properties` files. Two
+   Maven Central staging deployments still need a manual release in
+   [Central Portal](https://central.sonatype.com/publishing/deployments)
+   before the artifacts are publicly available — this is deliberate, because
+   Maven Central coordinates are immutable, and it is the last point at which
+   a bad release can be stopped.
 
 ## License
 

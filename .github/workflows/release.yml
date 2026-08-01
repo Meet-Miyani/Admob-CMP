@@ -1,0 +1,306 @@
+name: Release
+
+# There is deliberately NO `pull_request` trigger, and deliberately no test,
+# ABI-check, or Gradle verification job anywhere in this file — not even the
+# Ubuntu-runnable ones. SDK verification happens locally, before the PR, via
+# `scripts/release-readiness.sh`; see root AGENTS.md. Cheap runner minutes are
+# not the reason those jobs are absent, so "but it would only cost Ubuntu
+# minutes" is not a reason to add them back. This pipeline delivers; it does
+# not gate.
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A push to master reaches the upload/deploy steps, and aborting a run that is
+# mid-upload to Cloudflare or Maven Central leaves partial external state, so
+# overlapping runs of this pipeline are serialised rather than cancelled.
+concurrency:
+  group: release-pipeline
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    name: Gate
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.decide.outputs.version }}
+      should_release: ${{ steps.decide.outputs.should_release }}
+      should_deploy_docs: ${{ steps.decide.outputs.should_deploy_docs }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - id: decide
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -eu
+          lib="$(sed -n 's/^VERSION_NAME=//p' gradle.properties)"
+          plugin="$(sed -n 's/^VERSION_NAME=//p' admob-cmp-gradle-plugin/gradle.properties)"
+          [ -n "$lib" ] || { echo "VERSION_NAME missing from gradle.properties" >&2; exit 1; }
+          if [ "$lib" != "$plugin" ]; then
+            echo "Version mismatch: library is $lib but plugin is $plugin." >&2
+            echo "Bump both gradle.properties files in lockstep." >&2
+            exit 1
+          fi
+
+          on_master=false
+          [ "$GITHUB_REF" = "refs/heads/master" ] && on_master=true
+
+          tagged=false
+          git rev-parse -q --verify "refs/tags/$lib" >/dev/null 2>&1 && tagged=true
+
+          should_release=false
+          if [ "$on_master" = true ] && [ "$tagged" = false ]; then should_release=true; fi
+
+          docs=false
+          if [ "$should_release" = true ]; then
+            docs=true
+          elif [ "$GITHUB_EVENT_NAME" != "push" ]; then
+            docs=true
+          elif ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            docs=true
+          elif git diff --name-only "$BEFORE" "$GITHUB_SHA" | grep -qE \
+               '^(docs-site/|admob-cmp/|admob-cmp-core/|admob-cmp-compose/|gradle/libs\.versions\.toml|gradle\.properties|\.github/workflows/release\.yml)'; then
+            docs=true
+          fi
+
+          {
+            echo "version=$lib"
+            echo "should_release=$should_release"
+            echo "should_deploy_docs=$docs"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Decision
+        run: |
+          {
+            echo "### Release gate"
+            echo
+            echo "- version: \`${{ steps.decide.outputs.version }}\`"
+            echo "- should_release: \`${{ steps.decide.outputs.should_release }}\`"
+            echo "- should_deploy_docs: \`${{ steps.decide.outputs.should_deploy_docs }}\`"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ steps.decide.outputs.should_release }}" = "false" ] && [ "${{ steps.decide.outputs.should_deploy_docs }}" = "false" ]; then
+            echo "VERSION_NAME is unchanged and no docs-relevant paths were touched — nothing to do." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  # Dokka cannot run on Linux: the iOS cinterop tasks in the
+  # dokkaGeneratePublicationHtml graph (cinteropGmaIosArm64, cinteropUmpIosArm64,
+  # cinteropGmaIosSimulatorArm64, cinteropUmpIosSimulatorArm64, compileKotlinIosArm64,
+  # compileKotlinIosSimulatorArm64) require the iOS SDK headers shipped with
+  # Xcode, which the ubuntu-latest runner has no access to. Suppressing the iOS
+  # Dokka source set is not an option: admob-cmp-core/src/iosMain carries
+  # genuinely iOS-only public API (IosAdMob, BannerAdController.attachIosBanner,
+  # BannerAdController.registerIosBannerGeometry, NativeAdPool.peekIosNativeAd,
+  # iosAppForegroundState) and dropping it would silently gut /api/. This job
+  # therefore stays on macos-26.
+  api-reference:
+    name: Dokka API reference
+    needs: gate
+    if: needs.gate.outputs.should_deploy_docs == 'true'
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v6
+
+      # The cache MUST be restored before any step that gates on its
+      # `cache-hit` output. A step referencing `steps.dokka-cache.outputs` that
+      # runs earlier in the job sees an empty string, so `!= 'true'` is
+      # trivially true and the guard silently does nothing.
+      - uses: actions/cache@v4
+        id: dokka-cache
+        with:
+          path: docs-site/public/api
+          key: dokka-html-${{ hashFiles('admob-cmp/src/**', 'admob-cmp-core/src/**', 'admob-cmp-compose/src/**', 'admob-cmp/build.gradle.kts', 'admob-cmp-core/build.gradle.kts', 'admob-cmp-compose/build.gradle.kts', 'build.gradle.kts', 'gradle/libs.versions.toml', 'gradle.properties') }}
+
+      - uses: actions/setup-java@v5
+        if: steps.dokka-cache.outputs.cache-hit != 'true'
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v6
+        if: steps.dokka-cache.outputs.cache-hit != 'true'
+
+      - name: Assert Xcode 26 (iOS Simulator SDK 26)
+        if: steps.dokka-cache.outputs.cache-hit != 'true'
+        run: xcodebuild -showsdks | grep -q "iphonesimulator26" || { echo "SDK 26 not found"; xcodebuild -showsdks; exit 1; }
+
+      # admob-cmp-gradle-plugin is an included build, so Gradle builds it on
+      # demand as part of this task graph. Do not add an explicit
+      # `-p admob-cmp-gradle-plugin build` step: it is redundant, and `build`
+      # implies `check`, which would run the plugin's test suite in CI.
+      - name: Generate the Dokka API reference into docs-site/public/api
+        if: steps.dokka-cache.outputs.cache-hit != 'true'
+        run: ./gradlew syncApiDocsToDocsSite --no-configuration-cache
+
+      # The Dokka dump is thousands of small files and upload-artifact is
+      # pathologically slow on those; one tarball uploads in seconds.
+      - name: Tar the Dokka dump
+        run: tar -czf api-reference.tgz -C docs-site/public api
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: api-reference
+          path: api-reference.tgz
+          retention-days: 1
+          if-no-files-found: error
+
+  docs-site:
+    name: Build and deploy ads.avinya.dev
+    needs: [gate, api-reference]
+    if: needs.gate.outputs.should_deploy_docs == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Starlight's `lastUpdated` reads each page's git history. A shallow
+          # clone silently produces no timestamps and empty `dateModified`
+          # values in the TechArticle JSON-LD.
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: api-reference
+
+      - name: Unpack the Dokka API reference
+        run: |
+          mkdir -p docs-site/public
+          tar -xzf api-reference.tgz -C docs-site/public
+          if [ ! -f docs-site/public/api/index.html ]; then
+            echo "FATAL: docs-site/public/api/index.html is missing after unpacking the api-reference artifact." >&2
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: docs-site/package-lock.json
+
+      - name: Install docs-site dependencies
+        run: npm ci
+        working-directory: docs-site
+
+      # rehype-mermaid renders diagrams to static SVG at BUILD time and drives
+      # a headless Chromium to do it. `--with-deps` is Linux-only and installs
+      # the system libraries headless Chromium needs; on this ubuntu-latest
+      # runner it MUST NOT be dropped.
+      - name: Install the Chromium build used by rehype-mermaid
+        run: npx playwright install --with-deps chromium
+        working-directory: docs-site
+
+      # The one permitted test step in this pipeline: the docs site's own
+      # Vitest suite (9 tests, ~0.1s) over docs-site/src/lib/seo.ts. It guards
+      # the JSON-LD and OG-image output and is part of building the site, not
+      # of verifying the SDK. It is not a precedent for adding SDK test jobs.
+      - name: Unit-test the SEO helpers
+        run: npm test
+        working-directory: docs-site
+
+      - name: Build the site
+        run: npm run build
+        working-directory: docs-site
+
+      - name: Verify the built output
+        run: npm run verify
+        working-directory: docs-site
+
+      - name: Deploy to Cloudflare Pages
+        if: github.ref == 'refs/heads/master'
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=admob-cmp-docs --branch=master
+          workingDirectory: docs-site
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+  publish:
+    name: Publish to Maven Central
+    needs: gate
+    if: needs.gate.outputs.should_release == 'true'
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Assert Xcode 26 (iOS Simulator SDK 26)
+        run: xcodebuild -showsdks | grep -q "iphonesimulator26" || { echo "SDK 26 not found"; xcodebuild -showsdks; exit 1; }
+
+      - name: Publish to Maven Central
+        run: ./admob-cmp/scripts/publish-maven-central.sh
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_IN_MEMORY_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_IN_MEMORY_KEY_PASSWORD }}
+
+      - name: Record the manual Central Portal release steps
+        run: |
+          {
+            echo "### Maven Central staging deployments"
+            echo
+            echo "Two staging deployments were uploaded to Central Portal — one for the library, one for the Gradle plugin."
+            echo
+            echo "Both must be released manually in Central Portal before the artifacts are live:"
+            echo
+            echo "https://central.sonatype.com/publishing/deployments"
+            echo
+            echo "Releasing only one ships a library whose documented Gradle plugin does not exist at this version."
+            echo
+            echo "**No automated verification ran before this upload.** This pipeline runs no SDK tests;"
+            echo "the staging review in Central Portal is the only remaining check."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  tag-and-release:
+    name: Tag and cut GitHub release
+    needs: [gate, publish]
+    if: needs.gate.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Tag the release
+        run: |
+          set -eu
+          version="${{ needs.gate.outputs.version }}"
+          if git rev-parse -q --verify "refs/tags/$version" >/dev/null 2>&1; then
+            echo "Tag $version already exists — skipping tag creation."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$version" -m "Release $version" "$GITHUB_SHA"
+          git push origin "$version"
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          version="${{ needs.gate.outputs.version }}"
+          if gh release view "$version" >/dev/null 2>&1; then
+            echo "Release $version already exists — skipping release creation."
+            exit 0
+          fi
+          gh release create "$version" \
+            --title "$version" \
+            --notes "**Two Maven Central staging deployments were created and still require manual release in [Central Portal](https://central.sonatype.com/publishing/deployments):** one for the library, one for the Gradle plugin. Until both are released, this GitHub release refers to artifacts that are not yet publicly available." \
+            --generate-notes
