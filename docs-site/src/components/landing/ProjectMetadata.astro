@@ -1,0 +1,40 @@
+---
+/**
+ * Project metadata: a quiet, two-column definition list of release, license,
+ * Kotlin, platforms, and the Maven coordinate. On screens narrower than 720px
+ * each pair stacks into its own row separated by a hairline border.
+ *
+ * All values come from `landingMeta`; this component duplicates no literals.
+ */
+import { landingMeta } from '../../data/landing';
+import '../../styles/landing.css';
+
+const mavenCoordinateParts = landingMeta.mavenCoordinate.split(':');
+const mavenVersion = mavenCoordinateParts[mavenCoordinateParts.length - 1] ?? '';
+const platforms = `Android ${landingMeta.androidMinSdk}+ / iOS ${landingMeta.iosDeploymentTarget}+`;
+---
+
+<dl class="landing-meta">
+  <div>
+    <dt>Release</dt>
+    <dd>{mavenVersion}</dd>
+  </div>
+  <div>
+    <dt>License</dt>
+    <dd>{landingMeta.licenseName}</dd>
+  </div>
+  <div>
+    <dt>Kotlin</dt>
+    <dd>{landingMeta.kotlinVersion}</dd>
+  </div>
+  <div>
+    <dt>Platforms</dt>
+    <dd>{platforms}</dd>
+  </div>
+  <div>
+    <dt>Maven</dt>
+    <dd>
+      <code class="admob-font-mono">{landingMeta.mavenCoordinate}</code>
+    </dd>
+  </div>
+</dl>

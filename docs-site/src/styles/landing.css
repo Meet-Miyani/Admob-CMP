@@ -1,0 +1,76 @@
+/* docs-site/src/styles/landing.css
+ *
+ * Layout-only styles for the landing page. Every colour, font, and radius
+ * comes from --admob-* custom properties in tokens.css; this file only
+ * declares layout primitives, spacing variables, and responsive grids.
+ *
+ * Imported once, by ProjectMetadata.astro.
+ */
+
+:root {
+  --landing-section-gap: 2.5rem;
+  --landing-meta-gap: 0.75rem;
+  --landing-meta-pad-y: 0.625rem;
+}
+
+.landing-section {
+  margin-block: var(--landing-section-gap);
+}
+
+.landing-meta {
+  display: grid;
+  width: 100%;
+  max-width: var(--admob-reading);
+  margin-block: var(--landing-meta-gap);
+  grid-template-columns: max-content 1fr;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--admob-ink);
+}
+
+.landing-meta > div {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: max-content 1fr;
+  align-items: baseline;
+  gap: 0 var(--landing-meta-gap);
+  padding-block: var(--landing-meta-pad-y);
+  border-bottom: 1px solid var(--admob-hair);
+}
+
+.landing-meta > div:last-child {
+  border-bottom: 0;
+}
+
+.landing-meta dt {
+  color: var(--admob-slate);
+  font-weight: 500;
+}
+
+.landing-meta dd {
+  margin: 0;
+  color: var(--admob-ink);
+}
+
+.landing-meta dd > code,
+.landing-meta dd code.admob-font-mono {
+  display: inline-block;
+  padding: 2px 6px;
+  border: 1px solid var(--admob-hair);
+  border-radius: var(--admob-radius);
+  background: transparent;
+  font-family: var(--admob-font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+@media (max-width: 720px) {
+  .landing-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-meta > div {
+    grid-template-columns: 1fr;
+    gap: 0.125rem 0;
+  }
+}
