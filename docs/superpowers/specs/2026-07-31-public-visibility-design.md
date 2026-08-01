@@ -1,8 +1,19 @@
 # AdMob CMP — End-to-End Public Visibility Design
 
 **Date:** 2026-07-31
-**Status:** Approved (design), pending spec review
+**Status:** In progress — Plans 1–2, Plan 3's authored content, and the Native Reference docs theme are implemented. Plan 3's diagram/screenshot integration and final audit remain pending with Plans 4 and 7; Plans 4–7 are otherwise pending.
 **Scope:** Repository identity, SEO, developer documentation site, and off-site distribution for `dev.avinya.ads:admob-cmp`.
+
+## Visual design authority
+
+The documentation site's authoritative visual contract is
+[`2026-08-01-docs-native-reference-theme-design.md`](./2026-08-01-docs-native-reference-theme-design.md).
+It supersedes the earlier `avinya.dev`/editorial direction wherever this spec or
+one of its seven implementation plans mentions Space Grotesk, Inter, permanent
+dark code surfaces, large radii, shadows, decorative labels, spatial hover
+motion, or a fixed 19-token contract. The visibility program still owns content,
+information architecture, diagrams, screenshots, SEO, and distribution; the
+Native Reference specification owns how docs-site surfaces look and behave.
 
 ## 1. Problem
 
@@ -56,8 +67,8 @@ Worse, the queries the real audience types — `compose multiplatform admob`, `k
 | Maven coordinate | unchanged: `dev.avinya.ads:admob-cmp` | Published and consumed. Renaming breaks users for a marginal gain. |
 | Brand name | "AdMob CMP" | Retained. The README reconciles brand, repo slug, and coordinate in one line. |
 | Docs host | `ads.avinya.dev` | See §4. |
-| Site shape | Marketing landing page + `/docs/` + `/api/` | Landing targets commercial intent; docs target informational long-tail; they do not cannibalize. |
-| Docs framework | Astro + Starlight | `avinya.dev` is already Astro; tokens and toolchain carry over. |
+| Site shape | Landing page at `/` + root documentation sections + `/api/` | Documentation URLs carry no redundant `/docs/` prefix. |
+| Docs framework | Astro + Starlight | Starlight remains recognizable; the Native Reference layer supplies compact typography, paired theme surfaces, and Avinya's restrained accent. |
 | Docs location | Inside the SDK repo | API changes and doc updates ship in the same PR. |
 | Visuals | Diagrams first, device screenshots close behind | Originally deferred on the belief that 5 of 6 formats were unreachable in the demo. That was based on a stale `CLAUDE.md` note — see §10, Plan 7. Screenshots need capture work only, no app development. |
 | AI crawlers | Allowed on the docs host, with `llms.txt` | A large share of SDK integration now happens through a coding assistant. |
@@ -255,13 +266,28 @@ android               ios                    ump          gdpr
 
 ### Plan 2 — Documentation site foundation
 
-Scaffold Starlight in `docs-site/`. Lift design tokens from `avinya.dev` (Space Grotesk / Inter, existing theme system). SEO plumbing: `@astrojs/sitemap`, per-page canonical and OG, JSON-LD (`SoftwareSourceCode`, `TechArticle`, `FAQPage`, `BreadcrumbList`), permissive `robots.txt` for the docs host, `starlight-llms-txt`, generated OG cards, Pagefind search. Wire Dokka 2.2.0 into the Gradle build and publish HTML to `/api/`. Cloudflare Pages project, `ads.avinya.dev` custom domain, GitHub Actions deploy job. Provision **Google Search Console** for the new host and submit the sitemap — without it the §12 metrics cannot be measured.
+Scaffold Starlight in `docs-site/` and apply the Native Reference visual system:
+native UI typography, paired light/dark code surfaces, compact technical-document
+density, accessible structured tables, 6px radii, one-pixel borders, no shadows,
+and restrained Avinya accent usage. SEO plumbing: `@astrojs/sitemap`, per-page
+canonical and OG, JSON-LD (`SoftwareSourceCode`, `TechArticle`, `FAQPage`,
+`BreadcrumbList`), permissive `robots.txt` for the docs host,
+`starlight-llms-txt`, generated OG cards using bundled Noto Sans, and Pagefind
+search. Wire Dokka 2.2.0 into the Gradle build and publish HTML to `/api/`.
+Cloudflare Pages project, `ads.avinya.dev` custom domain, and deployment through
+the repository's existing release workflow. Provision **Google Search Console**
+for the new host and submit the sitemap — without it the §12 metrics cannot be
+measured.
 
 ### Plan 3 — Documentation content architecture
 
 Build the IA in §8. Rewrite and expand all existing docs to 800–1,500 words per guide with worked examples and question-based H2s. Author the net-new pages: What is AdMob CMP, Quickstart, Play Data safety, Revenue & paid events, Caching/retry/timeouts, Compatibility, Troubleshooting, Changelog, Roadmap, Contributing, Using with AI agents.
 
 ### Plan 4 — Visual system
+
+The diagrams inherit the Native Reference token values and typography. Their
+outer chrome is flat and functional: theme-aware neutral surfaces, one-pixel
+borders, at most 6px radii, no shadows, and no decorative motion.
 
 Eight theme-aware diagrams:
 
@@ -276,7 +302,11 @@ Eight theme-aware diagrams:
 
 ### Plan 5 — Landing page
 
-Hero targeting `compose multiplatform admob`. Six-format showcase grid. Neutral capability matrix. Badge and compatibility strip. Real code sample. Roadmap teaser. CTA into Quickstart.
+Hero targeting `compose multiplatform admob`. Six-format showcase grid. Neutral
+capability matrix. Compact project metadata and compatibility rows. Real code
+sample. Roadmap teaser. CTA into Quickstart. The page remains a technical entry
+point, not a product-console surface: no decorative eyebrow system, pill field,
+raised panels, oversized rounding, shadows, or spatial hover effects.
 
 ### Plan 6 — Launch and off-site distribution
 
@@ -288,7 +318,13 @@ Verify the klibs.io listing (auto-indexes within ~1 month given OSS + GitHub + `
 
 The current demo (`shared/src/adCapableMain/kotlin/dev/avinya/admob/cmp/demo/PlatformAdDemo.adCapable.kt`) renders `AdDebugScreen(catalog = AdDebugCatalog.Test)`, and `AdDebugCatalog.Test` already defines placements for **all six formats** — banner, collapsible banner, native, interstitial, rewarded, rewarded interstitial, and app-open — surfaced through `FormatsTab`, `LayoutsTab`, and `DiagnosticsTab`.
 
-So no demo-app development is required. This plan is: run the existing demo on an Android emulator and an iOS simulator, capture every format, produce light/dark and phone/tablet variants, optimise to AVIF/WebP with correct `alt` text, and retrofit into Plans 4 and 5. **Fix the stale `CLAUDE.md:107` note as part of this plan.**
+So no demo-app development is required. This plan is: run the existing demo on
+an Android emulator and an iOS simulator, capture every format in the harness's
+faithful dark appearance with the planned phone/tablet coverage, and capture
+light/dark pairs only for the OS-rendered UMP consent and iOS ATT surfaces.
+Astro generates AVIF/WebP delivery from normalized PNG sources with correct
+`alt` text before the assets are integrated into Plans 3 and 5. **Fix the stale
+`CLAUDE.md:107` note as part of this plan.**
 
 Because the cost collapsed, this plan may be resequenced ahead of Plan 5 so the landing page ships with real screenshots rather than retrofitting them.
 

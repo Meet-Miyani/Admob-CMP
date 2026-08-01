@@ -2,6 +2,17 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Status:** Implemented. Retained as the execution record for Visibility Plan 1.
+
+**Visual authority:** Repository README and GitHub metadata remain governed by
+this plan. Any future regeneration of the GitHub social preview should align its
+typography and restraint with the
+[`Documentation Native Reference Theme Design`](../specs/2026-08-01-docs-native-reference-theme-design.md):
+use a neutral sans family, the Avinya coral as a limited accent, and flat
+one-pixel geometry rather than gradients, pill clusters, shadows, or decorative
+display typography. The published social preview is an off-site brand asset and
+does not alter the docs-site theme contract.
+
 **Goal:** Rename the repository to `admob-compose-multiplatform`, replace the JetBrains-template root README with a keyword-bearing product README, and fix every piece of GitHub and POM metadata that currently makes the library unfindable — plus the cross-repo `avinya.dev` canonical defect that blocks Plan 2.
 
 **Architecture:** This is Plan 1 of the seven-plan program in `docs/superpowers/specs/2026-07-31-public-visibility-design.md` §10. It is almost entirely metadata and prose: a GitHub-side rename plus settings changes (done through `gh` and, for the social preview only, the web UI), and a small set of local file edits (root `README.md`, root `LICENSE`, five `gradle.properties` files, two cinterop `.def` files). One task (Task 8) is in a **different repository** whose path is unknown and must be located first. No production Kotlin source is touched and the public ABI is untouched.

@@ -2,6 +2,17 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Status:** Pending.
+
+**Visual authority and ownership:** This plan owns raw capture fidelity,
+filenames, manifest data, alt text, and platform/theme availability. The
+[`Documentation Native Reference Theme Design`](../specs/2026-08-01-docs-native-reference-theme-design.md)
+owns how screenshots are presented inside `docs-site/`; Plan 3 owns guide-page
+placement and Plan 5 owns landing-page placement. Dark-only debug-harness
+captures are faithful source content, not permanent-dark site UI, and must not be
+replaced with fabricated light variants. Consumers use neutral one-pixel frames,
+at most 6px radii, no shadows, and no spatial hover motion.
+
 **Goal:** Capture, normalise and publish a complete, machine-verified set of device screenshots of every `admob-cmp` ad format on Android and iOS into `docs-site/src/assets/screenshots/`, ready for Plan 5's landing-page showcase and Plan 3's per-format doc pages.
 
 **Architecture:** The demo app already renders every format — `PlatformAdDemo.adCapable.kt` mounts `AdDebugScreen(catalog = AdDebugCatalog.Test)`, and `AdDebugCatalog.Test` defines placements for banner, collapsible banner, native, interstitial, rewarded, rewarded interstitial and app-open. So this plan does **no demo-app feature development**. It adds (a) a re-runnable pre-flight gate, (b) two capture scripts that normalise device chrome before grabbing the framebuffer, (c) a JSON manifest of every screenshot with its dimensions and `alt` text, (d) a Node verifier that fails if the manifest and the files on disk disagree, and (e) one Astro component that is the single integration point for Plans 3 and 5. One stale documentation note and one missing one-line `AdDebugRecorder.install` call are fixed along the way.
@@ -107,7 +118,9 @@ Every task's requirements implicitly include this section.
 | `docs-site/src/assets/screenshots/*.png` | 34 committed source assets. | 6–13 |
 | `docs-site/src/components/Screenshot.astro` | The only supported way for Plans 3 and 5 to embed a screenshot. Resolves the manifest entry, emits `<Picture>` with AVIF+WebP and explicit dimensions. | 15 |
 
-`docs-site/` does not exist yet — Plan 2 scaffolds Astro into it. Every step below uses `mkdir -p`, so this plan works whether it runs before or after Plan 2.
+`docs-site/` is fully scaffolded and its Native Reference visual gates are part
+of local release readiness. Capture tasks may create only the missing screenshot
+directories and assets; they must preserve the existing site structure.
 
 ---
 
@@ -460,6 +473,7 @@ Build the contract before any pixels exist, so every later task has a failing/pa
 - Create: `docs-site/src/assets/screenshots/screenshots.json`
 - Create: `docs-site/scripts/screenshots.test.mjs`
 - Create: `docs-site/scripts/record-screenshot.mjs`
+- Modify: `docs-site/package.json` (include the Node screenshot verifier in `npm test`)
 
 **Interfaces:**
 - Consumes: nothing.
@@ -467,7 +481,7 @@ Build the contract before any pixels exist, so every later task has a failing/pa
   - `screenshots.json` shape: `{ "$contract": { version: number, namingGrammar: string, platforms: string[], themes: string[], focusValues: string[], requiredSubjects: string[], consumers: string[], licensing: string, themeNote: string }, "screenshots": Entry[] }` where
     `Entry = { file: string, subject: string, platform: "android"|"ios", deviceClass: "phone"|"tablet", theme: "light"|"dark", device: string, width: number, height: number, focus: "top"|"center"|"bottom", alt: string }`.
   - `record-screenshot.mjs` CLI: `node docs-site/scripts/record-screenshot.mjs --file <name.png> --subject <s> --platform <android|ios> --device-class <phone|tablet> --theme <light|dark> --device <string> --focus <top|center|bottom> --alt <string>`. Upserts by `file`, reads `width`/`height` from the PNG header, rewrites the manifest sorted by `file`.
-  - `node --test docs-site/scripts/screenshots.test.mjs` is the gate every later task runs.
+  - `node --test docs-site/scripts/screenshots.test.mjs` is the focused gate every later capture task runs; `npm test` runs it after Vitest so local release readiness cannot omit it.
 
 - [ ] **Step 1: Write the verifier (the failing test)**
 
@@ -589,7 +603,7 @@ Create `docs-site/src/assets/screenshots/screenshots.json`:
     ],
     "consumers": [
       "docs/superpowers/plans/2026-07-31-visibility-5-landing-page.md",
-      "docs/superpowers/plans/2026-07-31-visibility-3-docs-content.md"
+      "docs/superpowers/plans/2026-07-31-visibility-3-documentation-content.md"
     ],
     "themeNote": "The AdDebugScreen harness is theme-fixed: DebugTokens declares a fixed dark palette and explicitly does not inherit the host theme, and AdTemplates hardcodes white native-card backgrounds. A light variant of a harness surface therefore cannot exist, so every harness capture carries the dark theme token. Only the Google UMP consent form and the iOS ATT prompt are OS-rendered and respond to device appearance; those alone are captured in both light and dark.",
     "licensing": "Every image shows a Google TEST ad served from Google's public test ad units (publisher ca-app-pub-3940256099942544) against Google's sample AdMob App IDs, with AdPlacement.strictTestMode enabled so a production ad unit id throws. Google supplies these demonstration creatives so developers can verify an integration, and they are self-labelled as test ads; reproducing them in this SDK's own integration documentation is illustrative, nominative use of the same kind as the AdMob trademark reference in the README. Real, non-test ad creatives must NEVER appear in published material: a live creative is a third party's copyrighted advertisement delivered under a serving licence with no redistribution right, publishing it implies an advertiser endorsement that does not exist, and pairing it with marketing copy risks reading as an ad-performance or revenue claim under AdMob policy. No screenshot may show a real publisher id, a real ad unit id, or a real advertising identifier (IDFA/GAID). This is the project's operating rule, not legal advice.",
@@ -687,12 +701,23 @@ node -e "console.log(require('./docs-site/src/assets/screenshots/screenshots.jso
 
 Expected: `0`.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 7: Wire the verifier into the existing docs test gate**
+
+Update `docs-site/package.json` so the existing `test` script runs both suites:
+
+```json
+"test": "vitest run && node --test scripts/screenshots.test.mjs"
+```
+
+Run `cd docs-site && npm test`. Expected: the existing Vitest suite and the
+empty-manifest screenshot contract both pass.
+
+- [ ] **Step 8: Commit**
 
 ```bash
 chmod +x docs-site/scripts/record-screenshot.mjs
 git add docs-site/scripts/screenshots.test.mjs docs-site/scripts/record-screenshot.mjs \
-        docs-site/src/assets/screenshots/screenshots.json
+        docs-site/src/assets/screenshots/screenshots.json docs-site/package.json
 git commit -m "feat(docs): add screenshot manifest, verifier and recorder CLI"
 ```
 
@@ -704,7 +729,7 @@ Two scripts that make a capture deterministic: normalise the status bar and appe
 
 **Design decisions this task locks in — do not revisit later:**
 
-1. **No device frames.** A bezel adds 30–45% dead pixels that Astro then ships at every responsive breakpoint, which directly hurts the LCP of the landing page Plan 5 owns; a rendered handset also dates the asset to one hardware generation and has to be re-done at the next. CSS on the site can supply a rounded corner and a shadow for free, and can change in one line.
+1. **No device frames.** A bezel adds 30–45% dead pixels that Astro then ships at every responsive breakpoint, which directly hurts the LCP of the landing page Plan 5 owns; a rendered handset also dates the asset to one hardware generation and has to be re-done at the next. Native Reference consumers supply only the shared 6px radius and neutral one-pixel boundary—never a device frame or shadow.
 2. **No cropping.** Every committed PNG is the full framebuffer. Any crop geometry hard-coded into a plan rots the moment a `DebugTokens` dp value changes, and a cropped source cannot be re-framed without a re-capture. Instead the operator composes the shot *in the app* — scroll the target card into the content area, collapse the console — and the manifest's `focus` field tells the consumer where to anchor `object-position` when it crops to a card aspect ratio in CSS.
 3. **Shrink-only resize to a 1200px cap.** Raw device buffers are 1206–1600px wide; 1200 is a sensible 2x-density source for a card that renders around 400–600 CSS px, and `>` guarantees nothing is ever upscaled.
 4. **`-strip` on every image.** Removes any embedded metadata before the asset is published.
@@ -1961,7 +1986,7 @@ const widths = [...new Set([400, 800, entry.width])].filter((w) => w <= entry.wi
     display: block;
     max-width: 100%;
     height: auto;
-    border-radius: 0.75rem;
+    border-radius: var(--admob-radius);
     /* Sources are committed uncropped and unframed (Plan 7, Task 5). A consumer that
        wants a card-shaped crop sets its own aspect-ratio and object-fit; --screenshot-focus
        carries the manifest's hint for where to anchor. */
@@ -1975,13 +2000,13 @@ const widths = [...new Set([400, 800, entry.width])].filter((w) => w <= entry.wi
 Append to `docs-site/scripts/screenshots.test.mjs`:
 
 ```js
-test('consumer contract: every subject Plans 3 and 5 need is available on both platforms', () => {
+test('consumer contract: the complete format inventory is available on both platforms', () => {
   for (const subject of contract.requiredSubjects) {
     for (const platform of contract.platforms) {
       const hit = entries.find(
         (e) => e.subject === subject && e.platform === platform && e.deviceClass === 'phone' && e.theme === 'dark',
       );
-      assert.ok(hit, `Plan 5's showcase needs ${subject}-${platform}-dark.png and it is missing`);
+      assert.ok(hit, `format inventory is missing ${subject}-${platform}-dark.png`);
     }
   }
   // The consent flow and the iOS ATT prompt are the two OS-rendered surfaces, so they
@@ -2012,35 +2037,46 @@ node --test docs-site/scripts/screenshots.test.mjs
 
 Expected: PASS, `# pass 7`, `# fail 0`.
 
-- [ ] **Step 4: Build the site if Astro is already scaffolded**
+- [ ] **Step 4: Run deterministic docs and repository verification**
 
-The component needs `astro:assets`, which only resolves once Plan 2 has scaffolded Astro into `docs-site/`.
+Plan 2 and the Native Reference theme are already implemented, so no deferral is
+acceptable. Run the complete local chain before committing Task 15:
 
 ```bash
-if [ -f docs-site/package.json ]; then
-  (cd docs-site && npm install && npx astro build)
-else
-  echo "docs-site/package.json absent — Plan 2 has not run yet; Astro build check deferred to Plan 5"
-fi
+cd /Users/meetmiyani/Documents/MeetMiyani/MEET/AdmobCMP/docs-site
+npm test
+npm run build
+npm run verify
+npm run check:theme
+npm run check:overflow
+cd ..
+git add -N docs-site/src/components/Screenshot.astro docs-site/scripts/screenshots.test.mjs
+git diff --check
+./scripts/release-readiness.sh
 ```
 
-Expected: either a successful `astro build` with AVIF and WebP derivatives emitted under `docs-site/dist/_astro/`, or the deferral message. Both are acceptable outcomes; the Node verifier is the gate this plan owns.
+Expected: all docs checks pass, the Astro build emits AVIF and WebP derivatives
+under `docs-site/dist/_astro/`, `git diff --check` is clean, and the full
+eight-section readiness run ends in `READINESS: PASS`.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add docs-site/src/components/Screenshot.astro docs-site/scripts/screenshots.test.mjs
+git diff --cached --check
 git commit -m "feat(docs): add Screenshot.astro as the single consumer surface for device screenshots"
 ```
 
 ---
 
-## Handoff to Plans 5, 3 and 4
+## Available screenshot inventory and consumer handoff
 
-**Plan 5 (landing page)** did not exist when this plan was written, so **this plan is the authority on screenshot naming**. Plan 5 must:
+**This plan is the authority on screenshot naming and availability; Plan 5 owns
+landing-page selection.** Plan 5 must:
 
 - Use `<Screenshot name="…" />`; never import a PNG directly and never hand-write `alt`.
-- Build its format showcase grid from exactly these fourteen files — the seven `requiredSubjects`, phone, dark, on both platforms:
+- Treat these fourteen phone/dark files as the available format inventory, not a
+  requirement to render all fourteen on the landing page:
 
   | Subject | Android | iOS |
   |---|---|---|
@@ -2052,11 +2088,16 @@ git commit -m "feat(docs): add Screenshot.astro as the single consumer surface f
   | rewarded-interstitial | `rewarded-interstitial-android-dark.png` | `rewarded-interstitial-ios-dark.png` |
   | app-open | `app-open-android-dark.png` | `app-open-ios-dark.png` |
 
-  `rewarded` and `rewarded-interstitial` are distinct formats with distinct screenshots — the grid needs both rows, not one standing in for the other.
-- Set `loading="eager"` on at most the one above-the-fold hero image and leave the rest lazy.
+  `rewarded` and `rewarded-interstitial` are distinct formats with distinct
+  screenshots. The landing page selects at most one representative image per
+  six-format record; `banner-collapsible` may be explained under Banner or left
+  to the banner guide. Selection is a data-only mapping in Plan 5.
+- Keep landing screenshots below the initial hero and lazy-load them.
 - Not request a `-light` harness variant. None exists, and Task 5's Global Constraints explain why.
 
-**Plan 3 (per-format doc pages)** maps as follows:
+**Plan 3 (per-format doc pages)** owns final guide-page placement. The following
+table is the available inventory for that decision, not a requirement to place
+every listed asset:
 
 | Page | Screenshots |
 |---|---|
@@ -2070,7 +2111,15 @@ git commit -m "feat(docs): add Screenshot.astro as the single consumer surface f
 | `/advanced/mediation/`, `/advanced/revenue-events/` | `diagnostics-{android,ios}-dark.png`, `console-{android,ios}-dark.png` |
 | `/reference/troubleshooting/` | `diagnostics-{android,ios}-dark.png`, `console-{android,ios}-dark.png` |
 
-**Plan 4 (diagrams)**: the UMP → ATT → initialize sequence diagram should sit directly above `consent-ios-dark.png` and `att-ios-dark.png` on `/privacy/app-tracking-transparency/` — the diagram states the ordering rule and the two screenshots are the evidence.
+**Plan 4 (diagrams)** makes the UMP → ATT → initialize sequence available to
+Plan 3. On `/privacy/app-tracking-transparency/`, Plan 3 may place that diagram
+near `consent-ios-dark.png` and `att-ios-dark.png` when the combination improves
+the ordering explanation; this is contextual inventory, not a placement mandate.
+
+After `Screenshot.astro` or any consumer integration changes, run the complete
+docs chain from `docs-site/`: `npm test`, `npm run build`, `npm run verify`,
+`npm run check:theme`, and `npm run check:overflow`. Both browser gates must use
+their isolated fresh-build servers unless `PREVIEW_URL` is explicitly supplied.
 
 ---
 
