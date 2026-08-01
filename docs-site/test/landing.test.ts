@@ -587,4 +587,289 @@ describe('index.mdx quickstart and iOS note', () => {
       0
     );
   });
+
+  it('imports the CompatibilityList, RoadmapSummary, and LandingFooter components', () => {
+    expect(source).toMatch(
+      /import\s+CompatibilityList\s+from\s+['"]\.\.\/\.\.\/components\/landing\/CompatibilityList\.astro['"]/
+    );
+    expect(source).toMatch(
+      /import\s+RoadmapSummary\s+from\s+['"]\.\.\/\.\.\/components\/landing\/RoadmapSummary\.astro['"]/
+    );
+    expect(source).toMatch(
+      /import\s+LandingFooter\s+from\s+['"]\.\.\/\.\.\/components\/landing\/LandingFooter\.astro['"]/
+    );
+  });
+
+  it('renders CompatibilityList, RoadmapSummary, and LandingFooter in plan order after CapabilityMatrix', () => {
+    const order = ['<CapabilityMatrix', '<CompatibilityList', '<RoadmapSummary', '<LandingFooter']
+      .map((tag) => ({ tag, index: source.indexOf(tag) }))
+      .map(({ tag, index }) => ({ tag, index }));
+    for (const { tag, index } of order) {
+      expect(index, `${tag} must appear in index.mdx`).toBeGreaterThan(-1);
+    }
+    for (let i = 1; i < order.length; i += 1) {
+      expect(
+        order[i].index,
+        `${order[i].tag} must appear after ${order[i - 1].tag}`
+      ).toBeGreaterThan(order[i - 1].index);
+    }
+  });
+});
+
+const compatibilityListPath = fileURLToPath(
+  new URL('../src/components/landing/CompatibilityList.astro', import.meta.url)
+);
+const roadmapSummaryPath = fileURLToPath(
+  new URL('../src/components/landing/RoadmapSummary.astro', import.meta.url)
+);
+const landingFooterPath = fileURLToPath(
+  new URL('../src/components/landing/LandingFooter.astro', import.meta.url)
+);
+
+describe('CompatibilityList.astro contracts', () => {
+  const source = readFileSync(compatibilityListPath, 'utf8');
+
+  it('exists as an Astro component', () => {
+    expect(existsSync(compatibilityListPath)).toBe(true);
+  });
+
+  it('imports InitSequence and PlatformMatrix by their fixed names', () => {
+    expect(source).toMatch(
+      /import\s+InitSequence\s+from\s+['"]\.\.\/diagrams\/InitSequence\.astro['"]/
+    );
+    expect(source).toMatch(
+      /import\s+PlatformMatrix\s+from\s+['"]\.\.\/diagrams\/PlatformMatrix\.astro['"]/
+    );
+  });
+
+  it('mentions the klib binary compatibility caveat', () => {
+    expect(source.toLowerCase()).toMatch(/klib/);
+    expect(source.toLowerCase()).toMatch(/binary compatibility/);
+  });
+
+  it('renders landingMeta fields in canonical order (Kotlin, Compose Multiplatform, Android, iOS, Maven coordinate)', () => {
+    const expectedKeys = [
+      'kotlinVersion',
+      'composeMultiplatformVersion',
+      'androidMinSdk',
+      'iosDeploymentTarget',
+      'mavenCoordinate',
+    ];
+    const positions = expectedKeys.map((key) => ({ key, index: source.indexOf(key) }));
+    for (const { key, index } of positions) {
+      expect(index, `landingMeta.${key} must be referenced in CompatibilityList.astro`).toBeGreaterThan(
+        -1
+      );
+    }
+    for (let i = 1; i < positions.length; i += 1) {
+      expect(
+        positions[i].index,
+        `landingMeta.${positions[i].key} must appear after landingMeta.${positions[i - 1].key}`
+      ).toBeGreaterThan(positions[i - 1].index);
+    }
+  });
+
+  it('renders a <dl> with five pairs and the expected labels', () => {
+    expect(source).toMatch(/<dl[^>]*class="landing-compatibility__list"/);
+    const dlBlock = source.match(
+      /<dl[^>]*class="landing-compatibility__list"[^>]*>([\s\S]*?)<\/dl>/
+    );
+    expect(dlBlock, 'compatibility <dl> is present').not.toBeNull();
+    const body = dlBlock![1];
+    for (const label of [
+      'Kotlin',
+      'Compose Multiplatform',
+      'Android',
+      'iOS',
+      'Maven coordinate',
+    ]) {
+      const dtRe = new RegExp(`<dt>\\s*${label}\\s*</dt>`);
+      expect(dtRe.test(body), `expected <dt>${label}</dt> in compatibility <dl>`).toBe(true);
+    }
+  });
+
+  it('renders the Maven coordinate inside a <code class="admob-font-mono"> tag', () => {
+    expect(source).toMatch(
+      /<code[^>]*class="[^"]*\badmob-font-mono\b[^"]*"[^>]*>\s*\{landingMeta\.mavenCoordinate\}\s*<\/code>/
+    );
+  });
+
+  it('renders the InitSequence and PlatformMatrix components once each', () => {
+    const initCount = (source.match(/<InitSequence\s*\/>/g) ?? []).length;
+    const platformCount = (source.match(/<PlatformMatrix\s*\/>/g) ?? []).length;
+    expect(initCount).toBe(1);
+    expect(platformCount).toBe(1);
+  });
+
+  it('uses sentence-case headings and no uppercase mono eyebrows', () => {
+    expect(source).not.toMatch(/\btext-transform\s*:\s*uppercase\b/i);
+    expect(source).toMatch(/<h2>[^<]+<\/h2>/);
+  });
+});
+
+describe('RoadmapSummary.astro contracts', () => {
+  const source = readFileSync(roadmapSummaryPath, 'utf8');
+
+  it('exists as an Astro component', () => {
+    expect(existsSync(roadmapSummaryPath)).toBe(true);
+  });
+
+  it('imports roadmapItems from the data module', () => {
+    expect(source).toMatch(
+      /import\s*\{[^}]*\broadmapItems\b[^}]*\}\s*from\s*['"]\.\.\/\.\.\/data\/landing(?:\.ts)?['"]/
+    );
+  });
+
+  it('renders the two canonical roadmap titles via the data module', () => {
+    expect(source).toMatch(/\{item\.title\}/);
+    const titles = roadmapItems.map((i) => i.title);
+    expect(titles).toContain('Swift Package Manager dependency import');
+    expect(titles).toContain('Native video events on Android');
+  });
+
+  it('does not render roadmap status text in uppercase', () => {
+    const denylist = ['GATED', 'BLOCKED'];
+    for (const word of denylist) {
+      const re = new RegExp(`\\b${word}\\b`);
+      expect(re.test(source), `roadmap status must not be the all-caps label '${word}'`).toBe(
+        false
+      );
+    }
+    expect(source).not.toMatch(/\btext-transform\s*:\s*uppercase\b/i);
+  });
+
+  it('links to /project/roadmap/ with a trailing slash', () => {
+    expect(source).toMatch(/href="\/project\/roadmap\/"/);
+  });
+
+  it('does not render a status pill, badge, or uppercase chip element', () => {
+    expect(source).not.toMatch(/class="[^"]*\b(?:pill|badge|chip)\b/i);
+  });
+});
+
+describe('LandingFooter.astro contracts', () => {
+  const source = readFileSync(landingFooterPath, 'utf8');
+
+  it('exists as an Astro component', () => {
+    expect(existsSync(landingFooterPath)).toBe(true);
+  });
+
+  it('imports trademarkStatement and repoUrl from the data module', () => {
+    expect(source).toMatch(
+      /import\s*\{[^}]*\btrademarkStatement\b[^}]*\}\s*from\s*['"]\.\.\/\.\.\/data\/landing(?:\.ts)?['"]/
+    );
+    expect(source).toMatch(
+      /import\s*\{[^}]*\brepoUrl\b[^}]*\}\s*from\s*['"]\.\.\/\.\.\/data\/landing(?:\.ts)?['"]/
+    );
+  });
+
+  it('renders the trademark statement via the data module (rendered value matches the verbatim contract)', () => {
+    expect(source).toMatch(/<p[^>]*class="landing-footer__legal"[^>]*>\s*\{trademarkStatement\}\s*<\/p>/);
+    expect(trademarkStatement).toBe(
+      'Not affiliated with or endorsed by Google. AdMob and Google Mobile Ads are trademarks of Google LLC.'
+    );
+  });
+
+  it('renders exactly the seven required links in the compact list', () => {
+    const listMatch = source.match(
+      /<ul[^>]*class="landing-footer__links"[^>]*>([\s\S]*?)<\/ul>/
+    );
+    expect(listMatch, 'landing-footer links <ul> is present').not.toBeNull();
+    const body = listMatch![1];
+    const items = body.match(/<li>[\s\S]*?<\/li>/g) ?? [];
+    expect(items, 'seven <li> items expected').toHaveLength(7);
+    const labels = items.map((li) => li.replace(/<[^>]+>/g, '').trim());
+    expect(labels).toEqual([
+      'Quickstart',
+      'Installation',
+      'Compatibility',
+      'Roadmap',
+      'API reference',
+      'GitHub',
+      'Apache-2.0 license',
+    ]);
+  });
+
+  it('Quickstart, Installation, Compatibility, Roadmap, and API reference all point at internal trailing-slash routes', () => {
+    const listMatch = source.match(
+      /<ul[^>]*class="landing-footer__links"[^>]*>([\s\S]*?)<\/ul>/
+    );
+    const body = listMatch![1];
+    expect(body).toMatch(/href="\/start\/quickstart\/"/);
+    expect(body).toMatch(/href="\/start\/installation\/"/);
+    expect(body).toMatch(/href="\/reference\/compatibility\/"/);
+    expect(body).toMatch(/href="\/project\/roadmap\/"/);
+    expect(body).toMatch(/href="\/api\/"/);
+  });
+
+  it('GitHub link uses the canonical repoUrl value', () => {
+    const listMatch = source.match(
+      /<ul[^>]*class="landing-footer__links"[^>]*>([\s\S]*?)<\/ul>/
+    );
+    const body = listMatch![1];
+    expect(body).toMatch(/<li>\s*<a\s+href=\{repoUrl\}>GitHub<\/a>\s*<\/li>/);
+  });
+
+  it('Apache-2.0 license link points at the canonical Apache URL', () => {
+    const listMatch = source.match(
+      /<ul[^>]*class="landing-footer__links"[^>]*>([\s\S]*?)<\/ul>/
+    );
+    const body = listMatch![1];
+    expect(body).toMatch(
+      /href="https:\/\/www\.apache\.org\/licenses\/LICENSE-2\.0\.txt"/
+    );
+  });
+
+  it('renders the trademark statement in a <p class="landing-footer__legal">', () => {
+    expect(source).toMatch(
+      /<p[^>]*class="landing-footer__legal"[^>]*>\s*\{trademarkStatement\}\s*<\/p>/
+    );
+  });
+
+  it('does not duplicate the site footer with a five-column marketing layout', () => {
+    expect(source).not.toMatch(/footer-cols-5/);
+    expect(source).not.toMatch(/class="[^"]*\bcolumns?\b/i);
+    expect((source.match(/<ul\b/g) ?? []).length).toBe(1);
+  });
+});
+
+describe('landing.css footer and roadmap rules', () => {
+  const css = readFileSync(landingCssPath, 'utf8');
+
+  it('defines a border-top rule for the landing-footer class', () => {
+    const block = css.match(/\.landing-footer\s*\{([^}]*)\}/);
+    expect(block, '.landing-footer rule must be present').not.toBeNull();
+    expect(block![1]).toMatch(/border-top\s*:\s*1px\s+solid\s+var\(--admob-hair\)/);
+  });
+
+  it('defines a flex layout for the landing-footer__links list', () => {
+    const block = css.match(/\.landing-footer__links\s*\{([^}]*)\}/);
+    expect(block, '.landing-footer__links rule must be present').not.toBeNull();
+    expect(block![1]).toMatch(/display\s*:\s*flex/);
+    expect(block![1]).toMatch(/flex-wrap\s*:\s*wrap/);
+    expect(block![1]).toMatch(/list-style\s*:\s*none/);
+  });
+
+  it('styles the roadmap item title semibold (no uppercase)', () => {
+    const block = css.match(/\.landing-roadmap__item-title\s*\{([^}]*)\}/);
+    expect(block, '.landing-roadmap__item-title rule must be present').not.toBeNull();
+    expect(block![1]).toMatch(/font-weight\s*:\s*600/);
+    expect(block![1]).not.toMatch(/text-transform\s*:\s*uppercase/i);
+  });
+
+  it('styles the roadmap item status with muted text and 400 weight', () => {
+    const block = css.match(/\.landing-roadmap__item-status\s*\{([^}]*)\}/);
+    expect(block, '.landing-roadmap__item-status rule must be present').not.toBeNull();
+    expect(block![1]).toMatch(/font-weight\s*:\s*400/);
+    expect(block![1]).toMatch(/color\s*:\s*var\(--admob-slate\)/);
+  });
+
+  it('uses a hairline border-bottom on roadmap items and clears it on the last child', () => {
+    const block = css.match(/\.landing-roadmap__item\s*\{([^}]*)\}/);
+    expect(block, '.landing-roadmap__item rule must be present').not.toBeNull();
+    expect(block![1]).toMatch(/border-bottom\s*:\s*1px\s+solid\s+var\(--admob-hair\)/);
+    const lastBlock = css.match(/\.landing-roadmap__item:last-child\s*\{([^}]*)\}/);
+    expect(lastBlock, '.landing-roadmap__item:last-child rule must be present').not.toBeNull();
+    expect(lastBlock![1]).toMatch(/border-bottom\s*:\s*0/);
+  });
 });

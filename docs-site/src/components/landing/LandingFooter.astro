@@ -1,0 +1,29 @@
+---
+/**
+ * Compact reference link group and legal text, separated from the rest of
+ * the page by a single neutral rule. Not a five-column marketing layout
+ * and not a duplicate of the site-wide navigation footer.
+ *
+ * The seven links are listed as literal anchor elements (no .map) so the
+ * exact hrefs and labels remain greppable in this file and visible to the
+ * regression tests. The GitHub link resolves the canonical repo URL from
+ * the data module so the value cannot drift from `landing.ts`.
+ */
+import { repoUrl, trademarkStatement } from '../../data/landing';
+import '../../styles/landing.css';
+---
+
+<footer class="landing-footer">
+  <ul class="landing-footer__links">
+    <li><a href="/start/quickstart/">Quickstart</a></li>
+    <li><a href="/start/installation/">Installation</a></li>
+    <li><a href="/reference/compatibility/">Compatibility</a></li>
+    <li><a href="/project/roadmap/">Roadmap</a></li>
+    <li><a href="/api/">API reference</a></li>
+    <li><a href={repoUrl}>GitHub</a></li>
+    <li>
+      <a href="https://www.apache.org/licenses/LICENSE-2.0.txt">Apache-2.0 license</a>
+    </li>
+  </ul>
+  <p class="landing-footer__legal">{trademarkStatement}</p>
+</footer>

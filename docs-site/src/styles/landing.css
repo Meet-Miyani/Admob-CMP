@@ -150,3 +150,116 @@
 .landing-capabilities__footnote a {
   color: var(--admob-accent-text);
 }
+
+.landing-compatibility {
+  margin-block: var(--landing-section-gap);
+}
+
+.landing-compatibility__list {
+  display: grid;
+  width: 100%;
+  max-width: var(--admob-reading);
+  margin-block: var(--landing-meta-gap);
+  grid-template-columns: max-content 1fr;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--admob-ink);
+}
+
+.landing-compatibility__list > div {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: max-content 1fr;
+  align-items: baseline;
+  gap: 0 var(--landing-meta-gap);
+  padding-block: var(--landing-meta-pad-y);
+  border-bottom: 1px solid var(--admob-hair);
+}
+
+.landing-compatibility__list > div:last-child {
+  border-bottom: 0;
+}
+
+.landing-compatibility__list dt {
+  color: var(--admob-slate);
+  font-weight: 500;
+}
+
+.landing-compatibility__list dd {
+  margin: 0;
+  color: var(--admob-ink);
+}
+
+.landing-compatibility__list dd > code,
+.landing-compatibility__list code.admob-font-mono {
+  display: inline-block;
+  padding: 2px 6px;
+  border: 1px solid var(--admob-hair);
+  border-radius: var(--admob-radius);
+  background: transparent;
+  font-family: var(--admob-font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.landing-compatibility__klib-caveat {
+  margin-top: 0.5rem;
+  font-size: 0.9em;
+  color: var(--admob-slate);
+}
+
+.landing-compatibility__sub {
+  margin-top: 1.5rem;
+}
+
+.landing-roadmap {
+  margin-block: var(--landing-section-gap);
+}
+
+.landing-roadmap__list {
+  display: block;
+  width: 100%;
+  max-width: var(--admob-reading);
+  margin: 0;
+  padding: 0;
+}
+
+.landing-roadmap__item {
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--admob-hair);
+}
+
+.landing-roadmap__item:last-child {
+  border-bottom: 0;
+}
+
+.landing-roadmap__item-title {
+  font-weight: 600;
+  color: var(--admob-ink);
+}
+
+.landing-roadmap__item-status {
+  margin: 0.25rem 0 0;
+  font-weight: 400;
+  color: var(--admob-slate);
+}
+
+.landing-footer {
+  border-top: 1px solid var(--admob-hair);
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+}
+
+.landing-footer__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  padding: 0;
+  margin: 0 0 1rem;
+  list-style: none;
+}
+
+.landing-footer__legal {
+  font-size: 0.9em;
+  color: var(--admob-slate);
+}
