@@ -24,3 +24,10 @@ kotlin-js-store/
 
 # Agent scratch dirs (headless browser profiles, temp captures)
 scratch/
+
+# docs-site (Astro + Starlight)
+docs-site/dist/
+docs-site/.astro/
+docs-site/public/api/
+docs-site/src/assets/fonts/
+

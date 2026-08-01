@@ -4,6 +4,7 @@ import org.jetbrains.kotlin.gradle.plugin.extraProperties
 
 plugins {
     id("dev.avinya.ads.admob-cmp")
+    id("org.jetbrains.dokka")
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidKmpLibrary)
     alias(libs.plugins.composeMultiplatform)
@@ -90,4 +91,29 @@ val verifyKotlinMultiplatformPomDependencyScopes = tasks.register<VerifyPomDepen
 
 tasks.named("check") {
     dependsOn(verifyKotlinMultiplatformPomDependencyScopes)
+}
+
+dokka {
+    moduleName.set("admob-cmp-compose")
+    dokkaSourceSets.configureEach {
+        documentedVisibilities.set(
+            setOf(org.jetbrains.dokka.gradle.engine.parameters.VisibilityModifier.Public)
+        )
+        sourceLink {
+            localDirectory.set(layout.projectDirectory)
+            remoteUrl("https://github.com/Meet-Miyani/admob-compose-multiplatform/blob/master/admob-cmp-compose")
+            remoteLineSuffix.set("#L")
+        }
+    }
+}
+
+// See admob-cmp-core/build.gradle.kts for why this is pinned explicitly.
+mavenPublishing {
+    configure(
+        com.vanniktech.maven.publish.KotlinMultiplatform(
+            javadocJar = com.vanniktech.maven.publish.JavadocJar.Empty(),
+            sourcesJar = com.vanniktech.maven.publish.SourcesJar.Sources(),
+            androidVariantsToPublish = emptyList(),
+        )
+    )
 }
