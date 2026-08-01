@@ -1,0 +1,65 @@
+---
+import Default from '@astrojs/starlight/components/Head.astro';
+import {
+  REPO_URL,
+  breadcrumbListJsonLd,
+  faqPageJsonLd,
+  normalizeEntryId,
+  ogImagePath,
+  softwareSourceCodeJsonLd,
+  techArticleJsonLd,
+} from '../lib/seo';
+
+const site = Astro.site;
+if (!site) {
+  throw new Error('`site` must be set in astro.config.mjs — canonical and OG tags depend on it.');
+}
+
+const { entry, siteTitle, lastUpdated } = Astro.locals.starlightRoute;
+
+// Starlight's own canonical uses `ensureTrailingSlash`; match it exactly so the
+// OG url and the canonical never disagree.
+const pathname = Astro.url.pathname.endsWith('/') ? Astro.url.pathname : `${Astro.url.pathname}/`;
+const canonical = new URL(pathname, site).href;
+const isHome = pathname === '/';
+
+const key = normalizeEntryId(entry.id);
+const ogImage = new URL(ogImagePath(key), site).href;
+const description = entry.data.description ?? '';
+
+const structuredData: object[] = [
+  breadcrumbListJsonLd(pathname, entry.data.title, site.href),
+];
+
+if (isHome) {
+  structuredData.push(softwareSourceCodeJsonLd(site.href, REPO_URL));
+} else {
+  structuredData.push(
+    techArticleJsonLd({
+      url: canonical,
+      title: entry.data.title,
+      description,
+      siteUrl: site.href,
+      dateModified: lastUpdated?.toISOString(),
+    })
+  );
+}
+
+const faq = entry.data.faq;
+if (faq && faq.length > 0) {
+  structuredData.push(faqPageJsonLd(faq, canonical));
+}
+---
+
+<Default />
+<meta property="og:image" content={ogImage} />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content={`${entry.data.title} — ${siteTitle}`} />
+<meta name="twitter:image" content={ogImage} />
+{
+  structuredData.map((node) => (
+    <script type="application/ld+json" is:inline set:html={JSON.stringify(node)} />
+  ))
+}

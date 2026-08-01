@@ -1,0 +1,84 @@
+# https://ads.avinya.dev/robots.txt
+#
+# AdMob CMP documentation. Everything here is public documentation for an
+# Apache-2.0 Kotlin library, and a large share of SDK integration now happens
+# through a coding assistant. AI crawlers are therefore explicitly welcome —
+# see /llms.txt and /llms-full.txt for machine-readable bundles.
+#
+# This file is authored, not managed. If Cloudflare's managed robots.txt ever
+# prepends AI-training Disallow directives or a restrictive Content-Signal
+# header to this response, that toggle has been switched on at the zone level
+# and must be switched back off. See docs/superpowers/plans/2026-07-31-documentation-site-foundation.md, Task 5.
+
+# Content Signals Policy — deliberately permissive on every axis.
+Content-Signal: search=yes, ai-input=yes, ai-train=yes
+
+User-agent: *
+Allow: /
+
+# Named AI and answer-engine crawlers, allowed explicitly so that an audit of
+# this file shows intent rather than an omission.
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+User-agent: meta-externalagent
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: cohere-ai
+Allow: /
+
+User-agent: Bytespider
+Allow: /
+
+User-agent: DuckAssistBot
+Allow: /
+
+User-agent: YouBot
+Allow: /
+
+User-agent: Diffbot
+Allow: /
+
+User-agent: Timpibot
+Allow: /
+
+Sitemap: https://ads.avinya.dev/sitemap-index.xml

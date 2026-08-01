@@ -1,0 +1,58 @@
+/* docs-site/src/styles/mermaid.css
+ *
+ * `rehype-mermaid`'s `inline-svg` strategy has no dark-mode support: it bakes
+ * one palette into a <style> element inside each generated <svg>. Those are
+ * author rules, so `!important` here beats them in both directions.
+ *
+ * The light palette is configured in `mermaidConfig.themeVariables` in
+ * astro.config.mjs; this file re-tints the same SVG for the dark theme.
+ */
+
+.sl-markdown-content svg[id^='mermaid'] {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-inline: auto;
+  background: transparent !important;
+}
+
+:root[data-theme='dark'] .sl-markdown-content svg[id^='mermaid'] .node rect,
+:root[data-theme='dark'] .sl-markdown-content svg[id^='mermaid'] .node circle,
+:root[data-theme='dark'] .sl-markdown-content svg[id^='mermaid'] .node polygon,
+:root[data-theme='dark'] .sl-markdown-content svg[id^='mermaid'] .node path,
+:root[data-theme='dark'] .sl-markdown-content svg[id^='mermaid'] .cluster rect,
+:root[data-theme='dark'] .sl-markdown-content svg[id^='mermaid'] .labelBox,
+:root[data-theme='dark'] .sl-markdown-content svg[id^='mermaid'] .actor {
+  fill: var(--admob-surface) !important;
+  stroke: var(--admob-hair) !important;
+}
+
+:root[data-theme='dark'] .sl-markdown-content svg[id^='mermaid'] .edgePath .path,
+:root[data-theme='dark'] .sl-markdown-content svg[id^='mermaid'] .flowchart-link,
+:root[data-theme='dark'] .sl-markdown-content svg[id^='mermaid'] .messageLine0,
+:root[data-theme='dark'] .sl-markdown-content svg[id^='mermaid'] .messageLine1,
+:root[data-theme='dark'] .sl-markdown-content svg[id^='mermaid'] line {
+  stroke: var(--admob-slate) !important;
+}
+
+:root[data-theme='dark'] .sl-markdown-content svg[id^='mermaid'] .arrowheadPath,
+:root[data-theme='dark'] .sl-markdown-content svg[id^='mermaid'] marker path {
+  fill: var(--admob-slate) !important;
+  stroke: var(--admob-slate) !important;
+}
+
+:root[data-theme='dark'] .sl-markdown-content svg[id^='mermaid'] text,
+:root[data-theme='dark'] .sl-markdown-content svg[id^='mermaid'] .nodeLabel,
+:root[data-theme='dark'] .sl-markdown-content svg[id^='mermaid'] .edgeLabel,
+:root[data-theme='dark'] .sl-markdown-content svg[id^='mermaid'] .messageText,
+:root[data-theme='dark'] .sl-markdown-content svg[id^='mermaid'] .labelText,
+:root[data-theme='dark'] .sl-markdown-content svg[id^='mermaid'] .loopText {
+  fill: var(--admob-ink) !important;
+  color: var(--admob-ink) !important;
+}
+
+:root[data-theme='dark'] .sl-markdown-content svg[id^='mermaid'] .edgeLabel rect,
+:root[data-theme='dark'] .sl-markdown-content svg[id^='mermaid'] .edgeLabel foreignObject div {
+  background: var(--admob-paper) !important;
+  fill: var(--admob-paper) !important;
+}

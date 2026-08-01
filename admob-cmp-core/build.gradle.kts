@@ -2,6 +2,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("dev.avinya.ads.admob-cmp")
+    id("org.jetbrains.dokka")
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidKmpLibrary)
     alias(libs.plugins.mavenPublish)
@@ -81,5 +82,38 @@ kotlin {
             implementation(libs.mockito.core)
         }
     }
+}
+
+dokka {
+    moduleName.set("admob-cmp-core")
+    dokkaSourceSets.configureEach {
+        // `explicitApi()` is on and the ABI is frozen: document exactly the
+        // surface `checkKotlinAbi` guards, nothing wider.
+        documentedVisibilities.set(
+            setOf(org.jetbrains.dokka.gradle.engine.parameters.VisibilityModifier.Public)
+        )
+        sourceLink {
+            localDirectory.set(layout.projectDirectory)
+            remoteUrl("https://github.com/Meet-Miyani/admob-compose-multiplatform/blob/master/admob-cmp-core")
+            remoteLineSuffix.set("#L")
+        }
+    }
+}
+
+// Pin the publication exactly as it resolves today. Without this, the vanniktech
+// plugin's auto-detection sees `org.jetbrains.dokka` on the classpath and swaps
+// JavadocJar.Empty() for JavadocJar.Dokka(...), changing every published
+// -javadoc.jar and coupling `publishToMavenCentral` to a Dokka run.
+// `androidVariantsToPublish = emptyList()` matches what
+// `configureBasedOnAppliedPlugins` derives when
+// `com.android.kotlin.multiplatform.library` is applied.
+mavenPublishing {
+    configure(
+        com.vanniktech.maven.publish.KotlinMultiplatform(
+            javadocJar = com.vanniktech.maven.publish.JavadocJar.Empty(),
+            sourcesJar = com.vanniktech.maven.publish.SourcesJar.Sources(),
+            androidVariantsToPublish = emptyList(),
+        )
+    )
 }
 

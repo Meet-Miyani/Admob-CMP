@@ -2,6 +2,7 @@ import org.gradle.api.publish.maven.MavenPublication
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
+    id("org.jetbrains.dokka")
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidKmpLibrary)
     alias(libs.plugins.mavenPublish)
@@ -43,4 +44,30 @@ val verifyKotlinMultiplatformPomDependencyScopes = tasks.register<VerifyPomDepen
 
 tasks.named("check") {
     dependsOn(verifyKotlinMultiplatformPomDependencyScopes)
+}
+
+dokka {
+    moduleName.set("admob-cmp")
+    dokkaSourceSets.configureEach {
+        documentedVisibilities.set(
+            setOf(org.jetbrains.dokka.gradle.engine.parameters.VisibilityModifier.Public)
+        )
+        sourceLink {
+            localDirectory.set(layout.projectDirectory)
+            remoteUrl("https://github.com/Meet-Miyani/admob-compose-multiplatform/blob/master/admob-cmp")
+            remoteLineSuffix.set("#L")
+        }
+    }
+}
+
+// See admob-cmp-core/build.gradle.kts for why this is pinned explicitly. This
+// module is an api-only facade, so its Dokka module page is a re-export index.
+mavenPublishing {
+    configure(
+        com.vanniktech.maven.publish.KotlinMultiplatform(
+            javadocJar = com.vanniktech.maven.publish.JavadocJar.Empty(),
+            sourcesJar = com.vanniktech.maven.publish.SourcesJar.Sources(),
+            androidVariantsToPublish = emptyList(),
+        )
+    )
 }

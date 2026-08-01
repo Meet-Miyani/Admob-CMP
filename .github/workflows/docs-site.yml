@@ -1,0 +1,98 @@
+name: Docs site
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "docs-site/**"
+      - "admob-cmp/**"
+      - "admob-cmp-core/**"
+      - "admob-cmp-compose/**"
+      - "gradle/libs.versions.toml"
+      - "build.gradle.kts"
+      - ".github/workflows/docs-site.yml"
+  pull_request:
+    paths:
+      - "docs-site/**"
+      - "admob-cmp/**"
+      - "admob-cmp-core/**"
+      - "admob-cmp-compose/**"
+      - "gradle/libs.versions.toml"
+      - "build.gradle.kts"
+      - ".github/workflows/docs-site.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+
+# Pull requests may be superseded freely. A push to master reaches the deploy
+# step, and aborting a run that is mid-upload to Cloudflare leaves a partial
+# deployment, so those are never cancelled.
+concurrency:
+  group: docs-site-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build-and-deploy:
+    name: Build and deploy ads.avinya.dev
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Starlight's `lastUpdated` reads each page's git history. A shallow
+          # clone silently produces no timestamps and empty `dateModified`
+          # values in the TechArticle JSON-LD.
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: docs-site/package-lock.json
+
+      - name: Assert Xcode 26 (iOS Simulator SDK 26)
+        run: xcodebuild -showsdks | grep -q "iphonesimulator26" || { echo "SDK 26 not found"; xcodebuild -showsdks; exit 1; }
+
+      - name: Generate the Dokka API reference into docs-site/public/api
+        run: ./gradlew syncApiDocsToDocsSite --no-configuration-cache
+
+      - name: Install docs-site dependencies
+        run: npm ci
+        working-directory: docs-site
+
+      # rehype-mermaid renders diagrams to static SVG at BUILD time and drives a
+      # headless Chromium to do it. `--with-deps` is Linux-only, so it is omitted
+      # on this macOS runner.
+      - name: Install the Chromium build used by rehype-mermaid
+        run: npx playwright install chromium
+        working-directory: docs-site
+
+      - name: Unit-test the SEO helpers
+        run: npm test
+        working-directory: docs-site
+
+      - name: Build the site
+        run: npm run build
+        working-directory: docs-site
+
+      - name: Verify the built output
+        run: npm run verify
+        working-directory: docs-site
+
+      - name: Deploy to Cloudflare Pages
+        if: github.event_name != 'pull_request'
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=admob-cmp-docs --branch=master
+          workingDirectory: docs-site
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
