@@ -481,7 +481,7 @@ try {
         `${theme} hero action ${focus.href} has visible focus outline >= 2px`
       );
     }
-    if (landingDesktop.focus?.metaCode?.focusable) {
+    if (landingDesktop.focus?.metaCode && landingDesktop.focus.metaCode.focusable !== false) {
       check(
         landingDesktop.focus.metaCode.visible && landingDesktop.focus.metaCode.outlineWidth >= 2,
         `${theme} landing meta code has visible focus outline >= 2px`
