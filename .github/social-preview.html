@@ -1,0 +1,47 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1280px; height: 640px; overflow: hidden;
+    background: radial-gradient(1100px 620px at 12% 0%, #1B2440 0%, #0B0D12 62%);
+    color: #F4F6FB;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .frame { padding: 72px 80px; height: 100%; display: flex; flex-direction: column; justify-content: space-between; }
+  .rule { width: 96px; height: 6px; border-radius: 3px; background: linear-gradient(90deg, #7F52FF 0%, #3DDC84 100%); }
+  h1 { font-size: 92px; line-height: 1.02; letter-spacing: -0.035em; font-weight: 700; margin-top: 28px; }
+  h2 { font-size: 38px; line-height: 1.25; font-weight: 500; color: #AEB8D0; margin-top: 16px; letter-spacing: -0.01em; }
+  .formats { font-size: 24px; color: #8E9AB5; margin-top: 30px; letter-spacing: 0.005em; }
+  .chips { display: flex; gap: 14px; align-items: center; }
+  .chip {
+    font-size: 23px; padding: 12px 22px; border-radius: 999px;
+    border: 1px solid #303B57; background: #151A26; color: #C9D3E8;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  }
+  .chip.accent { border-color: #2E5B45; background: #10201A; color: #6FE3A6; font-family: inherit; }
+  .footer { display: flex; justify-content: space-between; align-items: center; }
+  .host { font-size: 27px; color: #7F8CA8; letter-spacing: 0.01em; }
+</style>
+</head>
+<body>
+  <div class="frame">
+    <div>
+      <div class="rule"></div>
+      <h1>AdMob CMP</h1>
+      <h2>Compose Multiplatform AdMob SDK</h2>
+      <div class="formats">Banner &middot; Interstitial &middot; Rewarded &middot; Rewarded Interstitial &middot; App-Open &middot; Native</div>
+    </div>
+    <div class="footer">
+      <div class="chips">
+        <span class="chip">dev.avinya.ads:admob-cmp</span>
+        <span class="chip accent">Android &middot; iOS</span>
+      </div>
+      <div class="host">ads.avinya.dev</div>
+    </div>
+  </div>
+</body>
+</html>
