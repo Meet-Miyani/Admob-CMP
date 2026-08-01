@@ -241,6 +241,161 @@ async function inspectThemeSelector(theme) {
   return { visible, focus, selectedTheme, opposite };
 }
 
+const NATIVELY_FOCUSABLE_TAGS = ['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'];
+
+async function focusAndRead(page, locator) {
+  await locator.focus();
+  return locator.evaluate((el) => {
+    const styles = getComputedStyle(el);
+    return {
+      visible: el.matches(':focus-visible'),
+      outlineStyle: styles.outlineStyle,
+      outlineWidth: Number.parseFloat(styles.outlineWidth),
+      href: el.getAttribute('href'),
+    };
+  });
+}
+
+async function inspectLanding({ theme, viewport, reducedMotion = 'no-preference' }) {
+  const browser = await chromium.launch();
+  const context = await browser.newContext({ viewport, colorScheme: theme, reducedMotion });
+  const page = await context.newPage();
+  await page.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+  await page.evaluate((nextTheme) => document.documentElement.setAttribute('data-theme', nextTheme), theme);
+
+  const data = await page.evaluate(() => {
+    const main = document.querySelector('main');
+    const h1 = document.querySelector('h1');
+    const h2 = document.querySelector('h2');
+    const h3 = document.querySelector('.landing-compatibility h3');
+    const section = document.querySelector('.landing-section');
+
+    const landingElements = [...document.querySelectorAll('[class*="landing-"]')].map((el) => {
+      const s = getComputedStyle(el);
+      return {
+        tag: el.tagName.toLowerCase(),
+        className: el.className,
+        borderRadius: Number.parseFloat(s.borderTopLeftRadius),
+        boxShadow: s.boxShadow,
+        transform: s.transform,
+      };
+    });
+
+    const tableWrapper = document.querySelector('.table-scroll.table-scroll--wide');
+    const table = tableWrapper?.querySelector('table');
+
+    const codeBlocks = [...document.querySelectorAll('.expressive-code pre')].map((block) => ({
+      background: getComputedStyle(block).backgroundColor,
+    }));
+
+    const metaCode = document.querySelector('.landing-meta code.admob-font-mono');
+    const metaCodeFocusable = metaCode
+      ? metaCode.tabIndex >= 0 || ['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'].includes(metaCode.tagName)
+      : false;
+
+    return {
+      main: main
+        ? {
+            fontFamily: getComputedStyle(main).fontFamily,
+            animationName: getComputedStyle(main).animationName,
+          }
+        : null,
+      section: section
+        ? { fontFamily: getComputedStyle(section).fontFamily }
+        : null,
+      headings: {
+        h1: h1 ? getComputedStyle(h1).fontSize : null,
+        h1Family: h1 ? getComputedStyle(h1).fontFamily : null,
+        h2: h2 ? getComputedStyle(h2).fontSize : null,
+        h3: h3 ? getComputedStyle(h3).fontSize : null,
+      },
+      landing: landingElements,
+      table: tableWrapper
+        ? {
+            tabIndex: tableWrapper.tabIndex,
+            role: tableWrapper.getAttribute('role'),
+            ariaLabel: tableWrapper.getAttribute('aria-label'),
+            scrollWidth: tableWrapper.scrollWidth,
+            clientWidth: tableWrapper.clientWidth,
+            rowCount: table ? table.querySelectorAll('tbody tr').length : 0,
+          }
+        : null,
+      codeBlocks,
+      metaCodeFocusable,
+      documentWidth: document.documentElement.scrollWidth,
+      viewportWidth: window.innerWidth,
+    };
+  });
+
+  const focusChecks = {};
+
+  focusChecks.heroActions = [];
+  for (const link of await page.locator('.hero a').all()) {
+    focusChecks.heroActions.push(await focusAndRead(page, link));
+  }
+
+  const metaCode = page.locator('.landing-meta code.admob-font-mono');
+  if (await metaCode.count() > 0) {
+    if (data.metaCodeFocusable) {
+      focusChecks.metaCode = await focusAndRead(page, metaCode);
+    } else {
+      focusChecks.metaCode = { focusable: false };
+    }
+  } else {
+    focusChecks.metaCode = { found: false };
+  }
+
+  focusChecks.formatLinks = [];
+  for (const link of await page.locator('.landing-formats a').all()) {
+    focusChecks.formatLinks.push(await focusAndRead(page, link));
+  }
+
+  const tableRegion = page.locator('.table-scroll.table-scroll--wide');
+  if (await tableRegion.count() > 0) {
+    focusChecks.tableRegion = await focusAndRead(page, tableRegion);
+  }
+
+  focusChecks.footerLinks = [];
+  for (const link of await page.locator('.landing-footer a').all()) {
+    focusChecks.footerLinks.push(await focusAndRead(page, link));
+  }
+
+  data.focus = focusChecks;
+
+  await context.close();
+  await browser.close();
+  return data;
+}
+
+async function inspectLandingThemeSelector(theme) {
+  const browser = await chromium.launch();
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, colorScheme: theme });
+  const page = await context.newPage();
+  await page.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+  await page.evaluate((nextTheme) => document.documentElement.setAttribute('data-theme', nextTheme), theme);
+
+  const selector = page.locator('.right-group starlight-theme-select select');
+  const visible = await selector.isVisible();
+  await selector.focus();
+  const focus = await selector.evaluate((element) => {
+    const styles = getComputedStyle(element);
+    return {
+      visible: element.matches(':focus-visible'),
+      outlineStyle: styles.outlineStyle,
+      outlineWidth: Number.parseFloat(styles.outlineWidth),
+    };
+  });
+
+  const opposite = theme === 'light' ? 'dark' : 'light';
+  await selector.selectOption(opposite);
+  await page.waitForFunction((nextTheme) => document.documentElement.dataset.theme === nextTheme, opposite);
+  const selectedTheme = await page.evaluate(() => document.documentElement.dataset.theme);
+
+  await context.close();
+  await browser.close();
+  return { visible, focus, selectedTheme, opposite };
+}
+
 try {
   for (const theme of ['light', 'dark']) {
     const desktop = await inspect({ theme, viewport: { width: 1440, height: 1000 } });
@@ -254,14 +409,14 @@ try {
       light: 'rgb(246, 248, 250)',
       dark: 'rgb(22, 27, 34)',
     }[theme];
+    const usesNativeStack = (fontFamily) =>
+      /-apple-system/.test(fontFamily ?? '') && !/Space Grotesk|Inter/.test(fontFamily ?? '');
     check(desktop.article?.fontSize === '16px', `${theme} body is 16px`);
     check(desktop.article?.lineHeight === '25.6px', `${theme} body uses 1.6 rhythm`);
     check(desktop.article?.width <= 720, `${theme} reading measure is at most 45rem`);
     check(desktop.headings?.h1 === '32px', `${theme} desktop H1 is 32px`);
     check(desktop.headings?.h2 === '24px', `${theme} H2 is 24px`);
     check(roadmapH3 === '19px', `${theme} H3 is 19px`);
-    const usesNativeStack = (fontFamily) =>
-      /-apple-system/.test(fontFamily ?? '') && !/Space Grotesk|Inter/.test(fontFamily ?? '');
     check(
       usesNativeStack(desktop.article?.fontFamily) && usesNativeStack(desktop.headings?.h1Family),
       `${theme} prose and headings share the native UI stack`
@@ -281,6 +436,82 @@ try {
     check(desktop.table?.headerBackground !== 'rgba(0, 0, 0, 0)' && desktop.table?.cellBorder === '1px', `${theme} table headers and rows are structured`);
     check(desktop.motion?.name === 'none', `${theme} articles do not animate on entry`);
 
+    const landingDesktop = await inspectLanding({ theme, viewport: { width: 1440, height: 1000 } });
+    check(landingDesktop.headings?.h1 === '32px', `${theme} landing H1 is 32px desktop`);
+    check(landingDesktop.headings?.h2 === '24px', `${theme} landing H2 is 24px desktop`);
+    check(landingDesktop.headings?.h3 === '19px', `${theme} landing H3 is 19px desktop`);
+    check(
+      usesNativeStack(landingDesktop.headings?.h1Family) && usesNativeStack(landingDesktop.section?.fontFamily),
+      `${theme} landing body and H1 share the native UI stack`
+    );
+    for (const el of landingDesktop.landing ?? []) {
+      check(
+        el.borderRadius <= 6,
+        `${theme} landing ${el.className} radius is at most 6px (got ${el.borderRadius}px)`
+      );
+      check(el.boxShadow === 'none', `${theme} landing ${el.className} has no shadow`);
+      check(el.transform === 'none', `${theme} landing ${el.className} has no transform`);
+    }
+    check(landingDesktop.table?.tabIndex === 0, `${theme} landing capability table is keyboard-focusable`);
+    check(landingDesktop.table?.role === 'region', `${theme} landing capability table has role=region`);
+    check(
+      typeof landingDesktop.table?.ariaLabel === 'string' && landingDesktop.table.ariaLabel.length > 0,
+      `${theme} landing capability table has a non-empty aria-label`
+    );
+    check(
+      (landingDesktop.table?.scrollWidth ?? 0) >= (landingDesktop.table?.clientWidth ?? 0),
+      `${theme} landing capability table is structured for horizontal scroll when needed`
+    );
+    check((landingDesktop.table?.rowCount ?? 0) > 0, `${theme} landing capability table has rows`);
+    for (const block of landingDesktop.codeBlocks ?? []) {
+      check(block.background === codeBackground, `${theme} landing code block uses ${codeBackground}`);
+    }
+    check(landingDesktop.main?.animationName === 'none', `${theme} landing main has no entrance animation`);
+    check(
+      landingDesktop.documentWidth <= landingDesktop.viewportWidth + 1,
+      `${theme} landing desktop does not overflow horizontally`
+    );
+    check(
+      landingDesktop.focus?.heroActions?.length === 2,
+      `${theme} landing exposes exactly two hero actions (got ${landingDesktop.focus?.heroActions?.length})`
+    );
+    for (const focus of landingDesktop.focus?.heroActions ?? []) {
+      check(
+        focus.visible && focus.outlineWidth >= 2,
+        `${theme} hero action ${focus.href} has visible focus outline >= 2px`
+      );
+    }
+    if (landingDesktop.focus?.metaCode?.focusable) {
+      check(
+        landingDesktop.focus.metaCode.visible && landingDesktop.focus.metaCode.outlineWidth >= 2,
+        `${theme} landing meta code has visible focus outline >= 2px`
+      );
+    }
+    check(
+      landingDesktop.focus?.formatLinks?.length === 6,
+      `${theme} landing exposes six format links (got ${landingDesktop.focus?.formatLinks?.length})`
+    );
+    for (const focus of landingDesktop.focus?.formatLinks ?? []) {
+      check(
+        focus.visible && focus.outlineWidth >= 2,
+        `${theme} format link ${focus.href} has visible focus outline >= 2px`
+      );
+    }
+    check(
+      landingDesktop.focus?.tableRegion?.visible && landingDesktop.focus?.tableRegion?.outlineWidth >= 2,
+      `${theme} landing capability table region has visible focus outline >= 2px`
+    );
+    check(
+      landingDesktop.focus?.footerLinks?.length === 7,
+      `${theme} landing exposes seven footer links (got ${landingDesktop.focus?.footerLinks?.length})`
+    );
+    for (const focus of landingDesktop.focus?.footerLinks ?? []) {
+      check(
+        focus.visible && focus.outlineWidth >= 2,
+        `${theme} footer link ${focus.href} has visible focus outline >= 2px`
+      );
+    }
+
     const themeSelector = await inspectThemeSelector(theme);
     check(themeSelector.visible, `${theme} desktop theme selector is visible`);
     check(
@@ -294,10 +525,32 @@ try {
       `${theme} theme selector updates the document theme`
     );
 
+    const landingThemeSelector = await inspectLandingThemeSelector(theme);
+    check(landingThemeSelector.visible, `${theme} landing theme selector is visible`);
+    check(
+      landingThemeSelector.focus.visible &&
+        landingThemeSelector.focus.outlineStyle !== 'none' &&
+        landingThemeSelector.focus.outlineWidth >= 2,
+      `${theme} landing theme selector has a visible focus outline of at least 2px`
+    );
+    check(
+      landingThemeSelector.selectedTheme === landingThemeSelector.opposite,
+      `${theme} landing theme selector updates the document theme`
+    );
+
     const mobile = await inspect({ theme, viewport: { width: 390, height: 844 } });
     check(mobile.headings?.h1 === '28px', `${theme} mobile H1 is 28px`);
     check(mobile.documentWidth <= mobile.viewportWidth + 1, `${theme} mobile document does not overflow horizontally`);
     check((mobile.table?.scrollWidth ?? 0) >= (mobile.table?.clientWidth ?? 0), `${theme} mobile table remains contained in its scroll region`);
+
+    const landingMobile = await inspectLanding({ theme, viewport: { width: 390, height: 844 } });
+    check(landingMobile.headings?.h1 === '28px', `${theme} landing H1 is 28px mobile`);
+    check(landingMobile.headings?.h2 === '24px', `${theme} landing H2 is 24px mobile`);
+    check(landingMobile.headings?.h3 === '19px', `${theme} landing H3 is 19px mobile`);
+    check(
+      landingMobile.documentWidth <= landingMobile.viewportWidth + 1,
+      `${theme} landing mobile does not overflow horizontally`
+    );
 
     for (const syntaxCase of syntaxCases) {
       const colors = await inspectSyntax({ theme, ...syntaxCase });
@@ -309,6 +562,9 @@ try {
 
     const reduced = await inspect({ theme, viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
     check(reduced.motion?.name === 'none', `${theme} reduced-motion disables article entrance`);
+
+    const reducedLanding = await inspectLanding({ theme, viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
+    check(reducedLanding.main?.animationName === 'none', `${theme} landing reduced-motion disables entrance animation`);
   }
 } finally {
   if (server) server.close();

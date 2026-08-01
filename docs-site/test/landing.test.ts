@@ -873,3 +873,68 @@ describe('landing.css footer and roadmap rules', () => {
     expect(lastBlock![1]).toMatch(/border-bottom\s*:\s*0/);
   });
 });
+
+const distIndexPath = fileURLToPath(new URL('../dist/index.html', import.meta.url));
+
+describe('dist/index.html rendered landing contract', () => {
+  let builtIndex = '';
+
+  beforeAll(() => {
+    if (existsSync(distIndexPath)) {
+      builtIndex = readFileSync(distIndexPath, 'utf8');
+    }
+  });
+
+  it('dist/index.html exists (run npm run build before npm test for the rendered guards)', () => {
+    expect(existsSync(distIndexPath), 'dist/index.html must exist for the rendered landing guards').toBe(true);
+  });
+
+  it('contains exactly one <h1> whose text is the canonical hero title', () => {
+    const h1Matches = [...builtIndex.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/g)];
+    expect(h1Matches, 'dist/index.html must contain at least one <h1>').toHaveLength(1);
+    const h1Text = h1Matches[0][1].replace(/<[^>]+>/g, '').trim();
+    expect(h1Text).toBe('Compose Multiplatform AdMob SDK for Android and iOS');
+  });
+
+  it('renders the trademark statement verbatim in the landing footer', () => {
+    expect(builtIndex).toContain(
+      'Not affiliated with or endorsed by Google. AdMob and Google Mobile Ads are trademarks of Google LLC.'
+    );
+  });
+
+  it('lists the six format names in the canonical order on the home page', () => {
+    const expected = [
+      'Banner',
+      'Interstitial',
+      'Rewarded',
+      'Rewarded interstitial',
+      'App-open',
+      'Native',
+    ];
+    const positions = expected.map((name) => builtIndex.indexOf(name));
+    for (const [index, name] of positions.map((pos, i) => [pos, expected[i]])) {
+      expect(index, `format name "${name}" must appear in dist/index.html`).toBeGreaterThan(-1);
+    }
+    for (let i = 1; i < positions.length; i += 1) {
+      expect(
+        positions[i],
+        `format name "${expected[i]}" must appear after "${expected[i - 1]}"`
+      ).toBeGreaterThan(positions[i - 1]);
+    }
+  });
+
+  it('renders the two roadmap titles in the canonical order on the home page', () => {
+    const expected = [
+      'Swift Package Manager dependency import',
+      'Native video events on Android',
+    ];
+    const positions = expected.map((title) => builtIndex.indexOf(title));
+    for (const [index, title] of positions.map((pos, i) => [pos, expected[i]])) {
+      expect(index, `roadmap title "${title}" must appear in dist/index.html`).toBeGreaterThan(-1);
+    }
+    expect(
+      positions[1],
+      '"Native video events on Android" must appear after "Swift Package Manager dependency import"'
+    ).toBeGreaterThan(positions[0]);
+  });
+});
