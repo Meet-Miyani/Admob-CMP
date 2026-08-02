@@ -127,6 +127,7 @@ section "2. Gradle plugin build"
 ./gradlew -p admob-cmp-gradle-plugin build --no-configuration-cache
 
 section "3. Android + ABI + publication metadata"
+./scripts/distribution/verify-pom-metadata.sh
 ./gradlew \
   :admob-cmp-core:testAndroidHostTest \
   :admob-cmp-compose:testAndroidHostTest \

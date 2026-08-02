@@ -54,6 +54,18 @@ Decision rule:
 Do not skip to step 3. Publishing a version purely to satisfy an indexer is a
 real cost to consumers and is only justified once the cheaper probes fail.
 
+### Why the old URL is not a defect to fix
+
+Maven Central artifacts are immutable by policy. The POMs for 1.0.0, 1.0.1,
+1.0.2 and 1.1.0 will carry `https://github.com/Meet-Miyani/Admob-CMP` forever
+and there is no republish path. This is fine for humans and for most tooling:
+GitHub 301-redirects the old URL, and the redirect holds as long as the old
+repository name is never reused.
+
+`scripts/distribution/verify-pom-metadata.sh` guarantees only that *future*
+releases carry the new URL. The only consumer that might not follow the
+redirect is the klibs.io indexer — see the decision rule above.
+
 ## Correction paths (all are human steps — they post publicly)
 
 | Situation | Where | URL |
