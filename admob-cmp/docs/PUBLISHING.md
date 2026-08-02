@@ -100,4 +100,11 @@ Repeat before each release:
 5. Local publication plus `-PadmobCmpConsumePublished=true` compiles Android and iOS.
 6. `./gradlew publishToMavenCentral --dry-run` and `./gradlew -p admob-cmp-gradle-plugin publishToMavenCentral --dry-run` schedule all modules.
 7. Confirm the `dev.avinya` namespace is verified in Central Portal.
-8. Run `./scripts/publish-maven-central.sh`, inspect **both** staging deployments (library and plugin), then release each manually.
+8. Draft the GitHub release body from
+   [`.github/RELEASE_NOTES_TEMPLATE.md`](../../.github/RELEASE_NOTES_TEMPLATE.md).
+   Name the release `vX.Y.Z — <what the user gains>` and keep "Compose
+   Multiplatform" or "Kotlin Multiplatform" in the name. Before publishing, run
+   `git tag --list` and confirm every tag you reference in a `compare/` link
+   actually exists — a broken changelog link shipped in 1.1.0 exactly this way.
+9. Run `./scripts/publish-maven-central.sh`, inspect **both** staging deployments (library and plugin), then release each manually.
+
