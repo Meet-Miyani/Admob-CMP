@@ -149,3 +149,9 @@ Local docs work only needs Node — `cd docs-site && npm ci && npm test &&
 npm run build && npm run verify` is sufficient to validate Astro
 changes once `./gradlew syncApiDocsToDocsSite` has populated
 `docs-site/public/api/`.
+
+Read `docs-site/DESIGN.md` before changing `tokens.css`, `landing.css` or
+`diagrams.css`. It records what the design system is for, which colour
+pairings are contrast-enforced, and the traps that have already been hit
+once. The gates catch broken mechanics; they cannot tell you the intent.
+It is an internal note and is not part of the built site.

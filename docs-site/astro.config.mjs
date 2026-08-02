@@ -32,16 +32,19 @@ export default defineConfig({
             mermaidConfig: {
               theme: 'base',
               fontFamily:
-                '-apple-system, BlinkMacSystemFont, Segoe UI, Noto Sans, Helvetica Neue, Arial, sans-serif',
+                'Archivo Variable, Archivo, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica Neue, Arial, sans-serif',
+              // Baked in at build time, so these must be the LIGHT theme values
+              // from tokens.css; src/styles/mermaid.css re-tints for dark.
+              // Keep them in sync by hand — nothing checks this pairing.
               themeVariables: {
-                background: '#f3f4f2',
-                primaryColor: '#ebecea',
-                primaryTextColor: '#16181a',
-                primaryBorderColor: '#d8dad6',
-                secondaryColor: '#f3f4f2',
-                tertiaryColor: '#ebecea',
-                lineColor: '#5a5f63',
-                textColor: '#16181a',
+                background: '#ffffff',
+                primaryColor: '#f7f5f3',
+                primaryTextColor: '#171310',
+                primaryBorderColor: '#e3deda',
+                secondaryColor: '#ffffff',
+                tertiaryColor: '#f7f5f3',
+                lineColor: '#6b625c',
+                textColor: '#171310',
               },
             },
           },
@@ -65,17 +68,20 @@ export default defineConfig({
       // which is `docs-site/`, so the base URL has to include that segment.
       editLink: { baseUrl: `${REPO}/edit/master/docs-site/` },
       customCss: ['./src/styles/tokens.css', './src/styles/mermaid.css'],
-      components: { Head: './src/components/Head.astro' },
+      components: {
+        Head: './src/components/Head.astro',
+        Hero: './src/components/Hero.astro',
+      },
       expressiveCode: {
         themes: ['github-dark', 'github-light'],
         minSyntaxHighlightingColorContrast: 5.5,
         useStarlightUiThemeColors: true,
         useStarlightDarkModeSwitch: true,
         styleOverrides: {
-          borderRadius: '6px',
+          borderRadius: 'var(--admob-radius-lg)',
           codeFontFamily: 'var(--admob-font-mono)',
           codeFontSize: '0.875rem',
-          codeLineHeight: '1.55',
+          codeLineHeight: '1.6',
           uiFontFamily: 'var(--admob-font-body)',
           frames: {
             shadowColor: 'transparent',
@@ -89,13 +95,26 @@ export default defineConfig({
           tag: 'link',
           attrs: {
             rel: 'preload',
+            // The display and body faces are one variable file (wght + wdth),
+            // so this single preload covers every non-code glyph on the page.
+            href: '/fonts/archivo-wdth.woff2',
+            as: 'font',
+            type: 'font/woff2',
+            crossorigin: 'anonymous',
+          },
+        },
+        {
+          tag: 'link',
+          attrs: {
+            rel: 'preload',
             href: '/fonts/jetbrains-mono-400.woff2',
             as: 'font',
             type: 'font/woff2',
             crossorigin: 'anonymous',
           },
         },
-        { tag: 'meta', attrs: { name: 'theme-color', content: '#0e0f10' } },
+        // Must track --admob-paper in tokens.css. It drifted once already.
+        { tag: 'meta', attrs: { name: 'theme-color', content: '#0c0a09' } },
       ],
       plugins: [
         starlightLlmsTxt({

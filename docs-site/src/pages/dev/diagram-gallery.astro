@@ -25,6 +25,39 @@ import PlatformMatrix from '../../components/diagrams/PlatformMatrix.astro';
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, nofollow" />
     <title>Diagram gallery (internal review)</title>
+    <link rel="canonical" href="https://ads.avinya.dev/dev/diagram-gallery/" />
+    <meta property="og:image" content="https://ads.avinya.dev/og/index.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <script
+      type="application/ld+json"
+      is:inline
+      set:html={JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          {
+            '@type': 'ListItem',
+            position: 1,
+            name: 'Diagram gallery',
+            item: 'https://ads.avinya.dev/dev/diagram-gallery/',
+          },
+        ],
+      })}
+    />
+    <script
+      type="application/ld+json"
+      is:inline
+      set:html={JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'TechArticle',
+        headline: 'Diagram gallery (internal review)',
+        description:
+          'Internal review surface for the diagram set rendered in dark theme.',
+        url: 'https://ads.avinya.dev/dev/diagram-gallery/',
+      })}
+    />
     <style is:global>
       body {
         margin: 0;

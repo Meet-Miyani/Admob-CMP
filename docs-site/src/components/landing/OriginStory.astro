@@ -1,0 +1,28 @@
+---
+/**
+ * Why this library exists, in the maintainer's own terms.
+ *
+ * Placed after the capability comparison on purpose: the reader has just seen
+ * what the library does and what it does that the alternative does not, and the
+ * next honest question is "who made this and why should I depend on it".
+ *
+ * TODO(origin-app): the app this was extracted from is not in live production
+ * yet, so it is described generically here. Once it ships, name it and link it
+ * in `originStory` in src/data/landing.ts — the wording is deliberately kept in
+ * the data module so that change is a one-line edit.
+ *
+ * The copy states only what is true: that other projects exist and helped, that
+ * the gap was API shape rather than capability, and that this came out of real
+ * app work. It makes no comparative claim about quality — the capability table
+ * above already carries the factual comparison, with its own dated footnote.
+ */
+import { originStory } from '../../data/landing';
+import '../../styles/landing.css';
+---
+
+<section class="landing-section landing-origin" aria-labelledby="why-this-exists">
+  <h2 id="why-this-exists">Why this exists</h2>
+  <div class="landing-origin__body">
+    {originStory.paragraphs.map((paragraph) => <p>{paragraph}</p>)}
+  </div>
+</section>

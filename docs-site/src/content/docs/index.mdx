@@ -1,11 +1,12 @@
 ---
-title: AdMob CMP
-description: Plug-and-play AdMob for Compose Multiplatform — banner, interstitial, rewarded, app-open and native ads with UMP consent on Android and iOS.
+title: Compose Multiplatform AdMob SDK
+description: 'Open-source Compose Multiplatform AdMob SDK: six ad formats on Android and iOS from one Kotlin API, with UMP consent built into the init flow.'
 template: splash
 hero:
-  tagline: One Kotlin API for six AdMob formats on Android and iOS, with UMP consent wired into the init flow.
+  title: Compose Multiplatform AdMob SDK for Android and iOS
+  tagline: Six AdMob formats on Android and iOS behind one Kotlin API — suspend functions, StateFlow, and UMP consent wired into initialization.
   actions:
-    - text: Quickstart
+    - text: Start the 5-minute quickstart
       link: /start/quickstart/
       icon: right-arrow
     - text: View on GitHub
@@ -19,8 +20,67 @@ head:
       content: website
 ---
 
-Plan 5 replaces this page with the full landing page. The frontmatter above is the
-contract: `template: splash`, the two hero actions, and the `og:type` override that
-stops Starlight declaring the home page an `article`.
+{/* The hero, the spec strip and the placement plate are rendered by the
+    Starlight `Hero` override in src/components/Hero.astro, driven by the
+    `hero:` frontmatter above. Everything below is page body. */}
 
-Not affiliated with or endorsed by Google. AdMob and Google Mobile Ads are trademarks of Google LLC.
+import CapabilityMatrix from '../../components/landing/CapabilityMatrix.astro';
+import OriginStory from '../../components/landing/OriginStory.astro';
+import CompatibilityList from '../../components/landing/CompatibilityList.astro';
+import RoadmapSummary from '../../components/landing/RoadmapSummary.astro';
+import LandingFooter from '../../components/landing/LandingFooter.astro';
+
+<section class="landing-section landing-quickstart">
+
+## Quick start
+
+The integration has two required lines: one Maven dependency in `commonMain`, and one initialization call at the root of the app that gathers consent and starts Mobile Ads in a single step. The full setup — version catalogs, the Gradle plugin, Kotlin/Native test linking, the iOS-only Info.plist keys, and the `doctorIos` check — lives in the [Quickstart guide](/start/quickstart/).
+
+<div class="landing-quickstart__pair">
+
+```kotlin
+// shared/build.gradle.kts
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            implementation("dev.avinya.ads:admob-cmp:1.1.0")
+        }
+    }
+}
+```
+
+```kotlin
+// commonMain — initialize once at the root
+adManager.gatherConsentAndInitialize(
+    AdConfig(
+        androidAppId = TestAdIds.ANDROID_APP_ID,
+        iosAppId = TestAdIds.IOS_APP_ID,
+        testMode = true,
+    )
+)
+```
+
+</div>
+
+{/* Blank lines inside the div are required: MDX only parses markdown inside a
+    block element when the content is separated from the tags. Collapsing this
+    onto one line would render literal backticks and bracket syntax. */}
+<div class="landing-quickstart__note">
+
+On iOS, the production ordering is UMP consent, then ATT tracking authorization, then initialize with `ConsentMode.InitializeOnlyIfAlreadyAllowed`. See the [iOS setup guide](/start/ios-setup/) for the two Swift Package Manager package URLs and the three `Info.plist` keys.
+
+</div>
+
+[Continue to the full Quickstart →](/start/quickstart/)
+
+</section>
+
+<CapabilityMatrix />
+
+<OriginStory />
+
+<CompatibilityList />
+
+<RoadmapSummary />
+
+<LandingFooter />

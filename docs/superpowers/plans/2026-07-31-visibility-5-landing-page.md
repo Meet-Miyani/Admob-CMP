@@ -5,9 +5,45 @@
 > superpowers:executing-plans to implement this plan task-by-task. Use
 > superpowers:test-driven-development for behavior and regression gates.
 
-**Status:** Pending. This revision supersedes the original editorial/marketing
-presentation draft while preserving its verified content, SEO, and integration
-contracts.
+**Status:** Content and structure complete and verified on 2026-08-02. The
+**presentation** requirements below were overridden the same day — see the
+notice immediately following. Task 6 is withdrawn.
+
+> ## Presentation requirements are superseded — 2026-08-02
+>
+> The owner reviewed the built page, rejected its appearance, and commissioned a
+> full redesign. The current design system is
+> [`docs-site/DESIGN.md`](../../../docs-site/DESIGN.md).
+>
+> **Ignore the "Native Reference presentation" section below**, and the
+> presentation lines of Task 7 and the acceptance checklist. They require the
+> native font stack, a 32px H1, no landing-only type, flat surfaces, 6px radii,
+> and no entrance animation or transform — every one of which the site now
+> deliberately does the opposite of. `check-theme.mjs` and `landing.test.ts`
+> were rewritten to enforce the new system, so implementing this section would
+> now fail the gates rather than satisfy them.
+>
+> **Everything else in this plan still stands and still passes**: the canonical
+> facts, the exact SEO/hero strings, the six-format contract, the capability
+> matrix and its neutrality rules, the roadmap wording, the footer link group,
+> the trademark statement, and the Plan 4 diagram integration.
+>
+> Structural changes made by the redesign:
+>
+> - `FormatList.astro` was **deleted**. The six formats are now rendered by
+>   `landing/PlacementPlate.astro`, which draws a to-scale phone viewport with
+>   the ad region as a solid block that moves per format. It replaced six empty
+>   screenshot placeholders.
+> - `Hero.astro` was added as a Starlight `Hero` component override, so the hero
+>   composes the spec strip and the plate. The splash frontmatter, the single
+>   H1, and the two hero actions are unchanged.
+> - `landing/OriginStory.astro` was added — a short "Why this exists" section
+>   between the capability matrix and compatibility.
+> - `ProjectMetadata.astro` became the hero spec strip and dropped its Release
+>   row; `CompatibilityList.astro` dropped its Maven coordinate row. Both were
+>   duplicates of values stated elsewhere on the page.
+> - The footer gained a two-link attribution line above the trademark. The seven
+>   reference links are unchanged and still asserted as a group.
 
 **Goal:** Replace the placeholder body of
 `docs-site/src/content/docs/index.mdx` with a concise technical-reference entry
@@ -82,14 +118,17 @@ the generated OG URL, and root `SoftwareSourceCode` JSON-LD.
 `landing.ts` exports this stable interface:
 
 ```ts
+// As shipped on 2026-08-02. `screenshot` and `crop` were removed with
+// FormatList.astro; `dimension` is the format's on-screen size, shown beside
+// the API signature. The plate's geometry lives in landing.css keyed by slug,
+// because geometry is presentation.
 export interface LandingFormat {
   slug: string;
   name: string;
   href: string;
   blurb: string;
   api: string;
-  screenshot: string | null;
-  crop: 'top' | 'center' | 'bottom';
+  dimension: string;
 }
 ```
 
@@ -157,7 +196,11 @@ The compact footer link group contains Quickstart, Installation, Compatibility,
 Roadmap, API reference, GitHub, and Apache-2.0 license links plus the exact
 trademark statement. Do not restore the deleted five-column marketing footer.
 
-### Native Reference presentation
+### Native Reference presentation — SUPERSEDED 2026-08-02, do not implement
+
+> Kept for the record only. See the notice at the top of this plan and
+> [`docs-site/DESIGN.md`](../../../docs-site/DESIGN.md). Implementing the rules
+> below now fails `check-theme.mjs` and `landing.test.ts`.
 
 - Use the shared native UI stack for every non-code element. Use
   `--admob-font-mono` only for coordinates, API identifiers, and code.
@@ -209,8 +252,10 @@ trademark statement. Do not restore the deleted five-column marketing footer.
 | `docs-site/src/data/landing.ts` | Typed facts, format records, compatibility data, capability rows, links, and legal copy. |
 | `docs-site/src/content/docs/index.mdx` | Frontmatter, hero, section order, Quickstart example, and component composition. |
 | `docs-site/src/styles/landing.css` | Layout-only spacing, grids, and responsive composition; no color/font/radius tokens. |
-| `docs-site/src/components/landing/ProjectMetadata.astro` | Quiet release/license/platform metadata and copyable Maven coordinate. |
-| `docs-site/src/components/landing/FormatList.astro` | Six-format overview, optionally enhanced with Plan 7 screenshots. |
+| `docs-site/src/components/Hero.astro` | **Added 2026-08-02.** Starlight `Hero` override: renders the H1/tagline/two actions from splash frontmatter and composes the spec strip and the plate. |
+| `docs-site/src/components/landing/ProjectMetadata.astro` | Hero spec strip: licence, platforms, Kotlin, and the copyable Maven coordinate. |
+| `docs-site/src/components/landing/PlacementPlate.astro` | **Replaced `FormatList.astro` 2026-08-02.** Six-format list plus the to-scale phone viewport whose ad region moves per format. CSS-only, no script. |
+| `docs-site/src/components/landing/OriginStory.astro` | **Added 2026-08-02.** Short "Why this exists" section. |
 | `docs-site/src/components/landing/CapabilityMatrix.astro` | Neutral, dated semantic comparison table using the canonical table wrapper. |
 | `docs-site/src/components/landing/CompatibilityList.astro` | Compact compatibility definition list plus binary-compatibility caveat. |
 | `docs-site/src/components/landing/RoadmapSummary.astro` | Two honest gated roadmap items and a link to the complete roadmap. |
@@ -343,20 +388,39 @@ CTA sections, testimonial patterns, statistics, or ornamental product copy.
 - Test diagram imports, compatibility values, roadmap links, license, and exact
   trademark text.
 
-## Task 6: Integrate screenshots when Plan 7 is available
+## Task 6: Integrate screenshots when Plan 7 is available — WITHDRAWN 2026-08-02
 
-**Files:**
+**Decision: the landing page does not show device screenshots. Plan 7's
+captures go to the per-format guide pages (Plan 3) only.**
 
-- Modify only `docs-site/src/data/landing.ts` unless a verified integration bug
-  requires a scoped fix.
+Plan 7 §"Handoff" anticipated this case and states that where Plan 5 disagrees,
+Plan 5 changes rather than the assets being renamed. This is that change; Plan
+7's naming, manifest, alt text and `Screenshot.astro` component are untouched
+and its Plan 3 integration is unaffected.
 
-**Requirements:**
+Why the landing page was the wrong consumer:
 
-- Map manifest filenames to format records without changing component markup.
-- Keep Plan 7 alt text and dimensions authoritative.
-- Do not create light variants of dark-only debug-harness captures.
-- Run the screenshot manifest verifier, landing tests, theme gate, and overflow
-  gate after the data change.
+1. **The plate already answers the question better.** A reader deciding whether
+   to adopt the SDK wants to know where each format lands on screen and what it
+   costs them in layout. The plate shows that to scale for all six formats in
+   one element; six static captures show six screenshots of a debug catalog.
+2. **The captures are dark-only, and Plan 7 forbids fabricating light
+   variants** — correctly, they are faithful source content. Six dark phone
+   images on the light theme would be exactly the foreign-object inconsistency
+   the redesign was commissioned to remove.
+3. **They are captures of the debug harness, not a shipping app.** That is
+   honest, useful evidence inside a format guide ("this is what a collapsible
+   banner does"), and weak evidence on the page that has to establish that the
+   library is production-grade.
+4. **LCP.** This is the SEO entry point. Plan 7 itself flags the cost and tells
+   consumers to keep landing screenshots below the hero and lazy-load them; not
+   shipping them at all is strictly better for the page's primary job.
+
+The machinery this task depended on — `FormatList.astro`, the guarded
+`import.meta.glob('../Screenshot.astro')` lookup, and the `screenshot` / `crop`
+fields on `LandingFormat` — was removed on 2026-08-02 along with the six empty
+placeholder frames. Reinstating it means reversing that decision deliberately,
+not restoring a missing piece.
 
 ## Task 7: Extend rendered verification and finish locally
 
@@ -366,18 +430,23 @@ CTA sections, testimonial patterns, statistics, or ornamental product copy.
 - Modify `docs-site/test/landing.test.ts` only if the rendered contract exposes a
   missing unit-level guard.
 
-**Rendered assertions at 1440px and 390px, both themes:**
+**Rendered assertions at 1440px and 390px, both themes.** Updated 2026-08-02 —
+the first and fourth bullets and the last clause were inverted by the redesign;
+what `check-theme.mjs` asserts today is:
 
-- Native font stack; H1 32px desktop/28px mobile; H2 24px; H3 19px.
+- Archivo family; landing H1 56px desktop / 36px mobile, H2 30px / 26px, H3
+  19px; docs H1 36px, H2 24px, H3 19px; body 16px on a 1.65 rhythm.
 - No element exceeds the viewport and no page-level horizontal overflow exists.
 - Light code uses the light syntax surface; dark code uses the dark surface.
-- Landing groups and screenshot frames use at most 6px radii, no shadow, and no
-  transform.
+- Every landing element's radii come from the `--admob-radius*` scale, and every
+  shadow is either `none` or a shadow token — resolved from the live tokens
+  rather than compared against fixed numbers.
 - Capability table is focusable, labelled, row-structured, and contained.
 - Focus is visible on hero actions, metadata links, format links, the table
-  region, and footer links.
+  region, and both footer link groups.
 - Theme switching remains functional.
-- No entrance animation or spatial hover motion; reduced-motion remains clean.
+- Motion is permitted; under `prefers-reduced-motion: reduce` every landing
+  element must report `animation-name: none`.
 
 **Final verification:**
 
@@ -401,16 +470,22 @@ integration.
 
 ## Acceptance checklist
 
-- [ ] The page reads like a technical reference entry, not a dashboard or
-  campaign landing page.
+Rewritten 2026-08-02: the third, fourth and sixth items described the
+superseded presentation contract. This repository does not tick checkboxes —
+verify each against the repo.
+
+- [ ] The page answers what the SDK supports, who it fits, how to install it,
+  and where platform limits apply, then sends the reader to Quickstart. It is
+  not a dashboard or a campaign page.
 - [ ] Verified project facts cannot silently drift from build configuration.
-- [ ] Typography, code, tables, controls, radii, color, and motion inherit the
-  Native Reference system.
-- [ ] No uppercase mono eyebrow system, pill field, decorative accent blocks,
-  shadow, gradient, lift, or entrance animation exists.
+- [ ] Typography, code, tables, controls, radii, colour, elevation, and motion
+  all resolve through `--admob-*` tokens — see `docs-site/DESIGN.md`.
+- [ ] No literal colour, hard-coded font stack, or off-scale radius exists
+  outside `tokens.css`, and nothing animates without a
+  `prefers-reduced-motion` answer in the same file.
 - [ ] Six formats, consent ordering, platform limitations, compatibility, and
   legal wording are accurate.
-- [ ] Plan 4 diagrams and Plan 7 screenshots are consumed through their supported
-  interfaces.
-- [ ] Desktop/mobile, light/dark, keyboard-focus, reduced-motion, and containment
-  gates pass locally.
+- [ ] Plan 4 diagrams are consumed through their fixed-name components.
+  Plan 7 screenshots are **not** consumed here — see the withdrawn Task 6.
+- [ ] Desktop/mobile, light/dark, keyboard-focus, reduced-motion, and
+  containment gates pass locally.

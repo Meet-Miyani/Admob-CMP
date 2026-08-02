@@ -34,6 +34,9 @@
   --dg-accent: var(--admob-accent);
   /* Decorative gridlines that carry no information on their own. */
   --dg-hair: var(--admob-hair);
+  /* The lighter of the two hairlines, for row separators inside a table where
+     the structure is already carried by the markup and the header band. */
+  --dg-hair-soft: var(--admob-hair-soft);
 }
 
 /* ----------------------------------------------------------------- metrics */
@@ -66,8 +69,28 @@
   overflow-x: auto;
   background: var(--dg-paper);
   border: var(--admob-border);
-  border-radius: var(--admob-radius);
+  /* Matches .table-scroll in tokens.css — a figure and a table are the same
+     kind of bounded object and must not have two different corner radii. */
+  border-radius: var(--admob-radius-lg);
   padding: 1rem;
+}
+
+/* A table already draws its own boundaries: a header band and hairline rows.
+   Padding the frame around it as well produced a visible box inside a box. Drop
+   the padding so the frame hugs the table exactly the way .table-scroll does,
+   and let the rounded frame clip the header band's corners. */
+.dg-scroll:has(.dg-table) {
+  padding: 0;
+}
+
+.dg-scroll:has(.dg-table) .dg-table caption {
+  padding: 0.875rem 0.875rem 0.625rem;
+}
+
+/* Two tables in one frame need a rule between them, not just white space. */
+.dg-scroll:has(.dg-table) .dg-table + .dg-table {
+  margin-top: 0;
+  border-top: 1px solid var(--dg-hair);
 }
 
 .dg-scroll:focus-visible {
@@ -219,54 +242,215 @@
   fill: var(--admob-accent-soft);
 }
 
+/* ------------------------------------------------- expand-to-dialog (JS-only)
+ * These controls are created by the script in DiagramFigure.astro, so nothing
+ * here renders unless JavaScript ran. The inline scroll region remains the
+ * baseline experience.
+ */
+
+.dg-expand {
+  margin-inline-start: auto;
+  padding: 0.25rem 0.625rem;
+  border: var(--admob-border);
+  border-radius: var(--admob-radius-sm);
+  background: transparent;
+  color: var(--dg-muted);
+  font-family: var(--admob-font-body);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 150ms var(--admob-ease), border-color 150ms var(--admob-ease),
+    background-color 150ms var(--admob-ease);
+}
+
+.dg-expand:hover {
+  border-color: var(--dg-ink);
+  background: var(--dg-node);
+  color: var(--dg-ink);
+}
+
+.dg-dialog {
+  width: min(96vw, 1600px);
+  max-width: none;
+  max-height: 92vh;
+  padding: 0;
+  border: var(--admob-border);
+  border-radius: var(--admob-radius-lg);
+  background: var(--dg-paper);
+  color: var(--dg-ink);
+  box-shadow: var(--admob-shadow-lg);
+}
+
+.dg-dialog::backdrop {
+  /* ::backdrop cannot see the element's inherited custom properties in every
+     engine, so the token is read off :root rather than from --dg-*. */
+  background: var(--admob-scrim);
+  backdrop-filter: blur(2px);
+}
+
+.dg-dialog__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--dg-hair);
+}
+
+.dg-dialog__title {
+  color: var(--dg-ink);
+  font-family: var(--admob-font-body);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.dg-dialog__close {
+  padding: 0.3125rem 0.75rem;
+  border: var(--admob-border);
+  border-radius: var(--admob-radius-sm);
+  background: transparent;
+  color: var(--dg-muted);
+  font-family: var(--admob-font-body);
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: color 150ms var(--admob-ease), border-color 150ms var(--admob-ease);
+}
+
+.dg-dialog__close:hover {
+  border-color: var(--dg-ink);
+  color: var(--dg-ink);
+}
+
+.dg-dialog__body {
+  overflow: auto;
+  max-height: calc(92vh - 3.5rem);
+  padding: 1rem;
+}
+
+/* Inside the dialog the frame is the dialog itself. */
+.dg-dialog__body .dg-scroll {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+}
+
 /* -------------------------------------------------------------- the table */
 /* PlatformMatrix is tabular data, so it ships as a real <table>: better for
    assistive technology and better for indexing than SVG text in a grid. */
 
+/* This is a data table and must read as one of the site's tables, not as a
+   diagram that happens to be tabular. Every value below is deliberately the
+   same as the `.table-scroll` treatment in tokens.css: mono eyebrow column
+   headers, body-face row headers, hairline row separators and no vertical
+   rules. It used to be a heavy full grid ruled in --dg-stroke at 14.4px, which
+   made the Platform support matrix the odd one out on every page it appears. */
+
 .dg-table {
-  width: 100%;
-  /* Same overflow contract as the SVGs: below --dg-min-w the scroll region
-     scrolls rather than crushing the columns. */
-  min-width: var(--dg-min-w, 0px);
+  /* Starlight's markdown CSS sets `display: block; overflow-x: auto` on every
+     table so a bare table can scroll. This one is already inside .dg-scroll,
+     and a block-display table is not a table box: it sizes like a div at the
+     container width while its cells lay out wider and spill out of it, which
+     renders as text clipped mid-word. Restoring `display: table` lets the box
+     grow to its content and lets .dg-scroll do the scrolling. */
+  display: table;
+  overflow: visible;
+  /* min-width rather than width, for the same reason: the table fills the
+     region and is still allowed to outgrow it. Below --dg-min-w the region
+     scrolls rather than crushing the columns — the same contract as the SVGs. */
+  min-width: max(100%, var(--dg-min-w, 0px));
   border-collapse: collapse;
   color: var(--dg-ink);
   font-family: var(--admob-font-body);
-  font-size: 0.9rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
 }
 
 .dg-table + .dg-table {
-  margin-top: 1.5rem;
+  margin-top: 2rem;
 }
 
 .dg-table caption {
   caption-side: top;
-  padding-bottom: 0.5rem;
+  padding-bottom: 0.625rem;
   color: var(--dg-muted);
-  font-size: 0.85rem;
+  font-family: var(--admob-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
   text-align: left;
 }
 
 .dg-table th,
 .dg-table td {
-  border: 1px solid var(--dg-stroke);
-  padding: 0.5rem 0.7rem;
+  border: 0;
+  border-bottom: 1px solid var(--dg-hair-soft);
+  padding: 0.75rem 0.875rem;
   text-align: left;
   vertical-align: top;
 }
 
+/* Notes cells carry long unbreakable identifiers such as
+   `AdTrackingAuthorization`. Without this their min-content width sets the
+   floor for the whole table and the cell renders outside the table box.
+   Data cells only — row headers are short phrases and must break on spaces,
+   or "App Tracking Transparency" ends up hyphen-less across three lines. */
+.dg-table td {
+  overflow-wrap: anywhere;
+}
+
+/* Floors for the two columns that fight each other: the row header must stay
+   readable, and the notes column must not be squeezed so narrow that
+   `overflow-wrap` starts chopping identifiers every two syllables. Once both
+   floors plus the status columns exceed the container, .dg-scroll scrolls —
+   which is the honest outcome for a table this wide. */
+.dg-table tbody th {
+  min-width: 8rem;
+}
+
+.dg-table td:last-child {
+  min-width: 15rem;
+}
+
 .dg-table thead th {
+  border-bottom: 1px solid var(--dg-hair);
   background: var(--dg-node);
-  font-weight: 600;
+  color: var(--dg-ink);
+  font-family: var(--admob-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
 }
 
 .dg-table tbody th {
+  background: transparent;
+  font-weight: 600;
+}
+
+.dg-table tbody tr:last-child th,
+.dg-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.dg-table tbody tr {
+  transition: background-color 120ms var(--admob-ease);
+}
+
+.dg-table tbody tr:hover {
   background: var(--dg-node);
-  font-weight: 500;
 }
 
 /* The glyph is decoration; the adjacent word carries the meaning. */
 .dg-mark {
   font-family: var(--admob-font-mono);
+  margin-inline-end: 0.125rem;
+}
+
+/* A status cell is one token of meaning — "✔ Supported" must not break across
+   two lines when the column is narrow. The scroll region already handles the
+   case where that makes the table wider than its container. */
+.dg-table td:has(.dg-mark) {
+  white-space: nowrap;
 }
 
 /* ------------------------------------------------------- the Mermaid bridge */

@@ -43,3 +43,71 @@ const scrollStyle = minWidth ? `--dg-min-w:${minWidth}px` : undefined;
     </a>
   </figcaption>
 </figure>
+
+<script>
+  /**
+   * Progressive enhancement only. Without this script every diagram is still a
+   * keyboard-focusable, horizontally scrollable region — which is why the
+   * Expand control is created here rather than rendered server-side: a control
+   * that does nothing without JavaScript should not exist in the markup.
+   *
+   * The scroll region is MOVED into the dialog and moved back on close, never
+   * cloned. The Mermaid diagrams carry id-scoped <style> blocks and
+   * aria-labelledby references inside their SVG, so a clone would duplicate
+   * every one of those ids.
+   */
+  for (const figure of document.querySelectorAll<HTMLElement>('.dg-figure')) {
+    const scroll = figure.querySelector<HTMLElement>('.dg-scroll');
+    const caption = figure.querySelector('.dg-caption');
+    if (!scroll || !caption) continue;
+
+    const label = scroll.getAttribute('aria-label')?.replace(' — scrollable diagram', '') ?? 'Diagram';
+
+    const dialog = document.createElement('dialog');
+    dialog.className = 'dg-dialog';
+    dialog.setAttribute('aria-label', label);
+
+    const bar = document.createElement('div');
+    bar.className = 'dg-dialog__bar';
+    const heading = document.createElement('span');
+    heading.className = 'dg-dialog__title';
+    heading.textContent = label;
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'dg-dialog__close';
+    close.textContent = 'Close';
+    bar.append(heading, close);
+
+    const body = document.createElement('div');
+    body.className = 'dg-dialog__body';
+    dialog.append(bar, body);
+    figure.append(dialog);
+
+    const expand = document.createElement('button');
+    expand.type = 'button';
+    expand.className = 'dg-expand';
+    expand.textContent = 'Expand';
+    expand.setAttribute('aria-label', `Open ${label} at full size`);
+    caption.append(expand);
+
+    const anchor = document.createComment('dg-scroll');
+
+    expand.addEventListener('click', () => {
+      scroll.replaceWith(anchor);
+      body.append(scroll);
+      dialog.showModal();
+      scroll.focus();
+    });
+
+    dialog.addEventListener('close', () => {
+      anchor.replaceWith(scroll);
+      expand.focus();
+    });
+
+    close.addEventListener('click', () => dialog.close());
+    // Clicking the backdrop closes; clicking the diagram itself must not.
+    dialog.addEventListener('click', (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+  }
+</script>
