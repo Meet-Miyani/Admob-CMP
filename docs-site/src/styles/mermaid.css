@@ -56,3 +56,17 @@
   background: var(--admob-paper) !important;
   fill: var(--admob-paper) !important;
 }
+
+/* Mermaid renders a flowchart edge label as
+ *   <foreignObject><div class="labelBkg"><span class="edgeLabel">text</span>
+ * and the SPAN carries its own white background from the baked-in light theme.
+ * The rule above only reaches the div, so in the dark theme these labels were
+ * near-white text on a white chip — the branch labels on the consent decision
+ * tree were invisible. `background-color` only: `fill` does not paint HTML
+ * inside a foreignObject, and the text colour is set by the rule above.
+ */
+:root[data-theme='dark'] .sl-markdown-content svg[id^='mermaid'] span.edgeLabel,
+:root[data-theme='dark'] .sl-markdown-content svg[id^='mermaid'] .edgeLabel .labelBkg,
+:root[data-theme='dark'] .sl-markdown-content svg[id^='mermaid'] .edgeLabel p {
+  background-color: var(--admob-paper) !important;
+}
