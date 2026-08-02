@@ -145,10 +145,14 @@ needs the Xcode-provided iOS SDK headers, which a Linux runner does not
 have. This is why the pipeline splits `api-reference` (macOS) and
 `docs-site` (Ubuntu) into two jobs with an artifact handoff.
 
-Local docs work only needs Node — `cd docs-site && npm ci && npm test &&
-npm run build && npm run verify` is sufficient to validate Astro
-changes once `./gradlew syncApiDocsToDocsSite` has populated
-`docs-site/public/api/`.
+Local docs work only needs Node — `cd docs-site && npm ci && npm run build &&
+npm test && npm run verify` is sufficient to validate Astro changes once
+`./gradlew syncApiDocsToDocsSite` has populated `docs-site/public/api/`.
+**Build before test, not the other way round** — some Vitest cases assert
+against rendered `dist/` output and hard-fail rather than skip when it is
+absent. Test-before-build shipped for a while and looked fine locally
+because a stale `dist/` from an earlier manual build was still on disk; a
+truly clean tree, including CI, fails.
 
 Read `docs-site/DESIGN.md` before changing `tokens.css`, `landing.css` or
 `diagrams.css`. It records what the design system is for, which colour
