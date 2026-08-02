@@ -187,8 +187,13 @@ if [ "$SKIP_DOCS" = "false" ]; then
     # ubuntu-latest `docs-site` job in release.yml. On macOS, plain
     # `playwright install chromium` is correct.
     npx playwright install chromium
-    npm test
+    # Build before test: some Vitest cases assert against dist/ output (the
+    # rendered <h1>, format/roadmap order, the diagram gallery) and hard-fail
+    # rather than skip when dist/ is absent. Test-before-build looked clean
+    # locally only because a stale dist/ from an earlier manual build was
+    # still on disk — a truly clean tree fails. See AGENTS.md.
     npm run build
+    npm test
     npm run check:theme
     npm run check:overflow
     npm run verify

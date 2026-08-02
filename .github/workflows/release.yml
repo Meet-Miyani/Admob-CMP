@@ -198,16 +198,21 @@ jobs:
         run: npx playwright install --with-deps chromium
         working-directory: docs-site
 
-      # The one permitted test step in this pipeline: the docs site's own
-      # Vitest suite (9 tests, ~0.1s) over docs-site/src/lib/seo.ts. It guards
-      # the JSON-LD and OG-image output and is part of building the site, not
-      # of verifying the SDK. It is not a precedent for adding SDK test jobs.
-      - name: Unit-test the SEO helpers
-        run: npm test
-        working-directory: docs-site
-
       - name: Build the site
         run: npm run build
+        working-directory: docs-site
+
+      # The one permitted test step in this pipeline: the docs site's own
+      # Vitest suite. It is part of building the site, not of verifying the
+      # SDK, and is not a precedent for adding SDK test jobs.
+      #
+      # Runs AFTER the build, not before. Some cases assert against dist/
+      # output (exact rendered <h1>, format/roadmap order, the diagram
+      # gallery) and hard-fail rather than skip when dist/ is absent — running
+      # this step first left that coverage silently dead in CI, since nothing
+      # here re-runs npm test after the build. See AGENTS.md.
+      - name: Unit-test the docs site
+        run: npm test
         working-directory: docs-site
 
       - name: Verify the built output
