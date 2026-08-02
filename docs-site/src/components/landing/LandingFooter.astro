@@ -9,7 +9,14 @@
  * regression tests. The GitHub link resolves the canonical repo URL from
  * the data module so the value cannot drift from `landing.ts`.
  */
-import { repoUrl, trademarkStatement } from '../../data/landing';
+import {
+  authorName,
+  authorUrl,
+  repoUrl,
+  studioName,
+  studioUrl,
+  trademarkStatement,
+} from '../../data/landing';
 import '../../styles/landing.css';
 ---
 
@@ -25,5 +32,8 @@ import '../../styles/landing.css';
       <a href="https://www.apache.org/licenses/LICENSE-2.0.txt">Apache-2.0 license</a>
     </li>
   </ul>
+  <p class="landing-footer__author">
+    Built by <a href={authorUrl}>{authorName}</a> at <a href={studioUrl}>{studioName}</a>.
+  </p>
   <p class="landing-footer__legal">{trademarkStatement}</p>
 </footer>

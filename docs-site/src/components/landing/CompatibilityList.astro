@@ -1,10 +1,15 @@
 ---
 /**
  * Compatibility facts as a compact definition list: Kotlin, Compose
- * Multiplatform, Android minSdk, iOS deployment target, and the Maven
- * coordinate. Followed by the consent/ATT/initialize sequence diagram and
- * the platform support matrix, both imported by their fixed names from
- * Plan 4 so their SVG/table markup is not duplicated here.
+ * Multiplatform, Android minSdk, iOS deployment target. Followed by the
+ * consent/ATT/initialize sequence diagram and the platform support matrix,
+ * both imported by their fixed names from Plan 4 so their SVG/table markup is
+ * not duplicated here.
+ *
+ * The Maven coordinate is deliberately NOT here. It is an identity fact, not a
+ * compatibility fact, and the page already states it twice: in the hero spec
+ * strip and in the Quick start dependency block. A third copy added nothing and
+ * was the one cell narrow enough to wrap mid-coordinate.
  */
 import { landingMeta } from '../../data/landing';
 import InitSequence from '../diagrams/InitSequence.astro';
@@ -30,12 +35,6 @@ import '../../styles/landing.css';
     <div>
       <dt>iOS</dt>
       <dd>deployment target {landingMeta.iosDeploymentTarget}</dd>
-    </div>
-    <div>
-      <dt>Maven coordinate</dt>
-      <dd>
-        <code class="admob-font-mono">{landingMeta.mavenCoordinate}</code>
-      </dd>
     </div>
   </dl>
   <p class="landing-compatibility__klib-caveat">

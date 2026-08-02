@@ -4,8 +4,15 @@ export interface LandingFormat {
   href: string;
   blurb: string;
   api: string;
-  screenshot: string | null;
-  crop: 'top' | 'center' | 'bottom';
+  /**
+   * The format's on-screen size, as a developer would state it. Shown beside
+   * the API signature on the landing page.
+   *
+   * The matching *geometry* — where the ad region sits inside the phone
+   * viewport that the placement plate draws — lives in landing.css keyed by
+   * slug, because it is presentation. Only the wording lives here.
+   */
+  dimension: string;
 }
 
 export const formats: readonly LandingFormat[] = [
@@ -15,8 +22,7 @@ export const formats: readonly LandingFormat[] = [
     href: '/formats/banner/',
     blurb: 'Inline rectangular ad anchored inside Compose layout.',
     api: 'BannerAdView(placement)',
-    screenshot: null,
-    crop: 'bottom',
+    dimension: '320 × 50 dp',
   },
   {
     slug: 'interstitial',
@@ -24,8 +30,7 @@ export const formats: readonly LandingFormat[] = [
     href: '/formats/interstitial/',
     blurb: 'Full-screen ad shown at a natural transition point.',
     api: 'adManager.interstitial(placement)',
-    screenshot: null,
-    crop: 'center',
+    dimension: 'full screen',
   },
   {
     slug: 'rewarded',
@@ -33,8 +38,7 @@ export const formats: readonly LandingFormat[] = [
     href: '/formats/rewarded/',
     blurb: 'Full-screen ad that grants a reward on completion.',
     api: 'adManager.rewarded(placement)',
-    screenshot: null,
-    crop: 'center',
+    dimension: 'full screen',
   },
   {
     slug: 'rewarded-interstitial',
@@ -42,8 +46,7 @@ export const formats: readonly LandingFormat[] = [
     href: '/formats/rewarded/#how-is-a-rewarded-interstitial-different',
     blurb: 'Full-screen rewarded ad shown at a natural transition point.',
     api: 'adManager.rewardedInterstitial(placement)',
-    screenshot: null,
-    crop: 'center',
+    dimension: 'full screen',
   },
   {
     slug: 'app-open',
@@ -51,8 +54,7 @@ export const formats: readonly LandingFormat[] = [
     href: '/formats/app-open/',
     blurb: 'Full-screen ad shown when the app returns to the foreground.',
     api: 'AppOpenAdCoordinator(manager, controller, config)',
-    screenshot: null,
-    crop: 'top',
+    dimension: 'full screen',
   },
   {
     slug: 'native',
@@ -60,8 +62,7 @@ export const formats: readonly LandingFormat[] = [
     href: '/formats/native/',
     blurb: 'Compose-rendered ad built from a typed layout DSL and pooled across screens.',
     api: 'NativeAdView(placement, itemKey, layout)',
-    screenshot: null,
-    crop: 'center',
+    dimension: 'sized by your layout',
   },
 ];
 
@@ -168,6 +169,27 @@ export const roadmapItems: readonly RoadmapItem[] = [
 export const repoUrl = 'https://github.com/Meet-Miyani/admob-compose-multiplatform';
 export const trademarkStatement =
   'Not affiliated with or endorsed by Google. AdMob and Google Mobile Ads are trademarks of Google LLC.';
+
+export const authorName = 'Meet Miyani';
+export const studioName = 'Avinya';
+export const studioUrl = 'https://avinya.dev';
+/** The repo owner's profile, derived so it cannot drift from `repoUrl`. */
+export const authorUrl = repoUrl.split('/').slice(0, 4).join('/');
+
+/**
+ * Why the library exists. Kept here rather than in the component so the wording
+ * is reviewable in one place alongside the other public copy.
+ *
+ * TODO(origin-app): the app this was extracted from is not live yet, so the
+ * third paragraph describes it generically. When it ships, name and link it.
+ */
+export const originStory = {
+  paragraphs: [
+    'Putting ads into a Compose Multiplatform app meant leaving Compose. The Google Mobile Ads SDKs are Android and iOS libraries with callback-based APIs, so the shared module ended up holding an expect/actual seam, two sets of platform glue, and a consent flow bolted on afterwards.',
+    'Samples and libraries already covered this ground, and they helped. What was still wanted was ads shaped like the rest of a Compose Multiplatform codebase: composables for the ad surfaces, suspend functions and StateFlow for the lifecycle, and consent gathered as part of initialization rather than as a step to remember.',
+    'So it was built inside an app that was being written, then extracted once the shape had settled. The APIs here are the ones that had to hold up on real screens: a native ad pool with max-size accounting, retry and cache behaviour with the numbers written down, and an iOS ordering — consent, then tracking authorization, then initialize — that the library sequences for you.',
+  ],
+} as const;
 
 export interface LandingMeta {
   mavenCoordinate: string;

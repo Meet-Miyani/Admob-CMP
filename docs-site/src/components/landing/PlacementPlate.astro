@@ -1,0 +1,62 @@
+---
+/**
+ * The placement plate — the landing page's signature element.
+ *
+ * A phone viewport drawn at a true 9:19.5 aspect with the ad region as a solid
+ * accent block. Hovering or focusing any of the six format rows moves and
+ * resizes that block to the real geometry of the format, read from
+ * `formats[].placement` in the data module.
+ *
+ * There is no JavaScript. The whole interaction is `:has()` + `:hover` /
+ * `:focus-visible` in landing.css, so it works with scripting disabled, and
+ * every row is a plain anchor that navigates to the format guide when clicked.
+ * The block's resting state is the banner geometry.
+ *
+ * The phone is `aria-hidden` on purpose: everything it conveys — the format
+ * name, what it does, its dimension and its API — is already text in the rows
+ * beside it. The plate annotates that list; it is not a second copy of it.
+ */
+import { formats } from '../../data/landing';
+import '../../styles/landing.css';
+---
+
+{/* Two roots on purpose. `.landing-opening` in Hero.astro is a grid: the stage
+    sits in the right-hand column and spans both rows so it stays beside the
+    headline and then tracks the format list as you scroll past it. */}
+
+<div class="landing-plate__stage" aria-hidden="true">
+  <div class="landing-plate__viewport">
+    <div class="landing-plate__content">
+      <span class="landing-plate__bar landing-plate__bar--wide"></span>
+      <span class="landing-plate__bar"></span>
+      <span class="landing-plate__bar landing-plate__bar--short"></span>
+      <span class="landing-plate__bar"></span>
+      <span class="landing-plate__bar landing-plate__bar--short"></span>
+      <span class="landing-plate__bar"></span>
+      <span class="landing-plate__bar landing-plate__bar--short"></span>
+    </div>
+    <div class="landing-plate__ad"></div>
+  </div>
+</div>
+
+<section class="landing-plate__formats" aria-labelledby="supported-formats">
+  <h2 id="supported-formats">Supported formats</h2>
+  <p class="landing-plate__lede">
+    Hover or focus a format to see where its ad region lands on screen.
+  </p>
+
+  <ol class="landing-formats">
+    {formats.map((format) => (
+      <li class="landing-format">
+        <a href={format.href} data-format={format.slug}>
+          <span class="landing-format__name">{format.name}</span>
+          <span class="landing-format__blurb">{format.blurb}</span>
+          <span class="landing-format__meta">
+            <span class="landing-format__dimension">{format.dimension}</span>
+            <code class="admob-font-mono landing-format__api">{format.api}</code>
+          </span>
+        </a>
+      </li>
+    ))}
+  </ol>
+</section>
