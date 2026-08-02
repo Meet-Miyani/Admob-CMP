@@ -220,7 +220,11 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=admob-cmp-docs --branch=master
+          # The Pages project name lives here and nowhere else. The host guard
+          # in docs-site/functions/_middleware.js derives the preview hosts by
+          # label count rather than matching this string, so renaming the
+          # project only requires changing this line.
+          command: pages deploy dist --project-name=admob-compose-multiplatform --branch=master
           workingDirectory: docs-site
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
