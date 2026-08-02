@@ -20,7 +20,7 @@ fail() { echo "  FAIL: $*"; FAIL=1; }
 ok()   { echo "  ok:   $*"; }
 
 prop() { # prop <file> <key> -> value, or empty
-  sed -n "s/^$2=//p" "$1" | head -1
+  sed -n "s/^$2[[:space:]]*=[[:space:]]*//p" "$1" | head -1
 }
 
 check_eq() { # check_eq <file> <key> <expected>
@@ -47,7 +47,7 @@ for f in "${ROOT}/gradle.properties" "${ROOT}/admob-cmp-gradle-plugin/gradle.pro
 done
 
 echo "== No file anywhere still references the old repo slug =="
-if grep -rn "${OLD_REPO}" "${ROOT}"/gradle.properties "${ROOT}"/*/gradle.properties 2>/dev/null; then
+if find "${ROOT}" -name "gradle.properties" -exec grep -q "${OLD_REPO}" {} + 2>/dev/null; then
   fail "the pre-rename repo URL is still present in a gradle.properties file"
 else
   ok "no gradle.properties references ${OLD_REPO}"

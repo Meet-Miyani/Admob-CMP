@@ -66,8 +66,12 @@ printf -- "- Docs site reachable: "
 curl -s -o /dev/null -w '%{http_code}\n' --max-time 25 -L https://ads.avinya.dev
 
 printf -- "- Docs sitemap URL count: "
-curl -sL --max-time 25 https://ads.avinya.dev/sitemap-index.xml https://ads.avinya.dev/sitemap-0.xml 2>/dev/null \
-  | grep -c "<loc>" || echo "0 (sitemap not found — check the path Plan 2 configured)"
+COUNT="$(curl -sL --max-time 25 https://ads.avinya.dev/sitemap-index.xml https://ads.avinya.dev/sitemap-0.xml 2>/dev/null | grep -c "<loc>" || true)"
+if [ "${COUNT}" -gt 0 ] 2>/dev/null; then
+  echo "${COUNT}"
+else
+  echo "0 (sitemap not found — check the path Plan 2 configured)"
+fi
 
 cat <<'TODO'
 

@@ -35,15 +35,28 @@ if printf '%s' "${BODY}" | grep -q 'not-found-page-message'; then
   exit 1
 fi
 
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "  RESULT: UNKNOWN (python3 not found in PATH)"
+  exit 2
+fi
+
 echo "  RESULT: INDEXED"
 echo
 echo "  Metadata rendered on the page (verify each against docs/distribution/klibs-io.md):"
-printf '%s' "${BODY}" | python3 -c '
+PY_OUT="$(printf '%s' "${BODY}" | python3 -c '
 import sys, re, html
-s = sys.stdin.read()
-s = re.sub(r"<script.*?</script>", " ", s, flags=re.S)
-s = re.sub(r"<style.*?</style>", " ", s, flags=re.S)
-t = html.unescape(re.sub(r"<[^>]+>", " ", s))
-print("   ", re.sub(r"\s+", " ", t).strip()[:900])
-'
+try:
+    s = sys.stdin.read()
+    s = re.sub(r"<script.*?</script>", " ", s, flags=re.S)
+    s = re.sub(r"<style.*?</style>", " ", s, flags=re.S)
+    t = html.unescape(re.sub(r"<[^>]+>", " ", s))
+    print("   ", re.sub(r"\s+", " ", t).strip()[:900])
+except Exception:
+    sys.exit(1)
+' 2>/dev/null)" || {
+  echo "  RESULT: UNKNOWN (metadata extraction failed)"
+  exit 2
+}
+
+echo "${PY_OUT}"
 exit 0
