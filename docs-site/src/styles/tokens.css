@@ -1,23 +1,44 @@
 /* docs-site/src/styles/tokens.css
  *
- * The AdMob CMP native reference language, mapped onto Starlight.
+ * The AdMob CMP design language, mapped onto Starlight.
  *
  * PUBLIC CONTRACT — diagrams and landing-page styles consume these custom
  * properties. Do not rename one without updating those consumers:
  *
- *   --admob-paper --admob-surface --admob-code --admob-ink --admob-slate
- *   --admob-hair --admob-accent --admob-accent-text
- *   --admob-accent-contrast --admob-accent-soft
+ *   --admob-paper --admob-surface --admob-raised --admob-code
+ *   --admob-ink --admob-slate --admob-hair --admob-hair-soft
+ *   --admob-accent --admob-accent-text
+ *   --admob-accent-contrast --admob-accent-soft --admob-tint --admob-scrim
  *   --admob-font-display --admob-font-body --admob-font-mono
- *   --admob-tracking-tight --admob-tracking-tighter
- *   --admob-radius --admob-radius-lg --admob-border --admob-shadow
- *   --admob-content-max --admob-reading --admob-ease
+ *   --admob-stretch-display
+ *   --admob-tracking-tight --admob-tracking-tighter --admob-tracking-label
+ *   --admob-radius-sm --admob-radius --admob-radius-lg --admob-radius-xl
+ *   --admob-border --admob-shadow --admob-shadow-lg
+ *   --admob-content-max --admob-reading --admob-ease --admob-ease-out
+ *
+ * Colour rules the tests enforce (test/diagram-contrast.test.ts):
+ *   ink and slate must both clear 4.5:1 on paper AND on surface, in both
+ *   themes. accent must clear 3:1 on both — it is a stroke/large-text colour
+ *   only and must never be used for body-size text. accent-text is the
+ *   text-safe accent and clears 4.5:1 on paper.
  *
  * This file is unlayered on purpose: Starlight ships its properties inside
  * `@layer starlight.base`, and unlayered author rules beat layered ones.
  */
 
 /* ------------------------------------------------------------------ fonts */
+
+/* Archivo Variable carries both axes in one file: wght 100–900 and
+   wdth 62–125 (exposed to CSS as font-stretch 62%–125%). The display face is
+   the same family pushed wide, not a second download. */
+@font-face {
+  font-family: 'Archivo Variable';
+  font-style: normal;
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  font-display: swap;
+  src: url('/fonts/archivo-wdth.woff2') format('woff2-variations');
+}
 
 @font-face {
   font-family: 'JetBrains Mono';
@@ -39,95 +60,113 @@
 
 :root,
 :root[data-theme='dark'] {
-  --admob-paper: #0d1117;
-  --admob-surface: #161b22;
-  --admob-code: #161b22;
-  --admob-ink: #e6edf3;
-  --admob-slate: #8b949e;
-  --admob-hair: #30363d;
+  --admob-paper: #0c0a09;
+  --admob-surface: #15110f;
+  --admob-raised: #1e1917;
+  --admob-code: #15110f;
+  --admob-ink: #f5f1ee;
+  --admob-slate: #a39b96;
+  --admob-hair: #2c2522;
+  --admob-hair-soft: #1f1a18;
   --admob-accent: #ee3a20;
-  --admob-accent-text: #ff9a88;
+  --admob-accent-text: #ff8b73;
   --admob-accent-contrast: #ffffff;
-  --admob-accent-soft: rgba(238, 58, 32, 0.14);
+  --admob-accent-soft: rgba(238, 58, 32, 0.16);
+  --admob-tint: rgba(238, 58, 32, 0.05);
+  --admob-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --admob-shadow-lg: 0 18px 48px -24px rgba(0, 0, 0, 0.8);
+  /* Modal scrim. Heavier in the dark theme: a dark dialog over a near-black
+     page needs more separation than the same scrim gives on white. */
+  --admob-scrim: rgba(0, 0, 0, 0.72);
 }
 
 /* ------------------------------------------------------- tokens: light */
 
 :root[data-theme='light'] {
   --admob-paper: #ffffff;
-  --admob-surface: #f6f8fa;
-  --admob-code: #f6f8fa;
-  --admob-ink: #1f2328;
-  --admob-slate: #59636e;
-  --admob-hair: #d0d7de;
+  --admob-surface: #f7f5f3;
+  --admob-raised: #ffffff;
+  --admob-code: #f7f5f3;
+  --admob-ink: #171310;
+  --admob-slate: #6b625c;
+  --admob-hair: #e3deda;
+  --admob-hair-soft: #efebe8;
   --admob-accent: #ee3a20;
-  --admob-accent-text: #9e2411;
+  --admob-accent-text: #b32a12;
   --admob-accent-contrast: #ffffff;
   --admob-accent-soft: rgba(238, 58, 32, 0.1);
+  --admob-tint: rgba(238, 58, 32, 0.04);
+  --admob-shadow: 0 1px 2px rgba(23, 19, 16, 0.08);
+  --admob-shadow-lg: 0 18px 48px -24px rgba(23, 19, 16, 0.28);
+  --admob-scrim: rgba(23, 19, 16, 0.5);
 }
 
 /* -------------------------------------------- tokens: theme-independent */
 
 :root {
-  --admob-font-display: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans',
-    'Helvetica Neue', Arial, sans-serif;
+  --admob-font-display: 'Archivo Variable', 'Archivo', -apple-system,
+    BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Helvetica Neue', Arial, sans-serif;
   --admob-font-body: var(--admob-font-display);
   --admob-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas,
     'Liberation Mono', monospace;
-  --admob-tracking-tight: 0;
-  --admob-tracking-tighter: 0;
-  --admob-radius: 6px;
-  --admob-radius-lg: 6px;
+  /* The display face is the body face pushed onto its width axis. Kept modest
+     on purpose: past roughly 106% the wide letterforms start costing more in
+     legibility than they return in character, and this is a reference site. */
+  --admob-stretch-display: 104%;
+  --admob-tracking-tight: -0.02em;
+  --admob-tracking-tighter: -0.035em;
+  --admob-tracking-label: 0.08em;
+  --admob-radius-sm: 4px;
+  --admob-radius: 8px;
+  --admob-radius-lg: 12px;
+  --admob-radius-xl: 18px;
   --admob-border: 1px solid var(--admob-hair);
-  --admob-shadow: none;
-  --admob-content-max: 72rem;
+  --admob-content-max: 78rem;
   --admob-reading: 45rem;
-  --admob-ease: ease-out;
+  --admob-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --admob-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ------------------------------------------- remap Starlight onto tokens */
 
 :root,
 :root[data-theme='dark'] {
-  --sl-color-white: #f0f6fc;
-  --sl-color-gray-1: #e6edf3;
-  --sl-color-gray-2: #b1bac4;
-  --sl-color-gray-3: #8b949e;
-  --sl-color-gray-4: #6e7681;
-  --sl-color-gray-5: #30363d;
-  --sl-color-gray-6: #161b22;
-  --sl-color-black: #0d1117;
+  --sl-color-white: #ffffff;
+  --sl-color-gray-1: #f5f1ee;
+  --sl-color-gray-2: #c9c1bc;
+  --sl-color-gray-3: #a39b96;
+  --sl-color-gray-4: #6f6762;
+  --sl-color-gray-5: #2c2522;
+  --sl-color-gray-6: #15110f;
+  --sl-color-black: #0c0a09;
 
   --sl-color-accent: var(--admob-accent);
   --sl-color-accent-high: var(--admob-accent-text);
-  --sl-color-accent-low: #4a150c;
+  --sl-color-accent-low: #45130a;
   --sl-color-text-invert: var(--admob-paper);
-
-  --sl-color-bg: var(--admob-paper);
-  --sl-color-bg-nav: var(--admob-paper);
-  --sl-color-bg-sidebar: var(--admob-paper);
-  --sl-color-bg-inline-code: var(--admob-surface);
-  --sl-color-hairline: var(--admob-hair);
-  --sl-color-hairline-light: var(--admob-hair);
-  --sl-color-hairline-shade: var(--admob-hair);
 }
 
 :root[data-theme='light'] {
-  --sl-color-white: #1f2328;
-  --sl-color-gray-1: #24292f;
-  --sl-color-gray-2: #424a53;
-  --sl-color-gray-3: #59636e;
-  --sl-color-gray-4: #818b98;
-  --sl-color-gray-5: #d0d7de;
-  --sl-color-gray-6: #eaeef2;
-  --sl-color-gray-7: #f6f8fa;
+  --sl-color-white: #171310;
+  --sl-color-gray-1: #221c19;
+  --sl-color-gray-2: #4a423c;
+  --sl-color-gray-3: #6b625c;
+  --sl-color-gray-4: #8d847d;
+  --sl-color-gray-5: #e3deda;
+  --sl-color-gray-6: #efebe8;
+  --sl-color-gray-7: #f7f5f3;
   --sl-color-black: #ffffff;
 
   --sl-color-accent: var(--admob-accent);
   --sl-color-accent-high: var(--admob-accent-text);
   --sl-color-accent-low: #fbdcd6;
   --sl-color-text-invert: #ffffff;
+}
 
+:root,
+:root[data-theme='dark'],
+:root[data-theme='light'] {
+  --sl-color-text-accent: var(--admob-accent-text);
   --sl-color-bg: var(--admob-paper);
   --sl-color-bg-nav: var(--admob-paper);
   --sl-color-bg-sidebar: var(--admob-paper);
@@ -137,17 +176,11 @@
   --sl-color-hairline-shade: var(--admob-hair);
 }
 
-:root,
-:root[data-theme='dark'],
-:root[data-theme='light'] {
-  --sl-color-text-accent: var(--admob-accent-text);
-}
-
 :root {
   --sl-font: var(--admob-font-body);
   --sl-font-mono: var(--admob-font-mono);
   --sl-content-width: var(--admob-reading);
-  --sl-nav-height: 3.75rem;
+  --sl-nav-height: 4rem;
   --sl-text-code: 0.875rem;
 }
 
@@ -160,35 +193,45 @@ h4,
 h5,
 h6,
 .site-title {
-  font-family: var(--admob-font-body);
+  font-family: var(--admob-font-display);
+  font-weight: 650;
+  letter-spacing: var(--admob-tracking-tight);
+}
+
+/* Display treatment: the width axis is what makes these read as headings
+   rather than bold body text. Reserved for h1/h2, never for running prose. */
+.sl-markdown-content h1,
+.content-panel h1,
+.sl-markdown-content h2 {
+  font-stretch: var(--admob-stretch-display);
   font-weight: 700;
-  letter-spacing: normal;
 }
 
 .sl-markdown-content h1,
 .content-panel h1 {
-  font-size: 2rem;
-  line-height: 1.2;
-  letter-spacing: normal;
-  text-wrap: wrap;
+  font-size: 2.25rem;
+  line-height: 1.1;
+  letter-spacing: var(--admob-tracking-tighter);
+  text-wrap: balance;
 }
 
 .sl-markdown-content h2 {
-  margin-block: 2.5rem 0.875rem;
+  margin-block: 2.75rem 0.875rem;
   font-size: 1.5rem;
-  line-height: 1.3;
+  line-height: 1.25;
 }
 
 .sl-markdown-content h3 {
-  margin-block: 1.75rem 0.625rem;
+  margin-block: 1.875rem 0.625rem;
   font-size: 1.1875rem;
   line-height: 1.4;
+  font-weight: 600;
 }
 
 .sl-markdown-content {
   color: var(--admob-ink);
   font-size: 1rem;
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
 @media (max-width: 50rem) {
@@ -216,8 +259,9 @@ h6,
 .sl-markdown-content td a {
   color: var(--admob-accent-text);
   text-decoration: underline;
-  text-decoration-color: color-mix(in srgb, var(--admob-accent-text) 55%, transparent);
-  text-underline-offset: 0.15em;
+  text-decoration-color: color-mix(in srgb, var(--admob-accent-text) 40%, transparent);
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 1px;
   transition: text-decoration-color 150ms var(--admob-ease), color 150ms var(--admob-ease);
 }
 
@@ -231,29 +275,30 @@ h6,
 /* ------------------------------------------------------------ inline code */
 
 .sl-markdown-content code:not(:where(.expressive-code *)) {
-  padding: 2px 6px;
-  border: 0;
-  border-radius: 4px;
+  padding: 0.125em 0.375em;
+  border: 1px solid var(--admob-hair);
+  border-radius: var(--admob-radius-sm);
   background: var(--admob-surface);
   font-family: var(--admob-font-mono);
-  font-size: 0.9em;
+  font-size: 0.85em;
 }
 
 /* -------------------------------------------------------------- sidebar */
 
 .sidebar-content a {
-  padding: 0.2em 0.375rem;
-  border-radius: 2px;
+  padding: 0.25em 0.5rem;
+  border-radius: var(--admob-radius-sm);
   color: var(--admob-slate);
   font-family: var(--admob-font-body);
   font-size: 0.8125rem;
-  line-height: 1.35;
-  transition: color 150ms var(--admob-ease);
+  line-height: 1.4;
+  transition: color 150ms var(--admob-ease), background-color 150ms var(--admob-ease);
 }
 
 .sidebar-content a:hover,
 .sidebar-content a:focus-visible {
   color: var(--admob-ink);
+  background: var(--admob-surface);
 }
 
 .sidebar-content a[aria-current='page'],
@@ -261,22 +306,22 @@ h6,
 .sidebar-content a[aria-current='page']:focus-visible {
   color: var(--admob-ink);
   font-weight: 600;
-  background: transparent;
+  background: var(--admob-accent-soft);
   box-shadow: none;
 }
 
 .sidebar-content .group-label .large {
   color: var(--admob-slate);
-  font-family: var(--admob-font-body);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: normal;
+  font-family: var(--admob-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: var(--admob-tracking-label);
   text-transform: none;
 }
 
 .sidebar-content summary {
-  padding: 0.2em 0.375rem;
-  line-height: 1.35;
+  padding: 0.25em 0.5rem;
+  line-height: 1.4;
 }
 
 .sidebar-content ul ul li {
@@ -286,17 +331,17 @@ h6,
 }
 
 .sidebar-content .top-level > li + li {
-  margin-top: 0.375rem;
+  margin-top: 0.5rem;
 }
 
 /* ------------------------------------------------------------------ TOC */
 
 starlight-toc nav > h2 {
   color: var(--admob-slate);
-  font-family: var(--admob-font-body);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: normal;
+  font-family: var(--admob-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: var(--admob-tracking-label);
   text-transform: none;
 }
 
@@ -320,6 +365,7 @@ starlight-toc nav a::before {
   bottom: 3px;
   left: 0;
   width: 2px;
+  border-radius: 1px;
   background: var(--admob-accent);
   opacity: 0;
   transition: opacity 150ms var(--admob-ease);
@@ -342,23 +388,24 @@ starlight-toc nav a[aria-current='true']::before {
 
 .expressive-code .frame {
   overflow: hidden;
-  border-radius: var(--admob-radius);
+  border: 1px solid var(--admob-hair);
+  border-radius: var(--admob-radius-lg);
   box-shadow: none;
 }
 
 .expressive-code code {
   font-size: 0.875rem;
-  line-height: 1.55;
+  line-height: 1.6;
 }
 
 .expressive-code .copy button {
-  border-radius: 4px;
+  border-radius: var(--admob-radius-sm);
 }
 
 /* --------------------------------------------------------------- asides */
 
 .starlight-aside {
-  border-radius: var(--admob-radius);
+  border-radius: var(--admob-radius-lg);
 }
 
 .starlight-aside__title {
@@ -375,7 +422,7 @@ starlight-toc nav a[aria-current='true']::before {
 
 .starlight-aside__content {
   font-size: 0.9375rem;
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
 /* ---------------------------------------------------------------- cards */
@@ -385,16 +432,17 @@ starlight-toc nav a[aria-current='true']::before {
   padding: 1.25rem;
   border: 1px solid var(--admob-hair);
   border-radius: var(--admob-radius-lg);
-  background: transparent;
+  background: var(--admob-raised);
   box-shadow: none;
   transition: border-color 150ms var(--admob-ease),
-    background-color 150ms var(--admob-ease), color 150ms var(--admob-ease);
+    background-color 150ms var(--admob-ease), box-shadow 150ms var(--admob-ease);
 }
 
 .sl-link-card:hover,
 .card:hover {
-  border-color: var(--admob-ink);
+  border-color: color-mix(in srgb, var(--admob-accent) 45%, var(--admob-hair));
   background: var(--admob-surface);
+  box-shadow: var(--admob-shadow);
 }
 
 .sl-link-card .title,
@@ -403,14 +451,14 @@ starlight-toc nav a[aria-current='true']::before {
   font-family: var(--admob-font-body);
   font-size: 1.0625rem;
   font-weight: 600;
-  letter-spacing: normal;
+  letter-spacing: var(--admob-tracking-tight);
 }
 
 .sl-link-card .description,
 .card .body {
   color: var(--admob-slate);
-  font-size: 0.84375rem;
-  line-height: 1.5;
+  font-size: 0.875rem;
+  line-height: 1.55;
 }
 
 .sl-link-card .icon {
@@ -426,22 +474,24 @@ starlight-toc nav a[aria-current='true']::before {
 .pagination-links a {
   border: 1px solid var(--admob-hair);
   border-radius: var(--admob-radius-lg);
+  background: var(--admob-raised);
   box-shadow: none;
   transition: border-color 150ms var(--admob-ease),
-    background-color 150ms var(--admob-ease), color 150ms var(--admob-ease);
+    background-color 150ms var(--admob-ease), box-shadow 150ms var(--admob-ease);
 }
 
 .pagination-links a:hover {
-  border-color: var(--admob-ink);
+  border-color: color-mix(in srgb, var(--admob-accent) 45%, var(--admob-hair));
   background: var(--admob-surface);
+  box-shadow: var(--admob-shadow);
 }
 
 .pagination-links a > span:first-child {
   color: var(--admob-slate);
-  font-family: var(--admob-font-body);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: normal;
+  font-family: var(--admob-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: var(--admob-tracking-label);
   text-transform: none;
 }
 
@@ -449,41 +499,58 @@ starlight-toc nav a[aria-current='true']::before {
   color: var(--admob-ink);
   font-family: var(--admob-font-body);
   font-weight: 600;
-  letter-spacing: normal;
+  letter-spacing: var(--admob-tracking-tight);
 }
 
 /* ------------------------------------------------------------- chrome */
 
 header.header {
   border-bottom: 1px solid var(--admob-hair);
-  background: var(--admob-paper);
+  background: color-mix(in srgb, var(--admob-paper) 85%, transparent);
+  backdrop-filter: saturate(1.4) blur(12px);
 }
 
+/* Header controls sat 4px apart with 24px hit areas — at the WCAG 2.5.8
+   minimum and visually cramped against the theme selector. The icon keeps its
+   24px glyph but gets a 36px target, and the groups are separated by a hairline
+   so the icon and the selector read as two different controls. */
 .right-group {
-  gap: 0.5rem;
+  gap: 0.375rem;
+  padding-inline-end: 0.25rem;
 }
 
 .social-icons {
-  gap: 0.25rem;
+  gap: 0.125rem;
 }
 
 .social-icons::after {
-  content: none;
-  display: none;
+  content: '';
+  display: block;
+  align-self: center;
+  width: 1px;
+  height: 1.125rem;
+  margin-inline-start: 0.5rem;
   border: 0;
+  background: var(--admob-hair);
 }
 
 .social-icons a {
-  margin: -0.25rem;
-  padding: 0.25rem;
-  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  margin: 0;
+  padding: 0;
+  border-radius: var(--admob-radius-sm);
   color: var(--admob-slate);
-  transition: color 150ms var(--admob-ease);
+  transition: color 150ms var(--admob-ease), background-color 150ms var(--admob-ease);
 }
 
 .social-icons a:hover,
 .social-icons a:focus-visible {
-  border-radius: 4px;
+  border-radius: var(--admob-radius-sm);
+  background: var(--admob-surface);
   color: var(--admob-ink);
 }
 
@@ -530,13 +597,16 @@ starlight-theme-select .caret {
 }
 
 .site-title {
-  font-size: 1.25rem;
+  font-size: 1.125rem;
+  font-stretch: var(--admob-stretch-display);
+  font-weight: 700;
+  letter-spacing: var(--admob-tracking-tight);
 }
 
 site-search button[data-open-modal] {
   border: 1px solid var(--admob-hair);
   border-radius: var(--admob-radius);
-  background: transparent;
+  background: var(--admob-surface);
   color: var(--admob-slate);
   font-family: var(--admob-font-body);
   font-size: 0.8125rem;
@@ -544,17 +614,18 @@ site-search button[data-open-modal] {
 }
 
 site-search button[data-open-modal]:hover {
-  border-color: var(--admob-ink);
+  border-color: color-mix(in srgb, var(--admob-accent) 45%, var(--admob-hair));
   color: var(--admob-ink);
 }
 
 site-search dialog {
-  box-shadow: none;
+  border: 1px solid var(--admob-hair);
+  box-shadow: var(--admob-shadow-lg);
 }
 
 @media (min-width: 50rem) {
   site-search dialog {
-    border-radius: var(--admob-radius);
+    border-radius: var(--admob-radius-lg);
   }
 }
 
@@ -579,7 +650,7 @@ site-search dialog {
   max-width: 100%;
   overflow-x: auto;
   border: 1px solid var(--admob-hair);
-  border-radius: 6px;
+  border-radius: var(--admob-radius-lg);
   scrollbar-color: var(--admob-slate) transparent;
   scrollbar-width: thin;
 }
@@ -589,43 +660,74 @@ site-search dialog {
 }
 
 .sl-markdown-content .table-scroll table {
+  /* Starlight makes every table `display: block; overflow-x: auto` so a bare
+     table can scroll. rehype-table-scroll already wraps each one in
+     .table-scroll, so that is redundant here — and a block-display table sizes
+     its box like a div while its cells lay out wider, so any column that cannot
+     compress spills outside the table instead of scrolling the wrapper. */
+  display: table;
+  overflow: visible;
   width: 100%;
   margin: 0;
   border-collapse: collapse;
   font-size: 0.875rem;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
 .sl-markdown-content .table-scroll--wide table {
   min-width: 42rem;
 }
 
-.sl-markdown-content .table-scroll th {
-  padding: 0.625rem 0.75rem;
+.sl-markdown-content .table-scroll th,
+.sl-markdown-content .table-scroll td {
+  padding: 0.75rem 0.875rem;
+  border-bottom: 1px solid var(--admob-hair-soft);
+  text-align: left;
+  vertical-align: top;
+}
+
+/* The mono eyebrow is for COLUMN headers only. `<th scope="row">` is a row
+   label — it is read as content, so it keeps the body face at body size and is
+   distinguished by weight instead. Applying the eyebrow to every `th` set the
+   whole first column of every row-header table in 11px mono. */
+.sl-markdown-content .table-scroll thead th {
   border-bottom: 1px solid var(--admob-hair);
   background: var(--admob-surface);
+  color: var(--admob-ink);
+  font-family: var(--admob-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: var(--admob-tracking-label);
+  text-transform: none;
+}
+
+.sl-markdown-content .table-scroll tbody th {
+  background: transparent;
   color: var(--admob-ink);
   font-family: var(--admob-font-body);
   font-size: 0.875rem;
   font-weight: 600;
   letter-spacing: normal;
-  text-align: left;
-  text-transform: none;
 }
 
-.sl-markdown-content .table-scroll td {
-  padding: 0.625rem 0.75rem;
-  border-bottom: 1px solid var(--admob-hair);
-  vertical-align: top;
-}
-
-.sl-markdown-content .table-scroll tr:last-child td {
+.sl-markdown-content .table-scroll tbody tr:last-child th,
+.sl-markdown-content .table-scroll tbody tr:last-child td {
   border-bottom: 0;
 }
 
-.sl-markdown-content .table-scroll td:first-child {
-  font-weight: 500;
+.sl-markdown-content .table-scroll tbody tr {
+  transition: background-color 120ms var(--admob-ease);
 }
+
+.sl-markdown-content .table-scroll tbody tr:hover {
+  background: var(--admob-surface);
+}
+
+/* No `td:first-child { font-weight: 500 }` here on purpose. Emphasis belongs to
+   real row headers — `<th scope="row">`, styled above — not to whatever happens
+   to sit in the first column. Markdown pipe tables have no row headers, so
+   bolding their first column was emphasis without meaning, and it made those
+   tables disagree with the component-authored ones. */
 
 /* ------------------------------------------------------------ overflow */
 
