@@ -2,11 +2,8 @@
 
 **HUMAN STEP — outward-facing publication.** An agent must not post to Slack.
 
-Library / Project metadata:
-- Brand/Slug/Coordinate: AdMob CMP (repo admob-compose-multiplatform, coordinate dev.avinya.ads:admob-cmp)
-- Target search keywords: compose multiplatform admob, kotlin multiplatform admob, kmp admob library
-
-Join at https://surveys.jetbrains.com/s3/kotlin-slack-sign-up if not already a member.
+Join at https://surveys.jetbrains.com/s3/kotlin-slack-sign-up if not already a
+member.
 
 ## The rule that shapes this file
 
@@ -44,7 +41,7 @@ general announcement.
 Post as a single message:
 
 ```
-Released AdMob CMP (repo admob-compose-multiplatform, coordinate dev.avinya.ads:admob-cmp) 1.1.0 — a compose multiplatform admob / kotlin multiplatform admob / kmp admob library for Android and iOS. I'm the author.
+Released admob-cmp 1.1.0 — a Compose Multiplatform AdMob SDK for Android and iOS. I'm the author.
 
 One Kotlin API for banner, interstitial, rewarded, rewarded interstitial, app-open and native ads, with UMP consent in the initialization flow, mediation and paid/revenue events. Suspend functions and StateFlow rather than listener callbacks.
 
@@ -58,7 +55,8 @@ Source: https://github.com/Meet-Miyani/admob-compose-multiplatform
 Not affiliated with or endorsed by Google. AdMob and Google Mobile Ads are trademarks of Google LLC.
 ```
 
-Put the `implementation(...)` line in a code block using the composer's code formatting.
+Put the `implementation(...)` line in a code block using the composer's code
+formatting.
 
 ---
 
@@ -72,7 +70,7 @@ which is squarely this channel's topic.
 Post as a single message:
 
 ```
-Sharing a Kotlin/Native gotcha and how I ended up solving it, in case it's useful to anyone binding an SPM-distributed framework in a kotlin multiplatform admob project.
+Sharing a Kotlin/Native gotcha and how I ended up solving it, in case it's useful to anyone binding an SPM-distributed framework.
 
 If your cinterop bindings target a framework that ships as a Swift package, `:module:iosSimulatorArm64Test` fails to link:
 
@@ -81,11 +79,9 @@ If your cinterop bindings target a framework that ships as a Swift package, `:mo
 
 The app builds fine — Xcode resolves the SPM package and hands the binaries to the linker. A Kotlin/Native test executable is built by Gradle with no Xcode in the loop, so SPM never resolves and the binaries are never on the link line.
 
-The fix that stuck was moving the XCFramework download, checksum verification and linker options into a Gradle plugin that applies them to test binaries only, leaving the app framework resolving through SPM as before. I ship it for my own library — AdMob CMP (repo admob-compose-multiplatform, coordinate dev.avinya.ads:admob-cmp) — but the shape generalises to any SPM-bound cinterop.
+The fix that stuck was moving the XCFramework download, checksum verification and linker options into a Gradle plugin that applies them to test binaries only, leaving the app framework resolving through SPM as before. I ship it for my own library (I maintain admob-cmp) but the shape generalises to any SPM-bound cinterop.
 
 Write-up: https://ads.avinya.dev/reference/troubleshooting/
-
-Not affiliated with or endorsed by Google. AdMob and Google Mobile Ads are trademarks of Google LLC.
 ```
 
 ---
@@ -98,15 +94,13 @@ Moderated by Maryam Alhuthayfi and Zach Klippenstein. **Different content again*
 Post as a single message:
 
 ```
-A Compose Multiplatform API design question I'd welcome opinions on for a compose multiplatform admob / kmp admob library.
+A Compose Multiplatform API design question I'd welcome opinions on.
 
 Native ads are awkward in Compose: the platform SDKs need a real view hierarchy with each asset registered to the ad object, so you can't just lay out Composables and hope. I ended up with a small declarative layout DSL that describes the arrangement and handles asset registration underneath, plus a pool so a scrolling feed isn't loading one ad per row.
 
 Docs, with the pool lifecycle diagram: https://ads.avinya.dev/formats/native/
 
-I maintain AdMob CMP (repo admob-compose-multiplatform, coordinate dev.avinya.ads:admob-cmp), so this is my own library — but the interesting bit isn't the ads, it's the general problem of a declarative wrapper over a platform API that demands imperative view registration. If anyone has solved that shape more cleanly elsewhere I'd genuinely like to see it.
-
-Not affiliated with or endorsed by Google. AdMob and Google Mobile Ads are trademarks of Google LLC.
+I maintain admob-cmp, so this is my own library — but the interesting bit isn't the ads, it's the general problem of a declarative wrapper over a platform API that demands imperative view registration. If anyone has solved that shape more cleanly elsewhere I'd genuinely like to see it.
 ```
 
 ---

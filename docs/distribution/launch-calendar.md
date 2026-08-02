@@ -3,7 +3,7 @@
 **Every posting step below is performed by a human.** No agent posts to a
 community forum, Slack workspace, subreddit, blogging platform, or mailing list
 on this project's behalf, under any circumstance. Agents write the copy into
-`docs/distribution/copy/` (and `docs/distribution/posts/`) and stop.
+`docs/distribution/posts/` and stop.
 
 Day 0 is the day `https://ads.avinya.dev` is live, its sitemap is submitted to
 Google Search Console (Plan 2), and the guide pages named in the copy exist

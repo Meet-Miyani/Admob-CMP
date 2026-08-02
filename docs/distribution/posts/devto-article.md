@@ -1,10 +1,6 @@
-# dev.to Article & X Announcement Thread — Day 2
+# dev.to — Day 2
 
 **HUMAN STEP — outward-facing publication.** An agent must not publish this.
-
-Library / Project metadata:
-- Brand/Slug/Coordinate: AdMob CMP (repo admob-compose-multiplatform, coordinate dev.avinya.ads:admob-cmp)
-- Target search keywords: compose multiplatform admob, kotlin multiplatform admob, kmp admob library
 
 dev.to's Code of Conduct contains no self-promotion prohibition, and dev.to
 supports cross-posting first-class through the `canonical_url` front-matter
@@ -20,7 +16,7 @@ into a search engine. Spec §7 marks
 `admob ios kotlin multiplatform undefined symbols GAD` as easy difficulty, high
 opportunity, "pure pain" — and uncontested.
 
-## dev.to Article Copy — publish verbatim
+## Copy — publish verbatim
 
 ```markdown
 ---
@@ -43,7 +39,9 @@ ld: symbol(s) not found for architecture arm64
 Your app builds. Your Android tests pass. Only `iosSimulatorArm64Test` fails,
 and the error names a class you never wrote.
 
-I maintain [AdMob CMP](https://github.com/Meet-Miyani/admob-compose-multiplatform) (repo admob-compose-multiplatform, coordinate dev.avinya.ads:admob-cmp), a compose multiplatform admob / kotlin multiplatform admob / kmp admob library solution for Android & iOS, and this was the single most confusing thing about integrating it. Here's what's actually happening and how to fix it.
+I maintain [admob-cmp](https://github.com/Meet-Miyani/admob-compose-multiplatform),
+a Compose Multiplatform AdMob SDK, and this was the single most confusing thing
+about integrating it. Here's what's actually happening and how to fix it.
 
 ## Why it happens
 
@@ -128,7 +126,10 @@ Then:
 
 ## While you're here
 
-AdMob CMP (repo admob-compose-multiplatform, coordinate dev.avinya.ads:admob-cmp) is a compose multiplatform admob / kotlin multiplatform admob / kmp admob library for Android and iOS. One Kotlin API for banner, interstitial, rewarded, rewarded interstitial, app-open and native ads, with UMP consent in the initialization flow, mediation, and paid/revenue events. Suspend functions and `StateFlow` instead of listeners.
+`admob-cmp` is a Compose Multiplatform AdMob SDK for Android and iOS. One Kotlin
+API for banner, interstitial, rewarded, rewarded interstitial, app-open and
+native ads, with UMP consent in the initialization flow, mediation, and
+paid/revenue events. Suspend functions and `StateFlow` instead of listeners.
 
 ```kotlin
 // commonMain
@@ -151,35 +152,10 @@ There's a [diagram of the sequence in the consent docs](https://ads.avinya.dev/p
 trademarks of Google LLC.*
 ```
 
-## X (Twitter) Announcement Thread Copy — post as thread
-
-```
-1/5 🚀 Released 1.1.0 of AdMob CMP (repo admob-compose-multiplatform, coordinate dev.avinya.ads:admob-cmp)!
-A lightweight compose multiplatform admob & kotlin multiplatform admob library for Android & iOS.
-One Kotlin API for banner, interstitial, rewarded, rewarded interstitial, app-open & native ads.
-https://ads.avinya.dev
-
-2/5 Hit "Undefined symbols: _OBJC_CLASS_$_GADBannerView" when running Kotlin/Native iOS tests?
-It happens because test executables link via Gradle without Xcode/SPM.
-1.1.0 introduces `dev.avinya.ads.admob-cmp` Gradle plugin to solve test linking in 1 line!
-
-3/5 AdMob CMP is a pure kmp admob library designed with Kotlin-first idioms:
-- StateFlow & suspend functions over callback listeners
-- Automatic UMP consent flow & ATT integration
-- Native ad layout DSL + view pooling
-
-4/5 Read the full deep-dive on fixing Kotlin/Native iOS test linking:
-https://ads.avinya.dev/reference/troubleshooting/
-
-5/5 Docs: https://ads.avinya.dev
-Source: https://github.com/Meet-Miyani/admob-compose-multiplatform
-
-Not affiliated with or endorsed by Google. AdMob and Google Mobile Ads are trademarks of Google LLC.
-```
-
 ## Before publishing
 
-- [ ] `canonical_url` is `https://ads.avinya.dev/reference/troubleshooting/` and that page returns 200.
+- [ ] `canonical_url` is `https://ads.avinya.dev/reference/troubleshooting/` and
+      that page returns 200.
 - [ ] Every link in the article returns 200.
 - [ ] Tags are four or fewer — dev.to's limit.
 - [ ] The authorship disclosure ("I maintain…") is in the third paragraph.

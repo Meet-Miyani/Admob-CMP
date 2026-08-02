@@ -1,10 +1,6 @@
-# r/Kotlin / r/androiddev — Day 7
+# r/Kotlin — Day 7
 
 **HUMAN STEP — outward-facing publication.** An agent must not post to Reddit.
-
-Library / Project metadata:
-- Brand/Slug/Coordinate: AdMob CMP (repo admob-compose-multiplatform, coordinate dev.avinya.ads:admob-cmp)
-- Target search keywords: compose multiplatform admob, kotlin multiplatform admob, kmp admob library
 
 ## MANDATORY GATE: read the rules first
 
@@ -45,13 +41,13 @@ explanation reads as sharing, linking to a bare repo reads as advertising.
 ## Title
 
 ```
-I built AdMob CMP: a Compose Multiplatform AdMob SDK covering all six ad formats — including native and app-open
+I built a Compose Multiplatform AdMob SDK covering all six ad formats — including native and app-open
 ```
 
 ## Body — post verbatim, as a text post
 
 ```
-I maintain AdMob CMP (repo admob-compose-multiplatform, coordinate dev.avinya.ads:admob-cmp), a compose multiplatform admob / kotlin multiplatform admob / kmp admob library wrapper over the Google Mobile Ads SDKs, and 1.1.0 is out. Sharing it here because the two things that took the longest are both things I'd have wanted to read about before starting.
+I maintain [admob-cmp](https://github.com/Meet-Miyani/admob-compose-multiplatform), a Compose Multiplatform wrapper over the Google Mobile Ads SDKs, and 1.1.0 is out. Sharing it here because the two things that took the longest are both things I'd have wanted to read about before starting.
 
 **What it is:** one Kotlin API for banner, interstitial, rewarded, rewarded interstitial, app-open and native ads on Android and iOS. UMP consent is in the initialization flow rather than bolted on. Mediation and paid/revenue events are supported. The API keeps AdMob's vocabulary — `AdValue`, `ResponseInfo`, adaptive banner sizes, native asset names — but replaces the listener surface with suspend functions, `StateFlow` state, and one sealed `AdEvent` stream.
 
@@ -73,7 +69,7 @@ Source: https://github.com/Meet-Miyani/admob-compose-multiplatform
 
 Happy to answer anything about the iOS side in particular — it's where all the sharp edges are.
 
-Not affiliated with or endorsed by Google. AdMob and Google Mobile Ads are trademarks of Google LLC.
+*Not affiliated with or endorsed by Google. AdMob and Google Mobile Ads are trademarks of Google LLC.*
 ```
 
 ## Before posting
