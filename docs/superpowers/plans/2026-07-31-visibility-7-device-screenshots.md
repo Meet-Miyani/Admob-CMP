@@ -2071,6 +2071,24 @@ git commit -m "feat(docs): add Screenshot.astro as the single consumer surface f
 
 ## Available screenshot inventory and consumer handoff
 
+> **Update 2026-08-02 — Plan 5 declined the landing-page showcase.** The landing
+> page ships a to-scale placement plate instead of device screenshots, and
+> `FormatList.astro`, the `Screenshot.astro` glob lookup, and the
+> `screenshot`/`crop` fields were removed with it. The reasoning is recorded in
+> Plan 5's withdrawn Task 6; in short, the captures are dark-only by design and
+> would fight the light theme on the SEO entry page, and the plate answers the
+> adoption question better than six captures of the debug catalog.
+>
+> **Nothing in this plan changes.** Naming, the manifest, alt text, the
+> verifier, and `Screenshot.astro` remain exactly as specified — this plan
+> already reserved the right outcome by stating that where Plan 5 disagrees,
+> Plan 5 changes and the assets are not renamed. **Plan 3's per-format guide
+> pages are now the sole consumer**, and the inventory table below is unchanged
+> and still authoritative for them.
+>
+> The Plan 5 subsection immediately below is therefore historical. Skip to
+> "Plan 3 (per-format doc pages)".
+
 **This plan is the authority on screenshot naming and availability; Plan 5 owns
 landing-page selection.** Plan 5 must:
 

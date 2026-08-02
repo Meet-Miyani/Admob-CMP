@@ -8,7 +8,23 @@
 
 **Tech Stack:** Astro 7.1.6, Starlight 0.41.5, Expressive Code/Shiki, Playwright 1.62.1, Vitest 4.1.10, CSS custom properties.
 
-**Status:** Implemented, independently reviewed, and verified. This document is maintained as the as-built implementation record.
+**Status:** Superseded on 2026-08-02. Implemented, reviewed and verified as
+written, then replaced by a full redesign.
+
+> ## ⚠️ This is no longer the as-built record
+>
+> It accurately records what was built on 2026-08-01 and is kept for that
+> history. It does **not** describe the site today. The current design system is
+> [`docs-site/DESIGN.md`](../../../docs-site/DESIGN.md); the spec this plan
+> implemented,
+> [`Documentation Native Reference Theme Design`](../specs/2026-08-01-docs-native-reference-theme-design.md),
+> carries a supersede notice listing exactly what changed.
+>
+> The most load-bearing difference: this plan's regression contract was built to
+> *forbid* fonts other than the native stack, radii above 6px, shadows,
+> transforms, gradients and motion. Those assertions were removed on 2026-08-02
+> and replaced with token-conformance and reduced-motion rules. Re-applying this
+> plan would fail the current gates.
 
 ## Global Constraints
 

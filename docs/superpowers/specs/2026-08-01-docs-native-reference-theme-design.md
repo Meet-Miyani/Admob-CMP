@@ -1,7 +1,37 @@
 # Documentation Native Reference Theme Design
 
+> ## ⚠️ SUPERSEDED — 2026-08-02
+>
+> **This spec no longer describes the site. Do not implement or enforce it.**
+> The current design system is documented in
+> [`docs-site/DESIGN.md`](../../../docs-site/DESIGN.md), and it is enforced by
+> `docs-site/test/landing.test.ts` and `docs-site/scripts/check-theme.mjs`.
+>
+> The owner reviewed the implemented result on 2026-08-02, rejected it, and
+> commissioned a full redesign. §4 Typography, §5 Color and Surfaces, §9 Motion,
+> and §11 Acceptance are the sections that are now wrong. What changed:
+>
+> | This spec says | The site now does |
+> |---|---|
+> | Native UI stack (`-apple-system`…) for all non-code text | Archivo Variable — display is the same family on its `wdth` axis at 104% |
+> | GitHub's neutral ramp (`#0d1117` / `#161b22` / `#8b949e`) | A purpose-built warm ramp; the accent `#ee3a20` is unchanged |
+> | 32px desktop / 28px mobile H1, no landing-only type | Docs H1 36px; the landing page has its own larger scale (56px H1) |
+> | Flat only — no shadows, gradients, or raised panels | Shadows, a gradient and raised surfaces, all from tokens |
+> | 6px radius everywhere | A four-step scale: 4 / 8 / 12 / 18px |
+> | No entrance animation, lift, translate, or scale | Motion is allowed; the rule is that it must answer `prefers-reduced-motion` |
+> | Uppercase mono eyebrows forbidden | Mono eyebrows are the structural voice (sentence case, tracked) |
+>
+> **The parts of this spec that still hold** are the ones about *reasoning*, not
+> values: §1's diagnosis that the site is code-heavy and its primary job is
+> sustained reading; §3's principles 1, 4 and 5; §6's rule that code belongs to
+> the active theme rather than a permanent dark island; §8's row-separated
+> tables. Those survived the redesign intact.
+>
+> Seven plans cite this document as visual authority. They inherit this notice.
+> Plan 5's presentation section carries its own, narrower correction.
+
 **Date:** 2026-08-01
-**Status:** Implemented, independently reviewed, and verified
+**Status:** Superseded on 2026-08-02 by `docs-site/DESIGN.md`. Implemented and verified as written, then rejected on review.
 **Scope:** Presentation, generated social imagery, and regression gates for `docs-site/`; no content, URL, SDK, or public API changes.
 
 ## 1. Problem
