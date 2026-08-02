@@ -270,14 +270,53 @@ async function inspectLanding({ theme, viewport, reducedMotion = 'no-preference'
     const h3 = document.querySelector('.landing-compatibility h3');
     const section = document.querySelector('.landing-section');
 
+    // Resolve the design tokens the way the browser will serialise them, by
+    // reading them back off a throwaway element. Comparing raw token text to a
+    // computed value never matches: `0 1px 2px #0006` computes to
+    // `rgba(0, 0, 0, 0.4) 0px 1px 2px 0px`.
+    const probe = document.createElement('div');
+    probe.style.position = 'absolute';
+    probe.style.visibility = 'hidden';
+    document.body.appendChild(probe);
+    // setProperty needs the kebab-case name; the computed-style object is read
+    // with the camelCase one. Passing camelCase to setProperty silently no-ops.
+    const resolve = (kebab, camel, token) => {
+      probe.style.setProperty(kebab, `var(${token})`);
+      const value = getComputedStyle(probe)[camel];
+      probe.style.removeProperty(kebab);
+      return value;
+    };
+    // `0px` is "no radius"; 50% and 999px are shapes (circle, pill) rather than
+    // points on the scale. Everything else must be a --admob-radius* token.
+    const allowedRadii = new Set([
+      '0px',
+      '50%',
+      '999px',
+      ...['--admob-radius-sm', '--admob-radius', '--admob-radius-lg', '--admob-radius-xl'].map(
+        (token) => resolve('border-top-left-radius', 'borderTopLeftRadius', token)
+      ),
+    ]);
+    const allowedShadows = new Set([
+      'none',
+      ...['--admob-shadow', '--admob-shadow-lg'].map((token) =>
+        resolve('box-shadow', 'boxShadow', token)
+      ),
+    ]);
+    probe.remove();
+
     const landingElements = [...document.querySelectorAll('[class*="landing-"]')].map((el) => {
       const s = getComputedStyle(el);
       return {
         tag: el.tagName.toLowerCase(),
         className: el.className,
-        borderRadius: Number.parseFloat(s.borderTopLeftRadius),
+        radii: [
+          s.borderTopLeftRadius,
+          s.borderTopRightRadius,
+          s.borderBottomRightRadius,
+          s.borderBottomLeftRadius,
+        ],
         boxShadow: s.boxShadow,
-        transform: s.transform,
+        animationName: s.animationName,
       };
     });
 
@@ -310,6 +349,8 @@ async function inspectLanding({ theme, viewport, reducedMotion = 'no-preference'
         h3: h3 ? getComputedStyle(h3).fontSize : null,
       },
       landing: landingElements,
+      allowedRadii: [...allowedRadii],
+      allowedShadows: [...allowedShadows],
       table: tableWrapper
         ? {
             tabIndex: tableWrapper.tabIndex,
@@ -355,9 +396,17 @@ async function inspectLanding({ theme, viewport, reducedMotion = 'no-preference'
     focusChecks.tableRegion = await focusAndRead(page, tableRegion);
   }
 
+  // Counted as two groups, not one total: the seven reference links are a
+  // content contract, and the attribution is a separate, smaller one. A single
+  // total would let one group grow while the other shrank.
   focusChecks.footerLinks = [];
-  for (const link of await page.locator('.landing-footer a').all()) {
+  for (const link of await page.locator('.landing-footer__links a').all()) {
     focusChecks.footerLinks.push(await focusAndRead(page, link));
+  }
+
+  focusChecks.footerAuthorLinks = [];
+  for (const link of await page.locator('.landing-footer__author a').all()) {
+    focusChecks.footerAuthorLinks.push(await focusAndRead(page, link));
   }
 
   data.focus = focusChecks;
@@ -405,31 +454,33 @@ try {
       selector: '.sl-markdown-content h3',
       property: 'fontSize',
     });
+    // --admob-surface, per theme, in tokens.css.
     const codeBackground = {
-      light: 'rgb(246, 248, 250)',
-      dark: 'rgb(22, 27, 34)',
+      light: 'rgb(247, 245, 243)',
+      dark: 'rgb(21, 17, 15)',
     }[theme];
-    const usesNativeStack = (fontFamily) =>
-      /-apple-system/.test(fontFamily ?? '') && !/Space Grotesk|Inter/.test(fontFamily ?? '');
+    // The display and body faces are one variable family; the display role is
+    // the same font pushed along its width axis, so both must resolve to it.
+    const usesArchivo = (fontFamily) => /Archivo Variable/.test(fontFamily ?? '');
     check(desktop.article?.fontSize === '16px', `${theme} body is 16px`);
-    check(desktop.article?.lineHeight === '25.6px', `${theme} body uses 1.6 rhythm`);
+    check(desktop.article?.lineHeight === '26.4px', `${theme} body uses 1.65 rhythm`);
     check(desktop.article?.width <= 720, `${theme} reading measure is at most 45rem`);
-    check(desktop.headings?.h1 === '32px', `${theme} desktop H1 is 32px`);
+    check(desktop.headings?.h1 === '36px', `${theme} desktop H1 is 36px`);
     check(desktop.headings?.h2 === '24px', `${theme} H2 is 24px`);
     check(roadmapH3 === '19px', `${theme} H3 is 19px`);
     check(
-      usesNativeStack(desktop.article?.fontFamily) && usesNativeStack(desktop.headings?.h1Family),
-      `${theme} prose and headings share the native UI stack`
+      usesArchivo(desktop.article?.fontFamily) && usesArchivo(desktop.headings?.h1Family),
+      `${theme} prose and headings share the Archivo family`
     );
-    check(usesNativeStack(desktop.sidebar?.fontFamily), `${theme} sidebar uses the UI stack`);
+    check(usesArchivo(desktop.sidebar?.fontFamily), `${theme} sidebar uses the Archivo family`);
     check(desktop.sidebar?.fontSize === '13px', `${theme} sidebar is 13px`);
     check(desktop.link?.color !== desktop.link?.bodyColor && contrast(desktop.link?.color ?? '', desktop.link?.background ?? '') >= 4.5, `${theme} links use a distinct semantic accent`);
     check(desktop.code?.background === codeBackground, `${theme} code follows the site theme`);
     check(desktop.code?.fontSize === '14px', `${theme} code is 14px`);
-    check(desktop.code?.radius === '6px', `${theme} code frame radius is 6px`);
+    check(desktop.code?.radius === '12px', `${theme} code frame radius is --admob-radius-lg`);
     check((desktop.code?.colors.length ?? 0) >= 5, `${theme} code exposes at least five syntax colors`);
-    check(desktop.components?.searchRadius === '6px', `${theme} search is not pill-shaped`);
-    check(desktop.components?.cardRadius === '6px', `${theme} cards use a quiet radius`);
+    check(desktop.components?.searchRadius === '8px', `${theme} search is --admob-radius, not a pill`);
+    check(desktop.components?.cardRadius === '12px', `${theme} cards use --admob-radius-lg`);
     check(desktop.components?.cardTransform === 'none', `${theme} cards have no spatial transform`);
     check(desktop.table?.tabIndex === 0 && desktop.table.role === 'region' && desktop.table.label === 'Scrollable data table', `${theme} tables use a focusable labelled scroll region`);
     check(desktop.table?.overflowX === 'auto', `${theme} table wrapper scrolls horizontally when needed`);
@@ -437,20 +488,29 @@ try {
     check(desktop.motion?.name === 'none', `${theme} articles do not animate on entry`);
 
     const landingDesktop = await inspectLanding({ theme, viewport: { width: 1440, height: 1000 } });
-    check(landingDesktop.headings?.h1 === '32px', `${theme} landing H1 is 32px desktop`);
-    check(landingDesktop.headings?.h2 === '24px', `${theme} landing H2 is 24px desktop`);
+    check(landingDesktop.headings?.h1 === '56px', `${theme} landing H1 is 56px desktop`);
+    check(landingDesktop.headings?.h2 === '30px', `${theme} landing H2 is 30px desktop`);
     check(landingDesktop.headings?.h3 === '19px', `${theme} landing H3 is 19px desktop`);
     check(
-      usesNativeStack(landingDesktop.headings?.h1Family) && usesNativeStack(landingDesktop.section?.fontFamily),
-      `${theme} landing body and H1 share the native UI stack`
+      usesArchivo(landingDesktop.headings?.h1Family) && usesArchivo(landingDesktop.section?.fontFamily),
+      `${theme} landing body and H1 share the Archivo family`
     );
+    // Token conformance, not flatness. Corners and depth may exist; they just
+    // have to come off the scale in tokens.css rather than being invented here.
+    const allowedRadii = new Set(landingDesktop.allowedRadii ?? []);
+    const allowedShadows = new Set(landingDesktop.allowedShadows ?? []);
+    check(allowedRadii.size >= 5, `${theme} landing resolved the radius scale from tokens`);
+    check(allowedShadows.size >= 3, `${theme} landing resolved the elevation scale from tokens`);
     for (const el of landingDesktop.landing ?? []) {
+      const offScale = (el.radii ?? []).filter((radius) => !allowedRadii.has(radius));
       check(
-        el.borderRadius <= 6,
-        `${theme} landing ${el.className} radius is at most 6px (got ${el.borderRadius}px)`
+        offScale.length === 0,
+        `${theme} landing ${el.className} uses only scale radii (off-scale: ${offScale.join(', ')})`
       );
-      check(el.boxShadow === 'none', `${theme} landing ${el.className} has no shadow`);
-      check(el.transform === 'none', `${theme} landing ${el.className} has no transform`);
+      check(
+        allowedShadows.has(el.boxShadow),
+        `${theme} landing ${el.className} shadow is none or a token (got ${el.boxShadow})`
+      );
     }
     check(landingDesktop.table?.tabIndex === 0, `${theme} landing capability table is keyboard-focusable`);
     check(landingDesktop.table?.role === 'region', `${theme} landing capability table has role=region`);
@@ -503,9 +563,16 @@ try {
     );
     check(
       landingDesktop.focus?.footerLinks?.length === 7,
-      `${theme} landing exposes seven footer links (got ${landingDesktop.focus?.footerLinks?.length})`
+      `${theme} landing exposes seven footer reference links (got ${landingDesktop.focus?.footerLinks?.length})`
     );
-    for (const focus of landingDesktop.focus?.footerLinks ?? []) {
+    check(
+      landingDesktop.focus?.footerAuthorLinks?.length === 2,
+      `${theme} landing attribution links the author and the studio (got ${landingDesktop.focus?.footerAuthorLinks?.length})`
+    );
+    for (const focus of [
+      ...(landingDesktop.focus?.footerLinks ?? []),
+      ...(landingDesktop.focus?.footerAuthorLinks ?? []),
+    ]) {
       check(
         focus.visible && focus.outlineWidth >= 2,
         `${theme} footer link ${focus.href} has visible focus outline >= 2px`
@@ -544,8 +611,8 @@ try {
     check((mobile.table?.scrollWidth ?? 0) >= (mobile.table?.clientWidth ?? 0), `${theme} mobile table remains contained in its scroll region`);
 
     const landingMobile = await inspectLanding({ theme, viewport: { width: 390, height: 844 } });
-    check(landingMobile.headings?.h1 === '28px', `${theme} landing H1 is 28px mobile`);
-    check(landingMobile.headings?.h2 === '24px', `${theme} landing H2 is 24px mobile`);
+    check(landingMobile.headings?.h1 === '36px', `${theme} landing H1 is 36px mobile`);
+    check(landingMobile.headings?.h2 === '26px', `${theme} landing H2 is 26px mobile`);
     check(landingMobile.headings?.h3 === '19px', `${theme} landing H3 is 19px mobile`);
     check(
       landingMobile.documentWidth <= landingMobile.viewportWidth + 1,
@@ -563,8 +630,20 @@ try {
     const reduced = await inspect({ theme, viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
     check(reduced.motion?.name === 'none', `${theme} reduced-motion disables article entrance`);
 
+    // The landing page is allowed to animate; what it is not allowed to do is
+    // ignore the opt-out. This is the assertion that replaced the old blanket
+    // "no transforms, no animation" rule.
     const reducedLanding = await inspectLanding({ theme, viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
     check(reducedLanding.main?.animationName === 'none', `${theme} landing reduced-motion disables entrance animation`);
+    const stillAnimating = (reducedLanding.landing ?? []).filter(
+      (el) => el.animationName !== 'none'
+    );
+    check(
+      stillAnimating.length === 0,
+      `${theme} landing reduced-motion stops every landing element (still animating: ${stillAnimating
+        .map((el) => el.className)
+        .join(', ')})`
+    );
   }
 } finally {
   if (server) server.close();

@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 import descriptions from '../src/components/diagrams/descriptions.json';
 
@@ -74,5 +75,40 @@ describe('overflow contract', () => {
   it('every diagram sits in a scroll region carrying its own min-width', () => {
     expect(html).toContain('class="dg-scroll"');
     expect(html).toContain('--dg-min-w:');
+  });
+});
+
+describe('expand-to-dialog is progressive enhancement', () => {
+  const figureSource = readFileSync(
+    fileURLToPath(new URL('../src/components/diagrams/DiagramFigure.astro', import.meta.url)),
+    'utf8'
+  );
+
+  it('renders no Expand control server-side — a control that cannot work must not exist', () => {
+    // The class names DO appear in the built HTML, inside the bundled script
+    // that creates them. What must not exist is a rendered element.
+    expect(html).not.toMatch(/<button[^>]*class="[^"]*\bdg-expand\b/);
+    expect(html).not.toMatch(/<dialog/i);
+    expect(figureSource).not.toMatch(/<button[^>]*class="dg-expand"/);
+  });
+
+  it('creates the control and the dialog from script instead', () => {
+    expect(figureSource).toMatch(/<script>[\s\S]*createElement\('dialog'\)[\s\S]*<\/script>/);
+    expect(figureSource).toMatch(/class = 'dg-expand'|className = 'dg-expand'/);
+    expect(figureSource).toMatch(/showModal\(\)/);
+  });
+
+  it('moves the scroll region rather than cloning it, so SVG ids stay unique', () => {
+    expect(figureSource).not.toMatch(/cloneNode/);
+    expect(figureSource).toMatch(/replaceWith/);
+  });
+
+  it('returns focus to the trigger when the dialog closes', () => {
+    expect(figureSource).toMatch(/addEventListener\('close'[\s\S]*?expand\.focus\(\)/);
+  });
+
+  it('keeps the inline scroll region as the no-script baseline', () => {
+    expect(html).toContain('class="dg-scroll"');
+    expect(html).toContain('tabindex="0"');
   });
 });

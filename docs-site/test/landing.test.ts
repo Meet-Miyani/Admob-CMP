@@ -3,13 +3,18 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
+  authorName,
+  authorUrl,
   basicAdsRepo,
   capabilities,
   capabilityVerifiedOn,
   formats,
   landingMeta,
+  originStory,
   repoUrl,
   roadmapItems,
+  studioName,
+  studioUrl,
   trademarkStatement,
 } from '../src/data/landing';
 
@@ -70,12 +75,22 @@ function extractStyleBlocks(astroSource: string): CssBlock[] {
 
 const CSS_COMMENT = /\/\*[\s\S]*?\*\//g;
 
-function isCodeCoordinateSelector(selector: string): boolean {
-  if (selector.includes('.admob-font-mono')) return true;
-  if (selector.includes('.admob-mono')) return true;
-  if (/(?:^|\s|,)code(?:\s|,|\.|:|>|\+|~|$)/.test(selector)) return true;
-  if (/(?:^|\s|,)pre(?:\s|,|\.|:|>|\+|~|$)/.test(selector)) return true;
-  return false;
+/**
+ * Radius values a landing file may write directly. Anything else has to come
+ * from a --admob-radius* token so the corner scale stays in one place.
+ *
+ * `0` clears a corner, `50%` and `999px` are shape declarations (a circle and a
+ * pill) rather than points on the scale, and `inherit`/`initial`/`unset` are
+ * resets.
+ */
+const ALLOWED_LITERAL_RADIUS = /^(0|50%|999px|inherit|initial|unset)$/;
+
+function isAllowedRadiusValue(value: string): boolean {
+  // Shorthand: every part must independently be a token reference or allowed.
+  const parts = value.split('/').join(' ').split(/\s+/).filter(Boolean);
+  return parts.every(
+    (part) => part.startsWith('var(--admob-radius') || ALLOWED_LITERAL_RADIUS.test(part)
+  );
 }
 
 function listFilesRecursive(dir: string): string[] {
@@ -93,13 +108,31 @@ function listFilesRecursive(dir: string): string[] {
   return out;
 }
 
+/**
+ * Design-system rules for the landing sources.
+ *
+ * These used to be an anti-design list — no shadows, no transforms, no
+ * gradients, no motion — which is why the page looked like an unstyled README.
+ * The rules now enforce that the design goes *through the token system* rather
+ * than forbidding the design outright:
+ *
+ *   - no literal colours: every colour is an --admob-* token, so both themes
+ *     re-skin from one place and the contrast tests in diagram-contrast.test.ts
+ *     stay meaningful;
+ *   - no literal font stacks: faces come from --admob-font-*;
+ *   - no off-scale corner radii: see ALLOWED_LITERAL_RADIUS above;
+ *   - any file that animates must also answer prefers-reduced-motion.
+ *
+ * Shadows, transforms, gradients and transitions are all permitted now, as
+ * long as their colours resolve to tokens — which the literal-colour rule
+ * already guarantees.
+ */
 const STYLING_VIOLATION_CHECKS = {
   color: /#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(|oklch\(|oklab\(/,
-  transform: /(?<![\w-])transform\s*:/,
-  animation: /\banimation\s*:|@keyframes\b/,
-  gradient: /linear-gradient\(|radial-gradient\(|conic-gradient\(|\bgradient\(/,
-  textTransformUpper: /\btext-transform\s*:\s*uppercase\b/i,
 };
+
+const MOTION_DECLARATION = /@keyframes\b|(?<![\w-])animation(?:-name|-duration)?\s*:/;
+const REDUCED_MOTION_GUARD = /prefers-reduced-motion/;
 
 function collectStyleContexts(source: string, isAstro: boolean): string {
   if (!isAstro) return source;
@@ -125,36 +158,22 @@ function findStylingViolations(source: string, isAstro: boolean): string[] {
   if (colorHit) {
     violations.push(`literal color '${colorHit[0]}'`);
   }
-  const transformHit = cssOnly.match(STYLING_VIOLATION_CHECKS.transform);
-  if (transformHit) {
-    violations.push(`transform declaration '${transformHit[0]}'`);
-  }
-  const animationHit = cssOnly.match(STYLING_VIOLATION_CHECKS.animation);
-  if (animationHit) {
-    violations.push(`animation declaration '${animationHit[0]}'`);
-  }
-  const gradientHit = cssOnly.match(STYLING_VIOLATION_CHECKS.gradient);
-  if (gradientHit) {
-    violations.push(`gradient '${gradientHit[0]}'`);
-  }
-  const textTransformHit = cssOnly.match(STYLING_VIOLATION_CHECKS.textTransformUpper);
-  if (textTransformHit) {
-    violations.push(`text-transform: uppercase`);
+
+  if (MOTION_DECLARATION.test(cssOnly) && !REDUCED_MOTION_GUARD.test(cssOnly)) {
+    violations.push('animates without a prefers-reduced-motion guard in the same file');
   }
 
-  const allowedBoxShadow = /^\s*(none|0|initial|unset)\s*$/i;
   for (const block of blocks) {
     for (const declaration of block.body.split(';')) {
       const trimmed = declaration.trim();
       if (!trimmed) continue;
-      if (/^box-shadow\s*:/i.test(trimmed)) {
-        const value = trimmed.split(':').slice(1).join(':').trim();
-        if (!allowedBoxShadow.test(value)) {
-          violations.push(`box-shadow '${value}'`);
-        }
+      const value = trimmed.split(':').slice(1).join(':').trim();
+
+      if (/^font-family\s*:/i.test(trimmed) && !value.includes('var(--admob-font-')) {
+        violations.push(`font-family not from a token in '${block.selector}': ${value}`);
       }
-      if (/^font-family\s*:/i.test(trimmed) && !isCodeCoordinateSelector(block.selector)) {
-        violations.push(`font-family outside code/coordinate selector '${block.selector}'`);
+      if (/^border(?:-[a-z]+)?-radius\s*:/i.test(trimmed) && !isAllowedRadiusValue(value)) {
+        violations.push(`off-scale radius in '${block.selector}': ${value}`);
       }
     }
   }
@@ -249,12 +268,20 @@ describe('formats contract', () => {
     }
   });
 
-  it('screenshot is string-or-null, crop is top/center/bottom', () => {
+  it('every format states a non-empty on-screen dimension', () => {
     for (const f of formats) {
-      expect(['top', 'center', 'bottom']).toContain(f.crop);
-      const ok = f.screenshot === null || typeof f.screenshot === 'string';
-      expect(ok, `${f.slug} screenshot must be string or null`).toBe(true);
+      expect(typeof f.dimension, `${f.slug} dimension must be a string`).toBe('string');
+      expect(f.dimension.length, `${f.slug} dimension must not be empty`).toBeGreaterThan(0);
     }
+  });
+
+  it('banner states its real size and the four full-screen formats agree with each other', () => {
+    const bySlug = Object.fromEntries(formats.map((f) => [f.slug, f.dimension]));
+    expect(bySlug.banner).toBe('320 × 50 dp');
+    for (const slug of ['interstitial', 'rewarded', 'rewarded-interstitial', 'app-open']) {
+      expect(bySlug[slug], `${slug} is a full-screen format`).toBe('full screen');
+    }
+    expect(bySlug.native).not.toBe('full screen');
   });
 });
 
@@ -323,21 +350,66 @@ describe('landing component styling-boundary rules', () => {
     }
   });
 
-  it('no landing file uses literal colors, transforms, animations, gradients, or uppercase text-transform', () => {
+  it('no landing file uses literal colors, literal font stacks, or off-scale radii', () => {
     for (const file of componentFiles) {
       const violations = checkFileForStylingViolations(file);
       expect(violations, `${file} contains ${violations.join(', ')}`).toEqual([]);
     }
   });
 
-  it('transform scan does not flag text-transform: lowercase (anchor against hyphen lookalike)', () => {
-    const violations = findStylingViolations('.x { text-transform: lowercase; }', false);
+  it('flags a literal colour', () => {
+    const violations = findStylingViolations('.x { color: #ff0000; }', false);
+    expect(violations.some((v) => v.startsWith('literal color'))).toBe(true);
+  });
+
+  it('accepts a colour that resolves through a token', () => {
+    const violations = findStylingViolations('.x { color: var(--admob-ink); }', false);
     expect(violations).toEqual([]);
   });
 
-  it('transform scan still flags a real transform: rotate(...) declaration', () => {
-    const violations = findStylingViolations('.x { transform: rotate(5deg); }', false);
-    expect(violations.some((v) => v.startsWith('transform declaration'))).toBe(true);
+  it('flags a hard-coded font stack but accepts the token', () => {
+    expect(
+      findStylingViolations(".x { font-family: 'Helvetica', sans-serif; }", false).some((v) =>
+        v.startsWith('font-family not from a token')
+      )
+    ).toBe(true);
+    expect(findStylingViolations('.x { font-family: var(--admob-font-mono); }', false)).toEqual([]);
+  });
+
+  it('flags an off-scale radius but accepts tokens, pills and zero', () => {
+    expect(
+      findStylingViolations('.x { border-radius: 7px; }', false).some((v) =>
+        v.startsWith('off-scale radius')
+      )
+    ).toBe(true);
+    expect(findStylingViolations('.x { border-radius: 999px; }', false)).toEqual([]);
+    expect(
+      findStylingViolations(
+        '.x { border-radius: 0 var(--admob-radius-lg) var(--admob-radius-lg) 0; }',
+        false
+      )
+    ).toEqual([]);
+  });
+
+  it('flags animation that has no reduced-motion answer, and accepts it when guarded', () => {
+    expect(
+      findStylingViolations('@keyframes k { to { opacity: 1; } } .x { animation: k 1s; }', false)
+    ).toContain('animates without a prefers-reduced-motion guard in the same file');
+    expect(
+      findStylingViolations(
+        '@keyframes k { to { opacity: 1; } } .x { animation: k 1s; } @media (prefers-reduced-motion: reduce) { .x { animation: none; } }',
+        false
+      )
+    ).toEqual([]);
+  });
+
+  it('permits shadows, transforms and gradients now that their colours must be tokens', () => {
+    expect(
+      findStylingViolations(
+        '.x { box-shadow: var(--admob-shadow); transform: translateY(2px); background: linear-gradient(var(--admob-tint), transparent); }',
+        false
+      )
+    ).toEqual([]);
   });
 });
 
@@ -362,80 +434,123 @@ describe('landing components do not import PNGs directly', () => {
   });
 });
 
-const formatListPath = fileURLToPath(
-  new URL('../src/components/landing/FormatList.astro', import.meta.url)
+const placementPlatePath = fileURLToPath(
+  new URL('../src/components/landing/PlacementPlate.astro', import.meta.url)
 );
+const heroPath = fileURLToPath(new URL('../src/components/Hero.astro', import.meta.url));
 
-describe('FormatList.astro contracts', () => {
-  const source = readFileSync(formatListPath, 'utf8');
+describe('PlacementPlate.astro contracts', () => {
+  const source = readFileSync(placementPlatePath, 'utf8');
 
   it('exists as an Astro component', () => {
-    expect(existsSync(formatListPath)).toBe(true);
+    expect(existsSync(placementPlatePath)).toBe(true);
   });
 
-  it('resolves the Screenshot component via guarded import.meta.glob, not a static import', () => {
-    expect(source).toMatch(/import\.meta\.glob[\s\S]*?['"]\.\.\/Screenshot\.astro['"]/);
-    const staticImportRe =
-      /^[ \t]*import\s+(?:\*\s+as\s+\w+|\{[^}]*\}|[\w$]+)\s+from\s+['"]\.\.\/Screenshot\.astro['"]/m;
-    expect(
-      source.match(staticImportRe),
-      'FormatList.astro must not static-import Screenshot.astro — use import.meta.glob'
-    ).toBeNull();
-  });
-
-  it('import.meta.glob is configured with eager: true so the default export is available at build time', () => {
-    const globBlock = source.match(/import\.meta\.glob[\s\S]*?\)/);
-    expect(globBlock, 'import.meta.glob call must be present').not.toBeNull();
-    expect(globBlock![0]).toMatch(/eager\s*:\s*true/);
-  });
-
-  it('reads the default export with optional chaining so the absent-component path is graceful', () => {
-    expect(source).toMatch(/screenshotModules\[['\"]\.\.\/Screenshot\.astro['\"]\]\?\.default/);
-  });
-
-  it('iterates the imported `formats` array directly, without sort or reorder', () => {
+  it('iterates the imported `formats` array directly, without sort, filter or slice', () => {
+    expect(source).toMatch(
+      /import\s*\{[^}]*\bformats\b[^}]*\}\s*from\s*['"]\.\.\/\.\.\/data\/landing(?:\.ts)?['"]/
+    );
     expect(source).toMatch(/formats\.map\(/);
     expect(source).not.toMatch(/\.sort\s*\(/);
-  });
-
-  it('does not filter the formats array down to a subset', () => {
     expect(source).not.toMatch(/formats\.(?:filter|slice)\s*\(/);
   });
 
+  it('renders exactly one <ol class="landing-formats"> of anchors to each format guide', () => {
+    expect(source.match(/<ol\s+class="landing-formats"/g) ?? []).toHaveLength(1);
+    expect(source).toMatch(/<a\s+href=\{format\.href\}\s+data-format=\{format\.slug\}>/);
+  });
+
   it('renders the API identifier inside <code class="admob-font-mono">', () => {
-    expect(source).toMatch(/<code[^>]*class="[^"]*\badmob-font-mono\b[^"]*"[^>]*>\s*\{format\.api\}\s*<\/code>/);
-  });
-
-  it('renders a <h3> with a link to the format href so the fragment is preserved', () => {
-    expect(source).toMatch(/<h3>\s*<a\s+href=\{format\.href\}>/);
-  });
-
-  it('renders exactly one <ol class="landing-formats">', () => {
-    const matches = source.match(/<ol\s+class="landing-formats"/g) ?? [];
-    expect(matches).toHaveLength(1);
-  });
-
-  it('section label is sentence case: no uppercase mono eyebrows in the component', () => {
-    expect(source).not.toMatch(/\btext-transform\s*:\s*uppercase\b/i);
-    const allCapsLabelRe = />\s*SUPPORTED\s+FORMATS\s*</;
-    expect(source.match(allCapsLabelRe), 'section label must not be all-caps').toBeNull();
-  });
-
-  it('always renders a landing-format__screenshot frame element on every row', () => {
-    expect(source).toMatch(/<div\s+class="landing-format__screenshot/);
-  });
-
-  it('renders the neutral placeholder div with role="img" and aria-label when the Screenshot is absent', () => {
     expect(source).toMatch(
-      /<div\s+class="landing-format__screenshot landing-format__screenshot--placeholder"[^>]*role="img"[^>]*aria-label="[^"]+"/
+      /<code[^>]*class="[^"]*\badmob-font-mono\b[^"]*"[^>]*>\s*\{format\.api\}\s*<\/code>/
     );
   });
 
-  it('landing.css defines aspect-ratio on the placeholder selector so the frame shape is stable', () => {
+  it('renders each format name, blurb and dimension as text in the row', () => {
+    expect(source).toMatch(/\{format\.name\}/);
+    expect(source).toMatch(/\{format\.blurb\}/);
+    expect(source).toMatch(/\{format\.dimension\}/);
+  });
+
+  it('hides the decorative phone from assistive technology', () => {
+    expect(source).toMatch(/class="landing-plate__stage"\s+aria-hidden="true"/);
+  });
+
+  it('ships no client-side script — the plate is CSS-only', () => {
+    expect(source).not.toMatch(/<script/i);
+    expect(source).not.toMatch(/addEventListener|client:(load|idle|visible)/);
+  });
+
+  it('landing.css keeps the viewport at a real 9:19.5 phone aspect', () => {
     const css = readFileSync(landingCssPath, 'utf8');
-    expect(css).toMatch(
-      /\.landing-format__screenshot--placeholder\s*\{[^}]*aspect-ratio\s*:\s*9\s*\/\s*19\.5/
+    expect(css).toMatch(/\.landing-plate__viewport\s*\{[^}]*aspect-ratio\s*:\s*9\s*\/\s*19\.5/);
+  });
+
+  it('landing.css drives the ad block from --ad-* custom properties', () => {
+    const css = readFileSync(landingCssPath, 'utf8');
+    const block = css.match(/\.landing-plate__ad\s*\{([^}]*)\}/);
+    expect(block, '.landing-plate__ad rule must be present').not.toBeNull();
+    for (const property of ['left', 'top', 'width', 'height']) {
+      const re = new RegExp(`${property}\\s*:\\s*var\\(--ad-`);
+      expect(re.test(block![1]), `.landing-plate__ad must set ${property} from --ad-*`).toBe(true);
+    }
+  });
+
+  it('landing.css defines geometry for every format slug, keyed off :has()', () => {
+    const css = readFileSync(landingCssPath, 'utf8');
+    for (const format of formats) {
+      if (format.slug === 'banner') continue; // banner is the resting state
+      expect(
+        css.includes(`[data-format='${format.slug}']:hover`),
+        `landing.css must define a hover geometry for ${format.slug}`
+      ).toBe(true);
+      expect(
+        css.includes(`[data-format='${format.slug}']:focus`),
+        `landing.css must define a focus geometry for ${format.slug}`
+      ).toBe(true);
+    }
+  });
+
+  it('the plate follows :focus, not only :focus-visible, so keyboard users drive it', () => {
+    const css = readFileSync(landingCssPath, 'utf8');
+    expect(css).not.toMatch(/\[data-format='[a-z-]+'\]:focus-visible/);
+  });
+});
+
+describe('Hero.astro contracts', () => {
+  const source = readFileSync(heroPath, 'utf8');
+
+  it('exists and is registered as the Starlight Hero override', () => {
+    expect(existsSync(heroPath)).toBe(true);
+    const config = readFileSync(
+      fileURLToPath(new URL('../astro.config.mjs', import.meta.url)),
+      'utf8'
     );
+    expect(config).toMatch(/Hero:\s*['"]\.\/src\/components\/Hero\.astro['"]/);
+  });
+
+  it('renders the <h1> from hero frontmatter with the id the skip link targets', () => {
+    // The rendered count is asserted against dist/index.html further down; this
+    // only pins the shape, so the title cannot drift away from frontmatter.
+    expect(source).toMatch(/<h1\s+id="_top"\s+data-page-title\s+set:html=\{title\}\s*\/>/);
+    expect(source).toMatch(/const\s*\{\s*title\s*=\s*data\.title/);
+  });
+
+  it('renders the frontmatter actions as anchors, and nothing else focusable inside .hero', () => {
+    expect(source).toMatch(/actions\.map\(/);
+    expect(source).toMatch(/class:list=\{\[\s*'landing-hero__action'/);
+    // The plate's six links must be siblings of .hero, not descendants, or the
+    // two-hero-action assertion in scripts/check-theme.mjs would count eight.
+    const heroBlock = source.match(/<div class="hero landing-hero">([\s\S]*?)<\/div>\s*\n\s*<PlacementPlate/);
+    expect(heroBlock, '.hero must close before <PlacementPlate />').not.toBeNull();
+    expect(heroBlock![1]).not.toMatch(/<PlacementPlate/);
+  });
+
+  it('composes the spec strip and the plate', () => {
+    expect(source).toMatch(/import\s+ProjectMetadata\s+from\s+['"]\.\/landing\/ProjectMetadata\.astro['"]/);
+    expect(source).toMatch(/import\s+PlacementPlate\s+from\s+['"]\.\/landing\/PlacementPlate\.astro['"]/);
+    expect(source).toMatch(/<ProjectMetadata\s*\/>/);
+    expect(source).toMatch(/<PlacementPlate\s*\/>/);
   });
 });
 
@@ -647,13 +762,12 @@ describe('CompatibilityList.astro contracts', () => {
     expect(source.toLowerCase()).toMatch(/binary compatibility/);
   });
 
-  it('renders landingMeta fields in canonical order (Kotlin, Compose Multiplatform, Android, iOS, Maven coordinate)', () => {
+  it('renders landingMeta fields in canonical order (Kotlin, Compose Multiplatform, Android, iOS)', () => {
     const expectedKeys = [
       'kotlinVersion',
       'composeMultiplatformVersion',
       'androidMinSdk',
       'iosDeploymentTarget',
-      'mavenCoordinate',
     ];
     const positions = expectedKeys.map((key) => ({ key, index: source.indexOf(key) }));
     for (const { key, index } of positions) {
@@ -669,29 +783,29 @@ describe('CompatibilityList.astro contracts', () => {
     }
   });
 
-  it('renders a <dl> with five pairs and the expected labels', () => {
+  it('renders a <dl> with four pairs and the expected labels', () => {
     expect(source).toMatch(/<dl[^>]*class="landing-compatibility__list"/);
     const dlBlock = source.match(
       /<dl[^>]*class="landing-compatibility__list"[^>]*>([\s\S]*?)<\/dl>/
     );
     expect(dlBlock, 'compatibility <dl> is present').not.toBeNull();
     const body = dlBlock![1];
-    for (const label of [
-      'Kotlin',
-      'Compose Multiplatform',
-      'Android',
-      'iOS',
-      'Maven coordinate',
-    ]) {
+    for (const label of ['Kotlin', 'Compose Multiplatform', 'Android', 'iOS']) {
       const dtRe = new RegExp(`<dt>\\s*${label}\\s*</dt>`);
       expect(dtRe.test(body), `expected <dt>${label}</dt> in compatibility <dl>`).toBe(true);
     }
+    expect((body.match(/<dt>/g) ?? []).length).toBe(4);
   });
 
-  it('renders the Maven coordinate inside a <code class="admob-font-mono"> tag', () => {
-    expect(source).toMatch(
-      /<code[^>]*class="[^"]*\badmob-font-mono\b[^"]*"[^>]*>\s*\{landingMeta\.mavenCoordinate\}\s*<\/code>/
-    );
+  it('does not repeat the Maven coordinate — the hero and Quick start already state it', () => {
+    expect(source).not.toMatch(/mavenCoordinate/);
+  });
+
+  it('the coordinate still appears exactly twice on the landing page', () => {
+    const hero = readFileSync(projectMetadataPath, 'utf8');
+    const mdx = readFileSync(indexMdxPath, 'utf8');
+    expect(hero).toMatch(/landingMeta\.mavenCoordinate/);
+    expect(mdx).toContain(`implementation("${landingMeta.mavenCoordinate}")`);
   });
 
   it('renders the InitSequence and PlatformMatrix components once each', () => {
@@ -831,6 +945,85 @@ describe('LandingFooter.astro contracts', () => {
     expect(source).not.toMatch(/class="[^"]*\bcolumns?\b/i);
     expect((source.match(/<ul\b/g) ?? []).length).toBe(1);
   });
+
+  it('attributes the project to the author and the studio, from the data module', () => {
+    expect(source).toMatch(
+      /<p[^>]*class="landing-footer__author"[^>]*>[\s\S]*?<a href=\{authorUrl\}>\{authorName\}<\/a>[\s\S]*?<a href=\{studioUrl\}>\{studioName\}<\/a>[\s\S]*?<\/p>/
+    );
+    // Names and URLs are never inlined here — they live in landing.ts.
+    expect(source).not.toMatch(/Meet Miyani|avinya\.dev/);
+  });
+});
+
+describe('attribution and origin story data', () => {
+  it('derives the author profile from the canonical repo URL so it cannot drift', () => {
+    expect(authorUrl).toBe('https://github.com/Meet-Miyani');
+    expect(repoUrl.startsWith(authorUrl)).toBe(true);
+  });
+
+  it('points the studio at avinya.dev', () => {
+    expect(studioUrl).toBe('https://avinya.dev');
+    expect(studioName).toBe('Avinya');
+    expect(authorName).toBe('Meet Miyani');
+  });
+
+  it('tells the origin story in three paragraphs of real prose', () => {
+    expect(originStory.paragraphs).toHaveLength(3);
+    for (const paragraph of originStory.paragraphs) {
+      expect(paragraph.length).toBeGreaterThan(80);
+    }
+  });
+
+  it('makes no comparative quality claim — the capability table carries the comparison', () => {
+    const text = originStory.paragraphs.join(' ').toLowerCase();
+    const denylist = [
+      'best',
+      'better than',
+      'leading',
+      'superior',
+      'the only',
+      'powerful',
+      'amazing',
+      'fastest',
+      'easiest',
+      'revolutionary',
+      'ultimate',
+      'seamless',
+      'effortless',
+    ];
+    for (const word of denylist) {
+      expect(text.includes(word), `origin story must not contain '${word}'`).toBe(false);
+    }
+  });
+
+  it('does not name the origin app while it is still unreleased', () => {
+    // TODO(origin-app): drop this test and name the app once it ships.
+    const text = originStory.paragraphs.join(' ');
+    expect(text).not.toMatch(/ViewTube/i);
+  });
+});
+
+const originStoryPath = fileURLToPath(
+  new URL('../src/components/landing/OriginStory.astro', import.meta.url)
+);
+
+describe('OriginStory.astro contracts', () => {
+  const source = readFileSync(originStoryPath, 'utf8');
+
+  it('renders every paragraph from the data module without inlining copy', () => {
+    expect(existsSync(originStoryPath)).toBe(true);
+    expect(source).toMatch(
+      /import\s*\{[^}]*\boriginStory\b[^}]*\}\s*from\s*['"]\.\.\/\.\.\/data\/landing(?:\.ts)?['"]/
+    );
+    expect(source).toMatch(/originStory\.paragraphs\.map\(/);
+  });
+
+  it('is placed between the capability comparison and compatibility on the landing page', () => {
+    const mdx = readFileSync(indexMdxPath, 'utf8');
+    const at = (tag: string) => mdx.indexOf(tag);
+    expect(at('<OriginStory')).toBeGreaterThan(at('<CapabilityMatrix'));
+    expect(at('<OriginStory')).toBeLessThan(at('<CompatibilityList'));
+  });
 });
 
 describe('landing.css footer and roadmap rules', () => {
@@ -864,13 +1057,48 @@ describe('landing.css footer and roadmap rules', () => {
     expect(block![1]).toMatch(/color\s*:\s*var\(--admob-slate\)/);
   });
 
-  it('uses a hairline border-bottom on roadmap items and clears it on the last child', () => {
+  it('gives roadmap items a bounded card with a token radius', () => {
     const block = css.match(/\.landing-roadmap__item\s*\{([^}]*)\}/);
     expect(block, '.landing-roadmap__item rule must be present').not.toBeNull();
-    expect(block![1]).toMatch(/border-bottom\s*:\s*1px\s+solid\s+var\(--admob-hair\)/);
-    const lastBlock = css.match(/\.landing-roadmap__item:last-child\s*\{([^}]*)\}/);
-    expect(lastBlock, '.landing-roadmap__item:last-child rule must be present').not.toBeNull();
-    expect(lastBlock![1]).toMatch(/border-bottom\s*:\s*0/);
+    expect(block![1]).toMatch(/border\s*:\s*var\(--landing-rule\)/);
+    expect(block![1]).toMatch(/border-radius\s*:\s*var\(--admob-radius/);
+  });
+
+  it('the hairline is defined once as a token-backed variable', () => {
+    expect(css).toMatch(/--landing-rule\s*:\s*1px\s+solid\s+var\(--admob-hair\)/);
+  });
+
+  it('widens the splash container without touching the docs reading measure', () => {
+    expect(css).toMatch(/\.content-panel:has\(\.landing-hero\)\s+\.sl-container/);
+    const block = css.match(/\.content-panel:has\(\.landing-hero\)[\s\S]*?\{([^}]*)\}/);
+    expect(block![1]).toMatch(/max-width\s*:\s*var\(--admob-content-max\)/);
+  });
+});
+
+const projectMetadataPath = fileURLToPath(
+  new URL('../src/components/landing/ProjectMetadata.astro', import.meta.url)
+);
+
+describe('ProjectMetadata.astro contracts', () => {
+  const source = readFileSync(projectMetadataPath, 'utf8');
+
+  it('renders every value from landingMeta rather than repeating literals', () => {
+    expect(source).toMatch(
+      /import\s*\{[^}]*\blandingMeta\b[^}]*\}\s*from\s*['"]\.\.\/\.\.\/data\/landing(?:\.ts)?['"]/
+    );
+    expect(source).not.toMatch(/dev\.avinya\.ads:admob-cmp/);
+    expect(source).not.toMatch(/Apache License/);
+  });
+
+  it('keeps the Maven coordinate focusable so it can be copied without a pointer', () => {
+    expect(source).toMatch(
+      /<code\s+class="admob-font-mono"\s+tabindex="0">\{landingMeta\.mavenCoordinate\}<\/code>/
+    );
+  });
+
+  it('no longer repeats the release version that the coordinate already carries', () => {
+    expect(source).not.toMatch(/<dt>Release<\/dt>/);
+    expect(source).not.toMatch(/mavenVersion/);
   });
 });
 
