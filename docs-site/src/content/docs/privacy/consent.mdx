@@ -1,13 +1,6 @@
 ---
 title: "UMP consent"
 description: "AdMob consent on Kotlin Multiplatform — UMP consent modes, canRequestAds, the privacy options form, debug geography, and resetting consent in development."
-faq:
-  - q: How does UMP consent work with AdMob on Kotlin Multiplatform?
-    a: Consent is part of initialization. gatherConsentAndInitialize runs the UMP flow, then starts Mobile Ads. Until consent allows requests, every ad load fails fast with AdErrorCode.CONSENT_REQUIRED and nothing reaches the network.
-  - q: When should I show a Privacy Settings button?
-    a: Only when adManager.consent.privacyOptionsRequirementStatus is PrivacyOptionsRequirementStatus.Required. Do not gate it on ConsentStatus.Obtained, because users who declined must still be able to reopen the form.
-  - q: How do I test the EEA consent flow?
-    a: Set testMode to true and debugGeography to ConsentDebugGeography.Eea, and register the device hash in AdDebugOptions.consentTestDeviceIds. Debug settings only apply when testMode is true.
 ---
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
@@ -161,7 +154,7 @@ manage, and it always appears when there is.
 
 ## How do I test the EEA consent flow?
 
-This section must correct a real ambiguity in the API surface. The
+The
 convenience `AdConfig(androidAppId = …, iosAppId = …, testDeviceIds = …)`
 constructor routes `testDeviceIds` into
 `GlobalRequestConfiguration.testDeviceIds`, which registers **GMA

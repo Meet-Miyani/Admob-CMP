@@ -1,13 +1,6 @@
 ---
 title: "App-open ads"
 description: "KMP app-open ads with AppOpenAdCoordinator — foreground detection, minimum background duration, cooldowns, blocking, and the four-hour ad TTL."
-faq:
-  - q: How do I show app-open ads in Kotlin Multiplatform?
-    a: Construct an AppOpenAdCoordinator with the ad manager, the app-open controller and an AppOpenConfig, then call coordinator.start(scope). It handles preloading, foreground detection, cooldowns and reloading.
-  - q: How do I stop an app-open ad interrupting a purchase?
-    a: Set coordinator.isBlocked to true before the sensitive flow and back to false afterwards. Use it during checkout, onboarding, and whenever another full-screen ad may appear.
-  - q: How long does an app-open ad stay valid?
-    a: Four hours by default, from AdExpirationPolicy.appOpenTtl, matching Google's guidance. Other full-screen formats default to one hour.
 ---
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';

@@ -1,13 +1,6 @@
 ---
 title: "Mediation"
 description: "AdMob mediation on Kotlin Multiplatform — adding adapters per platform, setting network privacy flags with hooks, and verifying fill."
-faq:
-  - q: Does AdMob CMP bundle mediation adapters?
-    a: No, deliberately. Adapters are platform binaries that must match your GMA SDK version and your network contracts. Add them to your Android module and your Xcode project directly.
-  - q: How do I set a mediation network's privacy flags before initialization?
-    a: Use an AdInitializationHook and act on AdInitializationPhase.BeforeMobileAdsInitialize. Hooks run at well-defined phases on both platforms, exactly once per real native initialization.
-  - q: How do I confirm a mediation adapter is serving?
-    a: Read adManager.diagnostics.adapterStatuses() after the manager is Ready, and open Google's Ad Inspector with adManager.diagnostics.openAdInspector() on a test device.
 ---
 
 import { Aside, Tabs, TabItem, CardGrid, LinkCard } from '@astrojs/starlight/components';

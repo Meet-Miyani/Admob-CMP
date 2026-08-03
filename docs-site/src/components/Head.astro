@@ -3,7 +3,6 @@ import Default from '@astrojs/starlight/components/Head.astro';
 import {
   REPO_URL,
   breadcrumbListJsonLd,
-  faqPageJsonLd,
   normalizeEntryId,
   ogImagePath,
   softwareSourceCodeJsonLd,
@@ -43,11 +42,6 @@ if (isHome) {
       dateModified: lastUpdated?.toISOString(),
     })
   );
-}
-
-const faq = entry.data.faq;
-if (faq && faq.length > 0) {
-  structuredData.push(faqPageJsonLd(faq, canonical));
 }
 ---
 

@@ -1,15 +1,6 @@
 ---
 title: "Native ads"
 description: "Compose Multiplatform native ads — the adLayout DSL, ad pooling, availableAds recovery, maxSize accounting, media info, and the Android video-event gap."
-faq:
-  - q: Can I show native ads in Compose Multiplatform?
-    a: Yes. AdMob CMP renders native ads through a declarative adLayout DSL that becomes real platform-native views, with every asset registered for click and impression tracking on both Android and iOS.
-  - q: Why does pool.acquire() return null?
-    a: AdCachePolicy.maxSize budgets available plus in-use ads together. Once leases fill the budget, acquire() returns null deterministically. Key your acquisition effect on pool.availableAds and re-run preload, not just acquire.
-  - q: Why do native video events only fire on iOS?
-    a: iOS emits five video events through GADVideoControllerDelegate. The Android Google Mobile Ads Next-Gen SDK exposes no equivalent callback surface on NativeAd, so Android emits none. It is an upstream SDK gap.
-  - q: Do I need an Ad badge in my native layout?
-    a: Yes. AdMob policy requires ad attribution, adBadge() is the node that provides it, and AdLayoutValidator warns when it is missing.
 ---
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';

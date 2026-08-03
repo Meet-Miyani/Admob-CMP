@@ -1,22 +1,13 @@
 ---
 title: "Troubleshooting"
 description: "Fix AdMob errors on Kotlin Multiplatform — undefined symbols _OBJC_CLASS_$_GAD when linking iOS tests, no fill, blank banners, consent gates and crashes."
-faq:
-  - q: Why do I get Undefined symbols _OBJC_CLASS_$_GAD when linking Kotlin/Native iOS tests?
-    a: A Kotlin/Native test executable links without Xcode, so it cannot use Swift Package Manager. Apply the dev.avinya.ads.admob-cmp Gradle plugin, which downloads the matching XCFrameworks and adds the linker options to test binaries only.
-  - q: Will adding another Swift Package Manager package fix a test link failure?
-    a: No. SPM is not involved in a Kotlin/Native test link at all. Only the Gradle plugin fixes it. Adding an SPM package fixes the equivalent failure during an Xcode app build.
-  - q: What does AdErrorCode.SDK_NOT_READY mean?
-    a: Initialization has not finished. Gate ad requests on adManager.status being AdManagerStatus.Ready. Nothing reaches the network until then.
-  - q: Why does my ad request fail with GMA code 3 on Android or 1 on iOS?
-    a: No fill. There was no ad available for that request. It is normal, it is non-retryable by policy, and the fix is to retry at a later natural moment rather than immediately.
 ---
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 ## Why do my iOS Kotlin/Native tests fail with undefined GAD symbols?
 
-This section must be answerable in the first screen. The exact
+The exact
 error text a reader pasted into a search box:
 
 ```
@@ -131,8 +122,7 @@ which fix.
 
 ## What does the Gradle plugin do to fix it?
 
-Readers trust a fix they understand. The plugin's behaviour,
-exactly as implemented:
+Readers trust a fix they understand. The plugin's behaviour:
 
 - It registers `downloadGmaIos` and `downloadUmpIos`, which
   fetch the version-stamped GoogleMobileAds and

@@ -1,13 +1,6 @@
 ---
 title: "Play Data safety"
 description: "The AdMob Play Data safety and AD_ID declaration — which data categories the Google Mobile Ads SDK collects, and what to tick in the Play Console form."
-faq:
-  - q: What does the Google Mobile Ads SDK collect for Play Data safety?
-    a: In its default configuration it collects device or other IDs (the advertising ID), app activity such as ad impressions and clicks, and approximate location derived from IP for ad targeting.
-  - q: Do I have to declare data sharing with third parties?
-    a: Yes. Ad serving sends this data to Google and, when mediation is enabled, to the mediated networks, so the collected categories must be declared as shared.
-  - q: What happens if I remove the AD_ID permission?
-    a: Your app can no longer access the advertising ID on API 33 and above, which reduces ad revenue. It also changes what you declare in the Data safety form.
 ---
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
@@ -81,7 +74,7 @@ A child-directed app should also set
 `GlobalRequestConfiguration(ageRestrictedTreatment = AgeRestrictedTreatment.Child)`,
 and `AdConfig.consentTagForUnderAgeOfConsent` is a **separate**
 UMP-only flag. The library deliberately does not infer either
-setting from the other. Show it:
+setting from the other:
 </Aside>
 
 ```kotlin

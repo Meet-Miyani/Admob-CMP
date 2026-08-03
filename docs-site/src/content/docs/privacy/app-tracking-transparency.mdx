@@ -1,13 +1,6 @@
 ---
 title: "App Tracking Transparency"
 description: "App Tracking Transparency for Kotlin Multiplatform AdMob apps — the required Info.plist key, the consent to ATT to initialize order, and what IDFA loss costs."
-faq:
-  - q: What order should I call consent, ATT and initialize in?
-    a: UMP consent first, then ATT, then your first ad request. Requesting ads before ATT resolves permanently forfeits the IDFA for those requests.
-  - q: What happens without NSUserTrackingUsageDescription?
-    a: The ATT prompt cannot be shown, so iOS withholds the IDFA and every request serves non-personalised ads at materially lower eCPM.
-  - q: Does App Tracking Transparency apply on Android?
-    a: No. Android has no ATT. adManager.tracking is a no-op there and always reports AdTrackingAuthorization.NotApplicable.
 ---
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
@@ -171,7 +164,7 @@ second ATT prompt and a second network round-trip.
 
 ## What does Android do?
 
-One short paragraph. Android has no ATT. `adManager.tracking` is a
+Android has no ATT. `adManager.tracking` is a
 no-op there and always reports `AdTrackingAuthorization.NotApplicable`,
 so the same common-code sequence compiles and runs correctly on
 both platforms with no `expect`/`actual` needed. The

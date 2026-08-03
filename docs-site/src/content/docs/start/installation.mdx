@@ -1,13 +1,6 @@
 ---
 title: "Installation"
 description: "Add the Kotlin Multiplatform AdMob library dev.avinya.ads:admob-cmp with a version catalog, plus the Gradle plugin that fixes iOS test linking."
-faq:
-  - q: Which Gradle dependency do I add for AdMob on Kotlin Multiplatform?
-    a: Add dev.avinya.ads:admob-cmp:1.1.0 to commonMain. The Android Google Mobile Ads Next-Gen SDK and UMP arrive as transitive Maven dependencies.
-  - q: Do I need the dev.avinya.ads.admob-cmp Gradle plugin?
-    a: Only if your project links Kotlin/Native test executables for iOS. Without it those links fail with undefined _OBJC_CLASS_$_GAD symbols, because a Kotlin/Native test binary cannot use Swift Package Manager.
-  - q: Which Kotlin version does admob-cmp 1.1.0 require?
-    a: It is compiled with Kotlin 2.3.20. Because it publishes cinterop klibs, consumers on a different Kotlin minor version may fail to resolve the klib.
 ---
 
 import { Aside, Tabs, TabItem, CardGrid, LinkCard } from '@astrojs/starlight/components';
@@ -150,7 +143,7 @@ Adding another Swift Package Manager package will **not** fix a
 
 ## What does the Gradle plugin actually do?
 
-The plugin's behaviour, exactly as implemented:
+The plugin's behaviour:
 
 - It registers `downloadGmaIos` and `downloadUmpIos`, which fetch the
   version-stamped GoogleMobileAds and UserMessagingPlatform XCFrameworks

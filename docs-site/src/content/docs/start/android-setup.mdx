@@ -1,13 +1,6 @@
 ---
 title: "Android setup"
 description: "Android setup for AdMob on Kotlin Multiplatform — the manifest APPLICATION_ID entry, the AD_ID permission, minSdk 26, and how to verify it works."
-faq:
-  - q: Why does my Android app crash at startup after adding AdMob?
-    a: The Google Mobile Ads SDK crashes on launch when the manifest has no com.google.android.gms.ads.APPLICATION_ID meta-data entry. Add it with your AdMob app id.
-  - q: Do I need the AD_ID permission for AdMob on Android?
-    a: The Google Mobile Ads SDK merges com.google.android.gms.permission.AD_ID into your manifest automatically. Apps targeting API 33 or higher that remove it cannot access the advertising ID, which reduces revenue.
-  - q: What is the minimum Android API level for AdMob CMP?
-    a: API 26. The library targets Android API 26 and above and depends on the Google Mobile Ads Next-Gen SDK.
 ---
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';

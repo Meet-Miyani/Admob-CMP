@@ -1,13 +1,6 @@
 ---
 title: "Compatibility matrix"
 description: "Kotlin version compatibility for the Compose Multiplatform AdMob SDK — Kotlin, Compose, Android minSdk, iOS versions each release supports."
-faq:
-  - q: Which Kotlin version does admob-cmp require?
-    a: Every published release so far is compiled with Kotlin 2.3.20. Consumers on a different Kotlin minor version may fail to resolve the klib.
-  - q: Can I use a newer Kotlin than the library was built with?
-    a: Ordinary klibs are backwards compatible from Kotlin 1.9.20, but that guarantee explicitly excludes cinterop klibs, and admob-cmp publishes cinterop klibs. Verify per Kotlin minor rather than assuming.
-  - q: Do I need Compose Multiplatform to use AdMob CMP?
-    a: Only for the composable surface — BannerAdView, NativeAdView and rememberAdManager. The controller API has no Compose dependency.
 ---
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
@@ -48,8 +41,6 @@ API simply is not available in those source sets. The
 why desktop and web are out of scope.
 
 ## Which Kotlin version do I need, and why is it strict?
-
-This section must not be softened.
 
 The library is published as Kotlin/Native klibs **plus cinterop
 klibs**. Klibs are not binary-compatible across arbitrary Kotlin

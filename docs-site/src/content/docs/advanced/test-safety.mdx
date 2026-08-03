@@ -1,13 +1,6 @@
 ---
 title: "Test safety"
 description: "AdMob test ads on Kotlin Multiplatform — why testMode does not serve test ads, what strictTestMode guards, and how to keep live ads out of debug builds."
-faq:
-  - q: Does testMode make AdMob serve test ads?
-    a: No. AdDebugOptions.testMode configures UMP consent debugging only. Test ads come from registering the device in GlobalRequestConfiguration.testDeviceIds or from using a TestAdIds ad unit.
-  - q: What does strictTestMode do?
-    a: AdPlacement.strictTestMode throws at construction if the placement points at a production ad unit. Turn it on in debug builds so a test build can never request live ads.
-  - q: Why does requesting live ads in a debug build matter?
-    a: It is invalid traffic, and invalid traffic gets AdMob accounts suspended. That is why the check fails closed with an exception rather than a warning.
 ---
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';

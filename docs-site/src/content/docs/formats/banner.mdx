@@ -1,13 +1,6 @@
 ---
 title: "Banner ads"
 description: "AdMob banners in Compose Multiplatform — BannerAdView, adaptive and collapsible size policies, refresh policies, and how banner width is resolved."
-faq:
-  - q: How do I show an AdMob banner in Compose Multiplatform?
-    a: Declare an AdPlacement with AdFormat.Banner and render BannerAdView. The composable measures its container, loads, sizes, attaches, refreshes and disposes the platform banner view for you.
-  - q: How do I make a collapsible banner?
-    a: Collapsible is a property of the anchored adaptive size policy. Set bannerSizePolicy to AdSizePolicy.LargeAnchoredAdaptive(collapsible = CollapsiblePlacement.Bottom), and test with the dedicated collapsible test ad units.
-  - q: Why is my banner blank?
-    a: Either the ad manager is not Ready yet, or the placement uses BannerRefreshPolicy.Manual and nothing has called refresh().
 ---
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';

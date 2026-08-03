@@ -1,13 +1,6 @@
 ---
 title: "Architecture"
 description: "The architecture behind this Compose Multiplatform AdMob SDK — one shared state machine, two thin platform adapters, bindings-only iOS, and the event flow."
-faq:
-  - q: How is AdMob CMP structured internally?
-    a: One shared state machine in common code, with thin Android and iOS adapters that implement only load, present, destroy and canPresent. Caching, retry, consent gating and event emission all live in common code.
-  - q: Why does the iOS artifact contain no Google binaries?
-    a: It is a deliberate bindings-only design. Embedding the GMA binary would break mediation adapters with duplicate Objective-C classes, pin the GMA version for every consumer, and raise redistribution questions.
-  - q: Is AdMob CMP safe to call from any thread?
-    a: Yes. Every public API is main-safe. All Google Mobile Ads and UMP calls are wrapped in Dispatchers.Main.immediate internally.
 ---
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';

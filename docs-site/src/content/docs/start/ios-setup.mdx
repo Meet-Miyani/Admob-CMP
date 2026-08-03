@@ -1,13 +1,6 @@
 ---
 title: "iOS setup"
 description: "iOS setup for KMP ads, ATT and IDFA — the two Swift Package Manager packages, Info.plist keys, JavaScriptCore linking, and the doctorIos check."
-faq:
-  - q: Why does AdMob CMP need Swift Package Manager packages on iOS?
-    a: The published artifact contains cinterop bindings only, never Google's binaries. Your app links the real GoogleMobileAds and UserMessagingPlatform frameworks itself, which keeps mediation adapters working and lets you take GMA patch releases independently.
-  - q: What causes Undefined symbol _OBJC_CLASS_$_JSContext on iOS?
-    a: GoogleMobileAds needs JavaScriptCore, and a static Kotlin framework does not autolink it. Add -framework JavaScriptCore to OTHER_LDFLAGS in the app target's build settings.
-  - q: Do I need NSUserTrackingUsageDescription for AdMob on iOS?
-    a: Yes if you want personalised ads. Without the key the ATT prompt cannot be shown, iOS withholds the IDFA, and every request serves non-personalised ads at materially lower eCPM.
 ---
 
 import { Aside, Steps, CardGrid, LinkCard } from '@astrojs/starlight/components';

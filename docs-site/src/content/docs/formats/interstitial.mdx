@@ -1,13 +1,6 @@
 ---
 title: "Interstitial ads"
 description: "Compose Multiplatform interstitial ads with suspend load and show, multi-ad caching, TTL eviction, retry, and why a second show returns NotReady."
-faq:
-  - q: How do I show an interstitial ad in Kotlin Multiplatform?
-    a: Get the controller with adManager.interstitial(placement) inside remember, call load() to fill the cache, then call show() from a UI-scoped coroutine. show() suspends until the ad is dismissed.
-  - q: Why does my second show() call return NotReady?
-    a: show() is not reentrant per controller. A second call while the first presentation is still on screen returns AdShowResult.NotReady immediately instead of queueing. Await the first result before calling again.
-  - q: How long does a cached interstitial stay valid?
-    a: One hour by default, from AdExpirationPolicy.fullScreenTtl. App-open ads default to four hours. Expired ads are evicted on access.
 ---
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';

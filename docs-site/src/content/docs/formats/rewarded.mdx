@@ -1,13 +1,6 @@
 ---
 title: "Rewarded ads"
 description: "Kotlin Multiplatform rewarded ads and rewarded interstitials — granting the reward exactly once, server-side verification, and load and show sequencing."
-faq:
-  - q: How do I grant a reward only once in Kotlin Multiplatform?
-    a: Grant from the onRewardEarned callback passed to show(), and do not also grant from AdEvent.RewardEarned. The event stream is telemetry; the callback is the single grant point on the client.
-  - q: When should I use server-side verification for rewarded ads?
-    a: Whenever the reward has real value. Pass ServerSideVerificationOptions with a userId and customData, and treat your server's callback as the authoritative grant rather than the client callback.
-  - q: What is a rewarded interstitial?
-    a: A full-screen format that offers a reward without an explicit opt-in prompt from your UI. It uses the same controller interface and the same show(onRewardEarned) signature as a rewarded ad.
 ---
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';

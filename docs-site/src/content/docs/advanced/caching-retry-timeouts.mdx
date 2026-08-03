@@ -1,13 +1,6 @@
 ---
 title: "Caching, retry and timeouts"
 description: "AdMob ad caching and retry on Kotlin Multiplatform — AdCachePolicy, AdExpirationPolicy, AdRetryPolicy and AdTimeoutPolicy, and how to size each one."
-faq:
-  - q: How many ads should I cache?
-    a: Cache the number of ads you can genuinely show before their TTL expires. Full-screen ads live one hour by default and app-open ads four, so a large cache mostly buys evictions.
-  - q: How many times does a failed ad load retry?
-    a: AdRetryPolicy.maxAttempts defaults to 2 — the initial attempt plus one retry — with capped exponential backoff. Set maxAttempts to 1 for no retry at all.
-  - q: Are no-fill errors retried?
-    a: No. Only retryable failures such as network, timeout and internal errors are retried. No fill and consent failures are non-retryable by policy.
 ---
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';

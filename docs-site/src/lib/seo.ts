@@ -116,19 +116,3 @@ export function softwareSourceCodeJsonLd(siteUrl: string, repoUrl: string): obje
     maintainer: { '@type': 'Organization', name: 'Avinya' },
   };
 }
-
-export function faqPageJsonLd(
-  faq: Array<{ q: string; a: string }>,
-  url: string
-): object {
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'FAQPage',
-    mainEntityOfPage: { '@type': 'WebPage', '@id': url },
-    mainEntity: faq.map(({ q, a }) => ({
-      '@type': 'Question',
-      name: q,
-      acceptedAnswer: { '@type': 'Answer', text: a },
-    })),
-  };
-}

@@ -1,13 +1,6 @@
 ---
 title: "Revenue and paid events"
 description: "Track the AdMob paid event on Kotlin Multiplatform — AdValue micros, precision, response info, and sending impression-level revenue to your analytics."
-faq:
-  - q: How do I get impression-level ad revenue in Kotlin Multiplatform?
-    a: Collect AdEvent.Paid from adManager.events or from a controller's events flow. Each event carries a PaidEvent with an AdValue holding valueMicros, currencyCode and precision.
-  - q: What does AdValuePrecision mean?
-    a: It says how trustworthy the number is — Precise, Estimated, PublisherProvided or Unknown. Aggregate estimated values with care and never present them as billed revenue.
-  - q: Which ad network won an impression?
-    a: Read responseInfo.loadedAdNetworkResponseInfo from the load event or the paid event. The full waterfall, including failures, is in adNetworkResponseInfos.
 ---
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';

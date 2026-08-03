@@ -1,11 +1,6 @@
 ---
 title: "Contributing"
 description: "Contributing to admob-cmp — how to build and test the library, why the public ABI is frozen, and what a mergeable pull request looks like."
-faq:
-  - q: How do I run the admob-cmp tests?
-    a: Run ./gradlew :admob-cmp:iosSimulatorArm64Test for the iOS runner and ./gradlew :admob-cmp:testAndroidHostTest for the JVM runner. Tests live in commonTest and use hand-written fakes.
-  - q: Why does my pull request fail the ABI check?
-    a: The public API surface is frozen and validated. After any intentional public change, run ./gradlew :admob-cmp:updateKotlinAbi and commit the regenerated api klib.api dump.
 ---
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
