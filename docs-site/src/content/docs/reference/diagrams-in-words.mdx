@@ -38,11 +38,11 @@ This is the highest-value correctness trap in the library. Three calls must happ
 
 Step one: adManager.consent.gatherConsent(config). This runs Google's User Messaging Platform consent-info update and, under ConsentMode.GatherBeforeInitialize, shows the consent form where the user's region requires one. UMP returns a ConsentStatus and sets canRequestAds, which is the gate on whether any ad may be requested at all. The gate is checked in both load() and show(), and canPresent() is re-checked at present time (invariant 5).
 
-Step two: adManager.tracking.requestAuthorization(). On iOS 14.5 and later this shows the system App Tracking Transparency prompt and resolves to Authorized, Denied, Restricted or NotDetermined. The prompt cannot appear at all unless NSUserTrackingUsageDescription is present in the app target's Info.plist; without that key iOS silently withholds the IDFA and every request serves non-personalised ads at materially lower eCPM. Android has no ATT: adManager.tracking is a no-op there and always reports AdTrackingAuthorization.NotApplicable.
+Step two: adManager.tracking.requestAuthorization(). On iOS 14.5 and later this shows the system App Tracking Transparency prompt and resolves to Authorized, Denied, Restricted or NotDetermined. The prompt cannot appear at all unless NSUserTrackingUsageDescription is present in the app target's Info.plist; without that key iOS silently withholds the IDFA. Android has no ATT: adManager.tracking is a no-op there and always reports AdTrackingAuthorization.NotApplicable.
 
 Step three: adManager.initialize(config, ConsentMode.InitializeOnlyIfAlreadyAllowed). Only now does the Google Mobile Ads SDK initialize and the first ad request become possible. AdManagerStatus moves to Ready, and UI should gate on that.
 
-Why the order is load-bearing: requesting ads before ATT resolves permanently forfeits the IDFA for those requests (invariant 11). It is not a delay or a degradation that later recovers — those requests are served without the identifier for good. Consent must precede ATT in turn, because UMP is what decides whether requests are permitted at all.
+Why the order is load-bearing: ad requests issued before ATT authorisation cannot retroactively attach an IDFA (invariant 11). Subsequent requests after approval will attach the identifier subject to platform SDK behaviour. UMP consent must precede ATT in turn, because UMP decides whether requests are permitted at all.
 <a id="full-screen-lifecycle"></a>
 
 ## Full-screen ad lifecycle: load, cache, show, reload
