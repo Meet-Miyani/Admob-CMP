@@ -20,12 +20,14 @@ The `admob-cmp` library provides Kotlin Multiplatform bindings for the Google Mo
 
 According to Google's official iOS data disclosure documentation, the Google Mobile Ads SDK collects specific data categories depending on user consent, App Tracking Transparency (ATT) authorization, and SDK configuration:
 
-| Data category | Apple privacy label data type | Stated purposes | Linked to user? | Used for tracking? |
-|---|---|---|---|---|
-| **Identifiers** | Device ID (IDFA / IDFV), User ID | Third-Party Advertising, Analytics, Fraud Prevention and Security | Yes (when ATT authorized) / No (when ATT denied or restricted) | Yes (when ATT authorized) / No (when ATT denied) |
-| **Usage Data** | Product Interaction (ad impressions, clicks, video views) | Third-Party Advertising, Analytics | Yes (when ATT authorized) / No (when ATT denied) | Yes (when ATT authorized) / No (when ATT denied) |
-| **Diagnostics** | Crash Data, Performance Data (load latency, error logs) | Analytics, Fraud Prevention and Security | No | No |
-| **Location** | Coarse Location (derived from IP address) | Third-Party Advertising, Analytics | No | No |
+| Data category | Apple privacy label data type | Stated purposes |
+|---|---|---|
+| **Identifiers** | Device ID (IDFA / IDFV), User ID | Third-Party Advertising, Analytics, Fraud Prevention and Security |
+| **Usage Data** | Product Interaction (ad impressions, clicks, video views) | Third-Party Advertising, Analytics |
+| **Diagnostics** | Crash Data, Performance Data (load latency, error logs) | Analytics, Fraud Prevention and Security |
+| **Location** | Coarse Location (derived from IP address) | Third-Party Advertising, Analytics |
+
+Whether this data is "Linked to the user" or "Used for tracking" in App Store Connect depends on your complete application binary, your App Tracking Transparency (ATT) implementation, and your mediation stack. Google does not provide definitive answers for these fields; you must evaluate them based on your app's specific architecture.
 
 ### Stated purpose definitions
 
@@ -59,7 +61,7 @@ If you enable ad mediation adapters (such as Meta Audience Network, AppLovin, or
 
 ## Publisher verification checklist
 
-Before submitting your iOS application to App Store Connect, verify the following checklist:
+Before submitting your iOS application to App Store Connect, you must make the final decisions regarding your data disclosure. Use the following framework to guide your evaluation:
 
 - [ ] **Primary source alignment**: Review the latest [Google iOS Data Disclosure guide](https://developers.google.com/admob/ios/privacy/data-disclosure) and Apple's [App Privacy Details](https://developer.apple.com/app-store/app-privacy-details/).
 - [ ] **ATT implementation**: Confirm whether your app requests tracking permission using `AdTrackingController` before initialising Mobile Ads.

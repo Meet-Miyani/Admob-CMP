@@ -64,6 +64,9 @@ On iOS, add the application identifier to `iosApp/iosApp/Info.plist`:
 In your top-level `@Composable` entry point, obtain the process-wide `AdManager` singleton using `rememberAdManager()` and trigger test initialisation inside a `LaunchedEffect`:
 
 ```kotlin
+import androidx.compose.runtime.CompositionLocalProvider
+import dev.avinya.ads.LocalAdManager
+
 @Composable
 fun App() {
     val adManager = rememberAdManager()
@@ -80,7 +83,9 @@ fun App() {
 
     val status by adManager.status.collectAsState()
     if (status is AdManagerStatus.Ready) {
-        MainAdScreen()
+        CompositionLocalProvider(LocalAdManager provides adManager) {
+            MainAdScreen()
+        }
     }
 }
 
@@ -165,16 +170,19 @@ fun ProductionApp() {
     }
 
     LaunchedEffect(adManager, config) {
-        // Initialise using stored consent or perform UMP gathering
+        // Gather UMP consent (shows form if required) and initialise
         adManager.initialize(
             config = config,
-            consentMode = ConsentMode.InitializeOnlyIfAlreadyAllowed,
+            consentMode = ConsentMode.GatherBeforeInitialize,
         )
     }
 
     when (status) {
-        AdManagerStatus.Ready -> ContentScreen(adManager)
-        AdManagerStatus.ConsentRequired -> ConsentPromptScreen(adManager)
+        AdManagerStatus.Ready -> {
+            CompositionLocalProvider(LocalAdManager provides adManager) {
+                ContentScreen(adManager)
+            }
+        }
         is AdManagerStatus.Failed -> ErrorScreen(status as AdManagerStatus.Failed)
         else -> LoadingScreen()
     }

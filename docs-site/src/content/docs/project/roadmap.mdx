@@ -41,8 +41,7 @@ step. It would raise the Kotlin floor for every consumer and
 would therefore ship as **2.0.0**, with the 1.x line continuing
 to receive fixes for as long as the ecosystem lags.
 
-A note on the "fixes for as long as the ecosystem lags"
-commitment. The 1.x line is not abandoned when 2.0.0 ships; it
+The 1.x line is not abandoned when 2.0.0 ships; it
 is maintained in parallel until the migration is provably
 complete for every consumer. The cost of a parallel line is
 small relative to the cost of a forced migration, and the
@@ -52,9 +51,8 @@ window is committed, not implied.
 
 ## Prerequisite migration gates
 
-The gates, with the reason for each, exactly as the Track 3 plan
-defines them. None of them can be unblocked by work in this
-repository, which is the honest reason there is no date.
+The gates and the reason for each are listed below. None of them can be
+unblocked by work in this repository.
 
 ### Gate 1 — Kotlin 2.4.20 or later is a stable release
 
@@ -89,46 +87,24 @@ module dependencies inside one Gradle build. It says nothing
 about a klib resolved from Maven Central by a stranger.
 </Aside>
 
-The direction of travel honestly:
 [KT-84420](https://youtrack.jetbrains.com/issue/KT-84420) concluded
 that Kotlin should start emitting a `Package.swift` structure
 describing the direct and transitive SwiftPM dependencies needed
 for linkage — that is, linkage requirements travel as **metadata
 the consumer resolves**, not as embedded binaries. Whether the
 equivalent reaches a Maven consumer's
-`linkDebugTestIosSimulatorArm64` is exactly what has to be
-proven.
+`linkDebugTestIosSimulatorArm64` is the open question that must
+be proven experimentally.
 
-The four steps the experiment will use: build a trivial Kotlin
-Multiplatform library declaring a `swiftPMDependencies` package
-and exposing one function touching its API; publish it to Maven
-Local; in a *separate* Gradle build with no SwiftPM declaration
-of its own, depend on it from `commonMain`, add a trivial test,
-and run `iosSimulatorArm64Test`; if it links, the migration is
-viable, and if it fails with undefined symbols, **the migration
-is dead for a published SDK**, because the consumer would then
-have to declare the SwiftPM dependency themselves — no better
-than today's Gradle plugin and worse than the status quo, since
-it would also drag every consumer onto a new Kotlin minor.
-
-The secondary technical prerequisite settled by the same
-experiment: GoogleMobileAds' `Package.swift` is a
-`.binaryTarget`, so `swiftPMDependencies` must handle
-binary-target packages. The official documentation's own example
-is a binary distribution, which is encouraging evidence but not
-proof for this package specifically.
-
-A note on the experiment's scope. It is intentionally a single
-trivial library, not a port of `admob-cmp` itself. The point of
-the experiment is to validate the metadata-passes-through-the-
-klink hypothesis, which is the only behaviour that matters for
-the migration's viability. A negative result is conclusive; a
-positive result is suggestive but not yet a commitment to ship.
+The secondary technical prerequisite is that `swiftPMDependencies`
+must handle binary-target packages, as GoogleMobileAds'
+`Package.swift` is a `.binaryTarget`. The official documentation's
+own example is a binary distribution, which is encouraging evidence
+but not proof for this package specifically.
 
 ## Rationale for binding-only architecture
 
-A factual contrast, no criticism of anyone. RevenueCat's
-`purchases-kmp` 3.0.0 reaches the same outcome by a different
+RevenueCat's `purchases-kmp` 3.0.0 reaches the same outcome by a different
 route: a home-grown `swiftPackage` DSL in their own build logic
 that compiles `purchases-ios` **from source**, pinned as a git
 submodule, and statically links the result into the published
@@ -145,8 +121,7 @@ full rationale.
 
 ## Fallback and long-term maintenance
 
-Plainly, because it reassures rather than worries: the Gradle
-plugin is a perfectly serviceable permanent answer. It is a
+The Gradle plugin is a perfectly serviceable permanent answer. It is a
 small amount of code in one place, it is dogfooded by this
 repository's own modules, and it is invisible to consumers
 beyond a single `plugins {}` line. The migration will not happen

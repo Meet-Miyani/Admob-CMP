@@ -20,12 +20,14 @@ When completing your Google Play Data safety declaration, you must account for a
 
 According to Google's current GMA Next-Gen data disclosure guidance, the Google Mobile Ads SDK collects the following data categories by default:
 
-| Data category | Form data type | Stated purposes | Collection & sharing |
-|---|---|---|---|
-| **Device or other IDs** | Advertising ID, App Set ID | Advertising or marketing, Analytics, Fraud prevention, security, and compliance | Collected and shared with third parties |
-| **IP address** | Approximate location / Device or other IDs | Advertising or marketing, Analytics, Fraud prevention, security, and compliance | Collected and shared with third parties |
-| **User product interactions** | App interactions (impressions, clicks, ad views) | Advertising or marketing, Analytics | Collected and shared with third parties |
-| **Diagnostic information** | Crash logs, performance metrics, diagnostic info | Analytics, Fraud prevention, security, and compliance | Collected and shared with third parties |
+| Data category | Stated purposes |
+|---|---|
+| **Device or other IDs** | Advertising or marketing, Analytics, Fraud prevention, security, and compliance |
+| **IP address** | Advertising or marketing, Analytics, Fraud prevention, security, and compliance |
+| **User product interactions** | Advertising or marketing, Analytics |
+| **Diagnostic information** | Analytics, Fraud prevention, security, and compliance |
+
+Google provides these as raw SDK disclosures. You must evaluate how these categories map to specific Play Console form fields and determine your final "Collection & sharing" declarations based on your complete application binary.
 
 ### Purpose breakdown
 
@@ -62,11 +64,11 @@ AdConfig(
 )
 ```
 
-Setting `ageRestrictedTreatment` to `Child` or `Teen` instructs the Google Mobile Ads SDK to serve appropriate non-personalised or restricted ad requests regardless of manifest permissions.
+Setting `ageRestrictedTreatment` to `Child` or `Teen` instructs the Google Mobile Ads SDK to serve appropriate non-personalised or restricted ad requests regardless of manifest permissions (see [Google's child-directed setting documentation](https://developers.google.com/admob/android/targeting#child-directed_setting)).
 
 ## Publisher evaluation checklist
 
-Because Google Play Data safety declarations reflect the entire application binary rather than a single SDK, you should verify the following before submitting your Play Console declaration:
+Because Google Play Data safety declarations reflect the entire application binary rather than a single SDK, you must make the final decisions about your form answers. Verify the following before submitting your Play Console declaration:
 
 - [ ] **Mediation adapters**: Have you checked the specific data safety disclosures for each mediation partner (e.g. Meta Audience Network, AppLovin, Unity Ads)? Additional adapters often collect extra device identifiers or user data.
 - [ ] **Custom analytics and backend logging**: Does your application send ad revenue events (`onPaidEvent`) or diagnostic details to your own backend server or third-party analytics services?
