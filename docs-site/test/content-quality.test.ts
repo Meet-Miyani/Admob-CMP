@@ -150,7 +150,7 @@ export function verifyQuickstartContract(content: string): QuickstartContractChe
     { key: 'AdInitializationHook', regex: /\bAdInitializationHook\b/ },
     { key: 'PreMobileAdsPhase', regex: /\b(?:BeforeMobileAdsInitialize|PreMobileAds|PreMobileAdsInit)\b/ },
     { key: 'requestAuthorization', regex: /\brequestAuthorization\b/ },
-    { key: 'ConsentMode.InitializeOnlyIfAlreadyAllowed', regex: /\bConsentMode\.InitializeOnlyIfAlreadyAllowed\b/ },
+    { key: 'ConsentMode.GatherBeforeInitialize', regex: /\bConsentMode\.GatherBeforeInitialize\b/ },
   ];
 
   const missing: string[] = [];
@@ -338,14 +338,14 @@ describe('Content Quality Scanner & Contract Helpers', () => {
     expect(check.missing).toContain('AdInitializationHook');
     expect(check.missing).toContain('PreMobileAdsPhase');
     expect(check.missing).toContain('requestAuthorization');
-    expect(check.missing).toContain('ConsentMode.InitializeOnlyIfAlreadyAllowed');
+    expect(check.missing).toContain('ConsentMode.GatherBeforeInitialize');
   });
 
   it('verifyQuickstartContract passes when all required terms are present', () => {
     const complete = `
       Use \`AdInitializationHook\` during the \`BeforeMobileAdsInitialize\` phase
       to call \`requestAuthorization\` before Mobile Ads init.
-      Set \`ConsentMode.InitializeOnlyIfAlreadyAllowed\` for returning users.
+      Set \`ConsentMode.GatherBeforeInitialize\` to gather consent and initialise.
     `;
     const check = verifyQuickstartContract(complete);
 
