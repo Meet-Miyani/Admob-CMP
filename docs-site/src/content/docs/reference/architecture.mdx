@@ -1,6 +1,6 @@
 ---
 title: "Architecture"
-description: "The Compose Multiplatform AdMob architecture behind AdMob CMP — one shared state machine, two thin platform adapters, bindings-only iOS, and the event flow."
+description: "The architecture behind this Compose Multiplatform AdMob SDK — one shared state machine, two thin platform adapters, bindings-only iOS, and the event flow."
 faq:
   - q: How is AdMob CMP structured internally?
     a: One shared state machine in common code, with thin Android and iOS adapters that implement only load, present, destroy and canPresent. Caching, retry, consent gating and event emission all live in common code.

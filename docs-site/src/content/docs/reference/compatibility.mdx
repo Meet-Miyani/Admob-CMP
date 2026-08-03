@@ -1,6 +1,6 @@
 ---
 title: "Compatibility matrix"
-description: "AdMob CMP Kotlin version compatibility — Kotlin, Compose, Android minSdk, iOS versions each release supports, plus the cinterop klib caveat."
+description: "Kotlin version compatibility for the Compose Multiplatform AdMob SDK — Kotlin, Compose, Android minSdk, iOS versions each release supports."
 faq:
   - q: Which Kotlin version does admob-cmp require?
     a: Every published release so far is compiled with Kotlin 2.3.20. Consumers on a different Kotlin minor version may fail to resolve the klib.
@@ -20,6 +20,9 @@ Every row is a fact from `admob-cmp/README.md` and
 every 1.x release has been built with the same Kotlin and
 Compose Multiplatform versions, because the library was
 designed for stability across the 1.x line.
+
+For what this library actually is and how it compares to other Kotlin Multiplatform
+AdMob wrappers, see [What is AdMob CMP?](/start/what-is-admob-cmp/).
 
 A note on rows that are *not* in the table. The library has
 not yet shipped a 2.0.0 release. When it does, the Kotlin floor

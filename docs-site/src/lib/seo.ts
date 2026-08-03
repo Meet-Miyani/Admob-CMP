@@ -93,7 +93,7 @@ export function techArticleJsonLd(args: {
     },
     isPartOf: {
       '@type': 'WebSite',
-      name: 'AdMob CMP documentation',
+      name: 'Compose Multiplatform AdMob documentation',
       url: absolute(siteUrl, '/'),
     },
   };
