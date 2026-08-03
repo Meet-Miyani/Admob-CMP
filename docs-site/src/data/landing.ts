@@ -66,88 +66,6 @@ export const formats: readonly LandingFormat[] = [
   },
 ];
 
-export interface CapabilityRow {
-  capability: string;
-  admobCmp: string;
-  basicAds: string;
-}
-
-export const capabilityVerifiedOn = '31 July 2026';
-export const basicAdsRepo = 'https://github.com/LexiLabs-App/basic-ads';
-
-export const capabilities: readonly CapabilityRow[] = [
-  {
-    capability: 'Banner ads',
-    admobCmp: 'Yes',
-    basicAds: 'Yes',
-  },
-  {
-    capability: 'Interstitial ads',
-    admobCmp: 'Yes',
-    basicAds: 'Yes',
-  },
-  {
-    capability: 'Rewarded ads',
-    admobCmp: 'Yes',
-    basicAds: 'Yes',
-  },
-  {
-    capability: 'Rewarded interstitial ads',
-    admobCmp: 'Yes',
-    basicAds: 'Yes',
-  },
-  {
-    capability: 'App-open ads',
-    admobCmp: 'Yes',
-    basicAds: 'Not offered',
-  },
-  {
-    capability: 'Native ads',
-    admobCmp: 'Yes',
-    basicAds: 'Not offered',
-  },
-  {
-    capability: 'Native ad layout DSL and pooling',
-    admobCmp: 'adLayout {} plus NativeAdPool max-size accounting',
-    basicAds: 'Not applicable',
-  },
-  {
-    capability: 'UMP consent inside initialization',
-    admobCmp: 'gatherConsentAndInitialize, three consent strategies, privacy-options form',
-    basicAds: 'Consent request',
-  },
-  {
-    capability: 'iOS ATT ordering',
-    admobCmp: 'tracking authorization between consent and initialize',
-    basicAds: 'Not documented',
-  },
-  {
-    capability: 'Paid and revenue events',
-    admobCmp: 'AdEvent.Paid with AdValue and ResponseInfo',
-    basicAds: 'Not documented',
-  },
-  {
-    capability: 'Mediation adapter hooks',
-    admobCmp: 'AdInitializationHook at three initialization points',
-    basicAds: 'Not documented',
-  },
-  {
-    capability: 'Kotlin/Native test linking',
-    admobCmp: 'Published dev.avinya.ads.admob-cmp Gradle plugin',
-    basicAds: 'Not addressed',
-  },
-  {
-    capability: 'Generated API reference',
-    admobCmp: 'Yes',
-    basicAds: 'Yes',
-  },
-  {
-    capability: 'Maven Central publication',
-    admobCmp: 'Yes',
-    basicAds: 'Yes',
-  },
-];
-
 export interface RoadmapItem {
   title: string;
   status: string;
@@ -185,9 +103,9 @@ export const authorUrl = repoUrl.split('/').slice(0, 4).join('/');
  */
 export const originStory = {
   paragraphs: [
-    'Putting ads into a Compose Multiplatform app meant leaving Compose. The Google Mobile Ads SDKs are Android and iOS libraries with callback-based APIs, so the shared module ended up holding an expect/actual seam, two sets of platform glue, and a consent flow bolted on afterwards.',
-    'Samples and libraries already covered this ground, and they helped. What was still wanted was ads shaped like the rest of a Compose Multiplatform codebase: composables for the ad surfaces, suspend functions and StateFlow for the lifecycle, and consent gathered as part of initialization rather than as a step to remember.',
-    'So it was built inside an app that was being written, then extracted once the shape had settled. The APIs here are the ones that had to hold up on real screens: a native ad pool with max-size accounting, retry and cache behaviour with the numbers written down, and an iOS ordering — consent, then tracking authorization, then initialize — that the library sequences for you.',
+    'Integrating Google Mobile Ads into a Compose Multiplatform application traditionally required writing platform-specific glue and managing consent flows separately on Android and iOS.',
+    'This library provides composable surfaces, suspend functions, and StateFlow lifecycle handling designed for Compose Multiplatform codebases, with UMP consent integration structured into initialization.',
+    'Extracted from real application production requirements, it provides native ad pooling, cache and retry policies, and pre-initialization hooks for ordering ATT and UMP consent on iOS.',
   ],
 } as const;
 
