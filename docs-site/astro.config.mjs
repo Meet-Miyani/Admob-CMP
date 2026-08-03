@@ -238,6 +238,7 @@ export default defineConfig({
             { slug: 'privacy/consent' },
             { slug: 'privacy/app-tracking-transparency' },
             { slug: 'privacy/play-data-safety' },
+            { slug: 'privacy/app-store-data-disclosure' },
           ],
         },
         {

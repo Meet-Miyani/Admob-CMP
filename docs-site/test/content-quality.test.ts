@@ -360,3 +360,31 @@ describe('Authored MDX Content Audit', () => {
     }
   });
 });
+
+describe('Store Data Disclosure Guidance Contracts', () => {
+  const playDataSafetyPath = join(docsDir, 'privacy/play-data-safety.mdx');
+  const appStoreDataDisclosurePath = join(docsDir, 'privacy/app-store-data-disclosure.mdx');
+  const astroConfigPath = join(repoRoot, 'docs-site/astro.config.mjs');
+
+  it('play-data-safety.mdx contains required categories (diagnostics, app set ID, fraud prevention) and primary source link', () => {
+    expect(existsSync(playDataSafetyPath)).toBe(true);
+    const content = readFileSync(playDataSafetyPath, 'utf8');
+
+    expect(content).toMatch(/diagnostic/i);
+    expect(content).toMatch(/app set id/i);
+    expect(content).toMatch(/fraud prevention/i);
+    expect(content).toContain('https://developers.google.com/admob/android/next-gen/privacy/play-data-disclosure');
+  });
+
+  it('app-store-data-disclosure.mdx exists, is in sidebar, links to primary guidance, and contains publisher qualification', () => {
+    expect(existsSync(appStoreDataDisclosurePath)).toBe(true);
+    const content = readFileSync(appStoreDataDisclosurePath, 'utf8');
+
+    expect(content).toContain('https://developers.google.com/admob/ios/privacy/data-disclosure');
+    expect(content).toContain('https://developer.apple.com/app-store/app-privacy-details/');
+    expect(content).toMatch(/publisher/i);
+    expect(content).toMatch(/legal advice/i);
+    const astroConfig = readFileSync(astroConfigPath, 'utf8');
+    expect(astroConfig).toContain('privacy/app-store-data-disclosure');
+  });
+});
