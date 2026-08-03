@@ -6,150 +6,58 @@ description: "The architecture behind this Compose Multiplatform AdMob SDK — o
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import ModuleMap from '../../../components/diagrams/ModuleMap.astro';
 
-## How is AdMob CMP put together?
+## How is AdMob CMP structured?
 
 <ModuleMap />
 
-| Package | Contents |
+| Module / Artifact | Purpose & Contents |
 |---|---|
-| `dev.avinya.ads` | Public API: `AdManager`, the controllers, `AdPlacement`, `AdConfig`, events, errors, consent, diagnostics |
-| `dev.avinya.ads.internal` | `FullScreenSlotCore` — the shared load/show/cache state machine — and `AdRetry`, capped exponential backoff |
-| `dev.avinya.ads.appopen` | `AppOpenAdCoordinator` plus the expected foreground signal |
-| `dev.avinya.ads.nativead` | The `NativeAdPool` contract, options, and media info |
-| `dev.avinya.ads.nativead.layout` | The `adLayout` DSL, `AdLayoutValidator`, and `AdTemplates` |
-| `dev.avinya.ads.ui` | The expected composables `BannerAdView` and `NativeAdView` |
+| `dev.avinya.ads:admob-cmp` | Umbrella artifact aggregating `admob-cmp-core` and `admob-cmp-compose` for Compose Multiplatform projects. |
+| `dev.avinya.ads:admob-cmp-core` | Core engine: `AdManager`, full-screen controllers, native ad pool, consent state machine, diagnostics, and event streams. |
+| `dev.avinya.ads:admob-cmp-compose` | Compose Multiplatform UI integration: `BannerAdView`, `NativeAdView`, and `rememberAdManager`. |
+| `dev.avinya.ads.admob-cmp` (Gradle Plugin) | Gradle plugin managing version-stamped iOS native test framework dependencies and linker flags for Kotlin/Native test binaries. |
 
-The platform side in prose: `androidMain` provides
-`AndroidGoogleAdManager` with slots, pool and banner over the GMA
-Next-Gen SDK, the `AdMob.manager(context)` singleton, and a
-`ProcessLifecycleOwner` foreground signal. `iosMain` provides
-`IosGoogleAdManager` over cinterop bindings, a Kotlin UIKit
-native-ad renderer, and an `NSNotificationCenter` foreground
-signal.
+`androidMain` provides `AndroidGoogleAdManager` with slots, native pool, and banner handling over the Android GMA Next-Gen SDK, the `AdMob.manager(context)` singleton, and process lifecycle monitoring (`ProcessLifecycleOwner`).
 
-The published module split for readers who look at Maven:
-`dev.avinya.ads:admob-cmp` is the umbrella artifact; `admob-cmp-core`
-holds the engine and `admob-cmp-compose` the Compose surface, so
-the controller API can be used without Compose.
+`iosMain` provides `IosGoogleAdManager` over Kotlin/Native cinterop bindings, a Kotlin UIKit native-ad renderer, and application lifecycle event observers via `NSNotificationCenter`.
 
-The split's design rationale: a server-side app, a CL tool, or a
-test harness that wants the controllers but not Compose
-Multiplatform depends on `admob-cmp-core` directly and skips
-`admob-cmp-compose` entirely. The umbrella coordinate exists for
-the common case, not to force Compose on consumers who do not
-want it.
+Separating `admob-cmp-core` from `admob-cmp-compose` allows projects using non-Compose UI architectures or custom UI wrappers to depend on `admob-cmp-core` directly without pulling in Compose Multiplatform dependencies.
 
 ## What lives in common code, and what is platform-specific?
 
-The invariant that gives the library its shape: **one state
-machine, two thin platform adapters.** Every full-screen slot
-extends `FullScreenSlotCore`, which owns the load mutex, the
-TTL'd FIFO cache bounded by `AdCachePolicy.maxSize`, retry,
-consent gating, event emission and `reloadAfterShow`. Platform
-classes implement only `loadAd`, `presentAd`, `destroyAd` and
-`canPresent`.
+The architecture follows a key principle: **one shared state machine, two thin platform adapters.** Every full-screen slot extends `FullScreenSlotCore`, which owns the load mutex, TTL-based FIFO caching (bounded by `AdCachePolicy.maxSize`), retry policies, consent gating, event emission, and `reloadAfterShow`. Platform classes implement only `loadAd`, `presentAd`, `destroyAd`, and `canPresent`.
 
-Why this matters to a consumer rather than only to a maintainer:
-it is the reason interstitial, rewarded, rewarded interstitial
-and app-open behave identically across platforms, and the reason
-a bug fixed in caching is fixed everywhere at once. The same
-pattern applies to native ads through the pool, and to banners
-through the headless-controller path. A single cache invalidation
-bug, once found, is fixed in common code and ships to all
-formats.
+Why this matters for applications: interstitial, rewarded, rewarded interstitial, and app-open formats share identical caching, state management, and retry behaviour across Android and iOS. A cache fix or state enhancement in common code takes effect across all full-screen ad formats simultaneously.
 
-The pattern is also the reason format-specific behaviour stays
-format-specific. A platform's `loadAd` is free to call
-`placementId` differently from a banner's, because the shared
-core does not know about per-format custom targeting. The shared
-core owns lifecycle, the platform adapter owns the SDK call, and
-the call site owns the format.
+Format-specific handling remains encapsulated within platform adapters. A platform's `loadAd` method configures placement identifiers and targeting parameters appropriate for its format, whilst shared common code manages overall lifecycle, status transitions, and ad presentation ownership.
 
 ## Why does iOS ship bindings instead of binaries?
 
-The iOS implementation compiles against the official GMA and UMP
-XCFrameworks via Kotlin/Native **cinterop**. The
-`dev.avinya.ads.admob-cmp` Gradle plugin downloads the zips into
-`build/admob-cmp-ios-frameworks/` — a version-stamped cache —
-purely for headers. The published klib contains **bindings**,
-never Google's binaries. The consuming app links GMA and UMP
-itself via Swift Package Manager.
+The iOS implementation compiles against official GMA and UMP XCFrameworks via Kotlin/Native **cinterop**. The `dev.avinya.ads.admob-cmp` Gradle plugin downloads header zips into `build/admob-cmp-ios-frameworks/` (a version-stamped build cache) strictly for header binding generation. The published library klibs contain header **bindings**, never Google's binary frameworks. The consuming iOS app links GMA and UMP natively using Swift Package Manager.
 
-Then the alternatives and why each was rejected, stated as
-engineering trade-offs:
+This approach was selected over alternative binary distribution models:
+- **CocoaPods packaging:** Rejected to maintain primary alignment with Swift Package Manager across iOS projects.
+- **Embedding static binaries (`staticLibraries` in `.def`):** Rejected because embedding binary frameworks breaks third-party mediation adapters due to duplicate Objective-C class symbols, pins the GMA version for every consumer, and introduces binary redistribution complexity.
 
-- A CocoaPods plugin — the ecosystem and this repository are
-  SPM-based.
-- Embedding binaries with `staticLibraries` — breaks mediation
-  adapters with duplicate Objective-C classes, pins the GMA
-  version for every consumer, and raises redistribution-licence
-  questions. Evaluated and rejected.
-
-The accepted costs, stated without spin: consumers must add two
-SPM packages, and the bound GMA major version must match the
-SPM-resolved one. The [iOS setup guide](/start/ios-setup/) has
-the executable steps; the [roadmap](/project/roadmap/) explains
-where this distribution model goes next.
-
-A note on `staticLibraries` specifically. The Kotlin/Native
-cinterop system supports embedding the linked binary into the
-consumer's framework via `staticLibraries` in the `.def` file.
-The library deliberately does not use this. The Android
-counterpart would be `implementation(files("…/GoogleMobileAds.aar"))`
-in the consumer's build. Both shapes break mediation because the
-embedded GMA is a different copy from the adapter's GMA, and
-the JVM and Objective-C runtimes resolve the "GMA" class
-non-deterministically when two copies exist in the same process.
+As a trade-off, consuming iOS projects add the `GoogleMobileAds` and `UserMessagingPlatform` Swift packages directly in Xcode, ensuring the SPM major version matches the bound header version (`13.x` for GMA, `3.x` for UMP).
 
 ## How does the full-screen state machine work?
 
-The cache carries a generation counter, bumped by `clear()`. A
-load or scheduled reload started before a `clear()` checks its
-required generation before publishing results, so it can never
-repopulate a cache the caller just asked to be emptied.
-Presentation ownership is a one-shot handle: the core owns it
-until the platform slot hands it off to the SDK's callbacks
-immediately before the actual show call; from then on only the
-SDK's terminal callback, or a cancellation that raced in *before*
-hand-off, may close it. Two consequences observable from the
-public API: `show()` is not reentrant per controller — a second
-call while one presentation is active returns
-`AdShowResult.NotReady` rather than queueing — and cancelling a
-caller never decrements the process-wide presence signal once
-hand-off has happened, so `AppOpenAdCoordinator` never sees "not
-presenting" while an ad the SDK still owns is on screen.
+The ad cache carries a generation counter incremented by `clear()`. A load or scheduled reload operation started before a `clear()` call checks its target generation before storing results, preventing stale loads from populating a newly invalidated cache.
+
+Ad presentation ownership is managed via a one-shot handle. The core state machine holds ownership until the platform slot hands execution off to the native SDK immediately before invocation. From that point onward, only the native SDK's completion callbacks (or a pre-hand-off cancellation) close the state.
+
+This model guarantees two key public API behaviours:
+1. `show()` is non-reentrant per controller: calling `show()` whilst a presentation is active returns `AdShowResult.NotReady` rather than queueing additional requests.
+2. Coroutine cancellation after hand-off does not corrupt process-wide presentation signals, ensuring coordinators such as `AppOpenAdCoordinator` accurately reflect when an ad is active on screen.
 
 ## What is the threading model?
 
-All GMA and UMP calls are wrapped in
-`Dispatchers.Main.immediate` internally, so every public API is
-main-safe and callable from any dispatcher. Registries are
-lock-protected. On iOS, delegate objects are strongly retained
-by their owners for exactly the Objective-C delegate's lifetime,
-because Objective-C delegates are weak references. Without that
-retention, a delegate set on a transient object would be
-deallocated before the platform SDK fires its terminal callback,
-and the ad would never be destroyed.
+Native GMA and UMP SDK invocations are executed on `Dispatchers.Main.immediate` internally, ensuring all public APIs are main-safe and callable from any coroutine context. Component registries are lock-protected for thread safety. On iOS, delegate instances are strongly retained for the lifetime of their native owner to prevent premature Objective-C deallocation before terminal callbacks fire.
 
-The `Main.immediate` choice, not `Main`: when a call originates
-on the main thread, `Main.immediate` runs the work without
-posting to the message queue, so the call resolves synchronously
-on the caller's stack. When a call originates on another
-dispatcher, `Main.immediate` posts as `Main` would. The
-behaviour is transparent to the caller but matters for latency:
-a `load()` called from a UI thread on an already-Ready manager
-returns the cached state synchronously, which is what
-`StateFlow.collectAsState` depends on.
+Using `Main.immediate` ensures synchronous execution when invoked from the main thread (avoiding unnecessary message queue posting) whilst correctly dispatching to the main thread when called from background threads. This ensures responsive state queries for Compose state bindings like `StateFlow.collectAsState`.
 
-A related note on coroutine cancellation. Every public API is
-cancellable through its coroutine context. Cancelling a `load()`
-cancels the network request, the generation check, and the
-result-publication step. Cancelling a `show()` cancels the
-suspension — but the presentation itself, once handed off to
-the platform SDK, runs to completion regardless of caller
-cancellation. That asymmetry is deliberate: a half-presented ad
-is worse than a fully-presented ad the caller has stopped
-caring about.
+Coroutine cancellation is supported across all suspend APIs. Cancelling a `load()` operation aborts the network request and result storage. Cancelling a `show()` coroutine releases caller suspension; however, once hand-off to the native SDK has occurred, the native presentation completes naturally to prevent corrupted UI states.
 
 ## How do events flow?
 
@@ -159,47 +67,29 @@ platform SDK callback → slot / pool / controller
     → AdManager.events    (global SharedFlow)
 ```
 
-The sealed `AdEvent` set is `Loaded`, `LoadFailed`, `ShowFailed`,
-`Impression`, `Clicked`, `OpenedFullScreen`, `ClosedFullScreen`,
-`RewardEarned`, `Paid`, and the iOS-only `Video*` family — see
-[Revenue and paid events](/advanced/revenue-events/) for the
-per-event shapes and the analytics patterns.
+The sealed `AdEvent` hierarchy includes `Loaded`, `LoadFailed`, `ShowFailed`, `Impression`, `Clicked`, `OpenedFullScreen`, `ClosedFullScreen`, `RewardEarned`, `Paid`, and iOS video events. Refer to [Revenue and paid events](/advanced/revenue-events/) for event payload structures and telemetry patterns.
 
-A note on `SharedFlow` versus `Flow`. The two event surfaces
-are `SharedFlow<AdEvent>` rather than `Flow<AdEvent>` so
-multiple collectors can attach to the same controller without
-each collector driving its own callback chain. The platform SDK
-fires a callback once; the controller re-emits it to every
-collector. For a single-collector pattern, the behaviour is
-indistinguishable from a `Flow`; for a multi-collector pattern
-— analytics + UI state + a test harness — `SharedFlow` is
-what makes the cost linear in the number of events rather
-than linear in the number of collectors.
+Event streams use `SharedFlow<AdEvent>` so multiple collectors (such as UI components, analytics engines, and test harnesses) can observe events concurrently without triggering duplicate underlying SDK callbacks.
 
 ## What were the key design decisions?
 
 | Decision | Rationale |
 |---|---|
-| Suspend functions and Flow instead of listener callbacks | One paradigm. `show()` suspending until dismissal collapses five callback interfaces into one call. |
-| Placement-keyed, long-lived controllers | The caching, retry and lifecycle layer every app otherwise rebuilds badly. |
-| Consent integrated into initialization | Requesting ads before consent becomes impossible by construction. |
-| Bindings-only iOS distribution | Mediation safety and version freedom. |
-| Caching in the slot layer, not the SDK preload APIs | Those APIs were beta and asymmetric across platforms at design time. |
-| No bundled mediation adapters | Adapters are platform binaries tied to your GMA version and your contracts. |
-| `explicitApi()` plus a committed ABI dump | The public surface cannot drift silently. |
+| Suspend functions and `Flow` instead of listener callbacks | Modern Kotlin coroutine approach. `show()` suspends until ad dismissal. |
+| Placement-keyed, long-lived controllers | Centralised caching, retry, and lifecycle management. |
+| Consent integrated into initialisation | Guarantees compliance before ad requests are attempted. |
+| Bindings-only iOS distribution | Ensures mediation compatibility and SPM version flexibility. |
+| Shared core caching | Delivers consistent caching behaviour across platforms independent of platform preloading APIs. |
+| No bundled mediation adapters | Allows publishers to select and maintain platform-specific mediation dependencies. |
+| `explicitApi()` and committed ABI dumps | Guarantees public API contract integrity via `checkKotlinAbi`. |
 
-The ABI dump is committed at
-`admob-cmp-core/api/admob-cmp-core.klib.api` and the matching
-file for the Compose surface, and `checkKotlinAbi` runs against
-it in CI. The
-[contributing guide](/project/contributing/) has the workflow
-when an intentional public change is part of a release.
+The library's public ABI definition is committed at `admob-cmp-core/api/admob-cmp-core.klib.api` (and the corresponding file for `admob-cmp-compose`), and verified during build checks.
 
 ## Where to next?
 
 <CardGrid>
-  <LinkCard title="Caching, retry and timeouts" href="/advanced/caching-retry-timeouts/" description="The policies this machinery exposes." />
-  <LinkCard title="Compatibility" href="/reference/compatibility/" description="Versions and the cinterop klib caveat." />
-  <LinkCard title="Contributing" href="/project/contributing/" description="Building and testing the library." />
-  <LinkCard title="Roadmap" href="/project/roadmap/" description="Where the iOS distribution model goes next." />
+  <LinkCard title="Caching, retry and timeouts" href="/advanced/caching-retry-timeouts/" description="Configuring cache policies and retry behavior." />
+  <LinkCard title="Compatibility" href="/reference/compatibility/" description="Toolchain versions and target matrix." />
+  <LinkCard title="Contributing" href="/project/contributing/" description="Building, testing, and updating ABI dumps." />
+  <LinkCard title="Roadmap" href="/project/roadmap/" description="Future framework capability targets." />
 </CardGrid>
