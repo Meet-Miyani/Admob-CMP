@@ -10,11 +10,11 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 The commands and what each one is for:
 
 ```bash
-./gradlew :admob-cmp:iosSimulatorArm64Test   # common tests, iOS runner
-./gradlew :admob-cmp:testAndroidHostTest     # common tests, JVM runner
-./gradlew :admob-cmp:checkKotlinAbi          # public API surface check
-./gradlew :admob-cmp:updateKotlinAbi         # regenerate api/ after an intentional API change
-./gradlew :admob-cmp-core:doctorIos          # diagnose iOS consumer integration
+./gradlew :admob-cmp-core:iosSimulatorArm64Test       # common tests, iOS runner
+./gradlew :admob-cmp-core:testAndroidHostTest         # common tests, JVM runner
+./gradlew :admob-cmp-core:checkKotlinAbi :admob-cmp-compose:checkKotlinAbi # public API surface check
+./gradlew :admob-cmp-core:updateKotlinAbi :admob-cmp-compose:updateKotlinAbi # regenerate api/ after an intentional API change
+./gradlew :admob-cmp-core:doctorIos                   # diagnose iOS consumer integration
 ```
 
 The test design so contributions match it: tests live in
@@ -39,15 +39,15 @@ behaviour of the library's common code.
 
 The mechanism and the reason together: the module uses
 `explicitApi()` plus Kotlin Gradle plugin ABI validation, and
-`api/admob-cmp.klib.api` is committed. Any change to the public
+`admob-cmp-core/api/admob-cmp-core.klib.api` and `admob-cmp-compose/api/admob-cmp-compose.klib.api` are committed. Any change to the public
 surface changes that file, so a reviewer sees the API diff in
 the pull request rather than discovering it after publication.
 Multiple versions are published and consumed, so a breaking
 change is not free.
 
 ```bash
-./gradlew :admob-cmp:updateKotlinAbi
-git add api/
+./gradlew :admob-cmp-core:updateKotlinAbi :admob-cmp-compose:updateKotlinAbi
+git add admob-cmp-core/api/ admob-cmp-compose/api/
 ```
 
 <Aside type="caution">
