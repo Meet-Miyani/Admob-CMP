@@ -1,71 +1,48 @@
 ---
 title: "iOS setup"
-description: "iOS setup for KMP ads, ATT and IDFA — the two Swift Package Manager packages, Info.plist keys, JavaScriptCore linking, and the doctorIos check."
+description: "iOS platform configuration for AdMob CMP — Swift Package Manager setup, Info.plist metadata, App Tracking Transparency hooks, and build verification."
 ---
 
-import { Aside, Steps, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Aside, Steps } from '@astrojs/starlight/components';
 
-## Why does iOS need extra setup at all?
+This guide covers the iOS setup required for AdMob CMP, including framework linkage via Swift Package Manager (SPM), `Info.plist` keys, App Tracking Transparency (ATT) initialisation hooks, and diagnostic checks.
 
-The published artifact contains cinterop **bindings** only — never Google's
-binaries. The app links the real GMA and UMP frameworks itself via Swift
-Package Manager. That buys three things:
+## Architecture and Framework Linkage
 
-- Mediation adapters keep working because there is exactly one copy of
-  the Objective-C classes in the process. Embedding Google's binary in
-  the published artifact would duplicate those classes the moment a
-  second artifact — an adapter — is added.
-- GMA patch releases can be taken without waiting for this library to
-  publish. The version floor is the bound headers, not the linked binary.
-- There is no redistribution question about Google's closed-source
-  binary. The app links it, the library does not carry it.
+AdMob CMP distributes Objective-C cinterop bindings in its Kotlin Multiplatform binaries without embedding Google's static framework binaries. The host iOS application links the native SDKs directly using Swift Package Manager.
 
-The cost is honest: two Swift packages must be added to the Xcode project,
-and the SPM-resolved GMA major version must match the major this library
-binds. The full rationale is on
-[Architecture](/reference/architecture/).
-
-This is the section of the integration where the cost-benefit trade-off
-of the bindings-only design is most visible. A greenfield project on a
-fresh Mac spends about five minutes adding the two packages, three
-`Info.plist` keys, and the JavaScriptCore linker flag — and that is the
-only time the iOS side has anything the Android side does not. Once
-the project grows mediation adapters, that five-minute cost is what
-prevents the duplicate-class problem.
-
-## Which Swift Package Manager packages do I add?
+### Swift Package Manager Setup
 
 <Steps>
 
-1. In Xcode, choose **File → Add Package Dependencies**.
-
-2. Add `https://github.com/googleads/swift-package-manager-google-mobile-ads.git` and select the **GoogleMobileAds** product. Use version **13.x** — it must match the major version this library binds.
-
-3. Add `https://github.com/googleads/swift-package-manager-google-user-messaging-platform.git` and select the **GoogleUserMessagingPlatform** product, version **3.x**.
+1. In Xcode, open your iOS project and select **File → Add Package Dependencies...**
+2. Enter the Google Mobile Ads SPM repository URL:
+   `https://github.com/googleads/swift-package-manager-google-mobile-ads.git`
+   Select the **GoogleMobileAds** product and specify version rule **Up to Next Major** with **13.x** (AdMob CMP 1.1.0 binds GMA iOS 13.7.0).
+3. Enter the User Messaging Platform SPM repository URL:
+   `https://github.com/googleads/swift-package-manager-google-user-messaging-platform.git`
+   Select the **GoogleUserMessagingPlatform** product and specify version rule **Up to Next Major** with **3.x** (AdMob CMP 1.1.0 binds UMP iOS 3.1.0).
 
 </Steps>
 
-`admob-cmp` 1.1.0 binds GMA iOS 13.7.0 and UMP iOS 3.1.0 headers. A GMA SPM
-package older than the bound headers produces link errors on
-newly-added API symbols such as `GADCurrentOrientation…`; the fix is to
-bump the SPM package, not to downgrade the library. The same
-upper-bound rule applies: a GMA SPM package *newer* than 13.x is
-unsupported and may break the build against the bound headers. The
-[compatibility matrix](/reference/compatibility/) is the canonical
-source for which combination is supported.
+### Linking JavaScriptCore
 
-If the project uses Swift Package Manager's automatic version
-selection (the default in recent Xcode), the `13.x` requirement is
-expressed as an "Up to Next Major" constraint. That gives the consumer
-patch releases and minor versions within the 13.x range, which is
-exactly the supported window. Setting it to "Exact" or "Branch" is a
-deliberate choice that should be revisited on every library upgrade.
+When compiling a static Kotlin framework target, Xcode autolinking may fail to pull in system dependencies required by Google Mobile Ads. Add `-framework JavaScriptCore` to your iOS app target's **Build Settings → Other Linker Flags** (`OTHER_LDFLAGS`):
 
-## What goes in Info.plist?
+```text
+OTHER_LDFLAGS = $(inherited) -framework JavaScriptCore
+```
+
+Omitting this linker flag when using a static Kotlin framework results in `Undefined symbol: _OBJC_CLASS_$_JSContext` at link time.
+
+## Info.plist Configuration
+
+Configure your iOS application target's `Info.plist` with required metadata keys:
 
 ```xml
+<!-- iosApp/iosApp/Info.plist -->
 <key>GADApplicationIdentifier</key>
-<string>ca-app-pub-3940256099942544~1458002511</string><!-- sample id; replace -->
+<string>ca-app-pub-3940256099942544~1458002511</string> <!-- Replace with real App ID -->
 
 <key>SKAdNetworkItems</key>
 <array>
@@ -73,75 +50,46 @@ deliberate choice that should be revisited on every library upgrade.
         <key>SKAdNetworkIdentifier</key>
         <string>cstr6suwn9.skadnetwork</string>
     </dict>
-    <!-- copy the full current list from the AdMob iOS documentation -->
+    <!-- Add current SKAdNetwork identifiers provided by Google AdMob -->
 </array>
 ```
 
-These go in the **app target's** `Info.plist`. `GADApplicationIdentifier`
-is the app id with a tilde, not an ad-unit id; the sample id must be
-replaced before release. An incomplete `SKAdNetworkItems` list degrades
-attribution rather than breaking the build, which is why it is easy to
-forget and worth checking with `doctorIos`.
+- `GADApplicationIdentifier`: Application identifier with a tilde separator (`ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX`).
+- `SKAdNetworkItems`: Array of ad network identifiers enabling privacy-preserving ad attribution.
 
-The current `SKAdNetworkItems` list is published by Google in the AdMob
-iOS documentation and changes over time. The list above is a single
-example entry; the real list at any given release is much longer.
-`doctorIos` only checks for the *presence* of the key, not the
-completeness of the entries, so the source of truth is Google's
-documentation.
+## App Tracking Transparency (ATT) Setup
 
-Apps that ship a `NSAppTransportSecurity` exception for any other
-reason should be aware that the AdMob iOS SDK is HTTPS-only and does
-not require an ATS exception of its own. Anything added in
-`Info.plist` for an unrelated feature does not interact with the
-GMA network stack.
+To request user authorisation for accessing the Identifier for Advertisers (IDFA) on iOS 14.5+, configure `Info.plist` and implement an initialisation hook.
 
-## How do I enable App Tracking Transparency and keep the IDFA?
+### 1. System Usage Description String
 
-The required `Info.plist` key, first:
+Add `NSUserTrackingUsageDescription` to your `Info.plist`:
 
 ```xml
 <key>NSUserTrackingUsageDescription</key>
 <string>This identifier will be used to deliver personalised ads to you.</string>
 ```
 
-Without this key the ATT prompt cannot be shown and iOS withholds the
-IDFA, so every request serves non-personalised ads at materially lower
-eCPM. The string is shown verbatim in the system prompt so it should
-say what the user gets rather than what the app wants; App Review
-rejects vague or misleading strings.
+<Aside type="caution">
+Adding `NSUserTrackingUsageDescription` to `Info.plist` configures the iOS system description string; it does **not** trigger the ATT prompt by itself. The application must explicitly invoke `requestAuthorization()` programmatically prior to initialising Google Mobile Ads.
+</Aside>
 
-Apps that also target the European Union will combine this with a UMP
-consent flow. The consent form is presented by the SDK, but the order
-of the two prompts is up to the app, and the correct order is
-consent first, then ATT, then the first ad request. Reversed, you get
-non-personalised ads on the first sessions — sometimes for the lifetime
-of the install.
+### 2. Pre-Initialisation ATT Hook
 
-The call order, then:
+Invoke `adManager.tracking.requestAuthorization()` using an `AdInitializationHook` targeting the `BeforeMobileAdsInitialize` phase. This guarantees that ATT authorization is requested after UMP consent gathering but before native ad engine startup:
 
 ```kotlin
-adManager.consent.gatherConsent(config)
-adManager.tracking.requestAuthorization()
-adManager.initialize(config, ConsentMode.InitializeOnlyIfAlreadyAllowed)
-```
-
-Requesting ads before ATT resolves permanently forfeits the IDFA for
-those requests. Android has no ATT so `adManager.tracking` is a no-op
-there and always reports `AdTrackingAuthorization.NotApplicable`.
-
-The same ordering can be expressed with a hook instead of three calls,
-which is useful when the app wants a single
-`gatherConsentAndInitialize` entry point:
-
-```kotlin
-AdConfig(
-    androidAppId = "ca-app-pub-…",
-    iosAppId = "ca-app-pub-…",
+val config = AdConfig(
+    androidAppId = "ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX",
+    iosAppId = "ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX",
     initializationHooks = listOf(
         object : AdInitializationHook {
-            override suspend fun onPhase(phase: AdInitializationPhase, config: AdConfig) {
+            override suspend fun onPhase(
+                phase: AdInitializationPhase,
+                config: AdConfig,
+            ) {
                 if (phase == AdInitializationPhase.BeforeMobileAdsInitialize) {
+                    // Prompt for ATT authorisation on iOS
                     adManager.tracking.requestAuthorization()
                 }
             }
@@ -150,88 +98,35 @@ AdConfig(
 )
 ```
 
-The three phases are `BeforeConsentRequest`,
-`BeforeMobileAdsInitialize` and `AfterMobileAdsInitialize`. The ATT
-slot is the middle one, because it must run after the UMP gate and
-before native GMA initialisation. Hooks run exactly once per real
-native-initialization attempt, so cancelling one `initialize()` caller
-can never skip or duplicate a hook. The
-[App Tracking Transparency](/privacy/app-tracking-transparency/) guide
-has the full sequence diagram and the per-phase semantics.
+On non-iOS platforms, `requestAuthorization()` completes immediately without displaying a prompt.
 
-## Why do I need to link JavaScriptCore?
+## Kotlin/Native Test Cinterop Linkage
 
-If the Kotlin framework is static and no Swift file imports
-`GoogleMobileAds`, nothing triggers autolinking of JavaScriptCore, which
-GMA needs. Add `-framework JavaScriptCore` to the app target's
-`OTHER_LDFLAGS`. The symptom when it is missing is
-`Undefined symbol: _OBJC_CLASS_$_JSContext`.
+Executing Kotlin/Native test tasks (such as `./gradlew :shared:iosSimulatorArm64Test`) invokes the Kotlin compiler directly without Xcode or SPM. Apply the `dev.avinya.ads.admob-cmp` Gradle plugin to your shared module to inject required framework search paths into test executables:
 
-This is the one linker flag every static-Kotlin-framework iOS project
-needs but no one writes down. The
-[troubleshooting guide](/reference/troubleshooting/) treats it as a
-first-class failure with its own row in the symptom table.
-
-The flag is needed because GMA force-loads JavaScriptCore through
-`GADOMIDJSContextPool`, but a static Kotlin framework does not
-autolink transitive Objective-C dependencies the way a dynamic one
-does. Once any Swift file imports `GoogleMobileAds`, autolinking
-takes over and the flag becomes redundant — but the project still
-ships the flag because removing it would break the case where the
-Swift import is later removed.
-
-## How do I verify the iOS setup?
-
-```bash
-./gradlew :admob-cmp-core:doctorIos
+```kotlin
+// shared/build.gradle.kts
+plugins {
+    id("dev.avinya.ads.admob-cmp") version "1.1.0"
+}
 ```
 
-`doctorIos` is diagnostic only and never fails the build. It reports:
+The plugin downloads reference framework headers and configures test link tasks without altering your production Xcode framework outputs.
 
-- Whether the GoogleMobileAds and UserMessagingPlatform XCFramework
-  download caches are present.
-- Whether the Xcode project references each SPM product.
-- Whether `Info.plist` declares `GADApplicationIdentifier`, and whether
-  that value is still Google's sample id.
-- Whether `SKAdNetworkItems` is present.
+## iOS Verification
 
-The Xcode project directory can be overridden with
-`-PadmobCmp.xcodeproj=<dir>` if the standard search does not find it.
-For a KMP project with the Xcode project in `iosApp/`, the default
-behaviour finds it without flags.
+Verify your iOS setup using diagnostic tooling and build tasks:
 
-After `doctorIos` passes, run a real iOS build (`./gradlew
-:shared:iosSimulatorArm64Test` if Kotlin/Native tests are configured)
-to confirm the link is real and the Swift packages resolve. The doctor
-checks the configuration; only the test task proves the configuration
-is in the right state.
+1. **Run Diagnostic Doctor**:
+   ```bash
+   ./gradlew :admob-cmp-core:doctorIos
+   ```
+   `doctorIos` inspects XCFramework download caches, Xcode project SPM references, `GADApplicationIdentifier` declarations, and `SKAdNetworkItems` keys.
 
-## What about Kotlin/Native test executables?
+2. **Execute Simulator Test Link**:
+   ```bash
+   ./gradlew :shared:iosSimulatorArm64Test
+   ```
 
-A Kotlin/Native test link has no Xcode and therefore cannot use SPM.
-The `dev.avinya.ads.admob-cmp` Gradle plugin is the supported fix, and
-it adds the linker options to test binaries only — leaving the shipped
-app framework alone for Xcode to bind via SPM. Adding another SPM
-package will not help, because SPM is not consulted during a
-Kotlin/Native test link. The full mechanic is on
-[Installation](/start/installation/) and the symptom table is on
-[Troubleshooting](/reference/troubleshooting/).
-
-This is the most common place new contributors to a KMP AdMob project
-lose an afternoon: the app builds and runs, then a CI job that runs
-Kotlin/Native tests fails with `_OBJC_CLASS_$_GADMobileAds` undefined
-even though the Xcode project compiles cleanly. The reason is that
-the two builds share the same Kotlin source but resolve GMA through
-completely different mechanisms, and the test link has no
-SPM-equivalent fallback. The plugin closes that gap for one specific
-build target — the test executable — and does so on macOS only,
-which is where the iOS test runner lives anyway.
-
-## Where to next?
-
-<CardGrid>
-  <LinkCard title="App Tracking Transparency" href="/privacy/app-tracking-transparency/" description="The consent to ATT to initialize sequence." />
-  <LinkCard title="UMP consent" href="/privacy/consent/" description="Consent modes and canRequestAds." />
-  <LinkCard title="Architecture" href="/reference/architecture/" description="Why iOS ships bindings only." />
-  <LinkCard title="Troubleshooting" href="/reference/troubleshooting/" description="Undefined GAD and JSContext symbols." />
-</CardGrid>
+3. **Xcode Build & Run**:
+   Open `iosApp.xcworkspace` in Xcode, build and run on an iOS simulator or device, and confirm initialisation succeeds with ATT and UMP prompts operating as configured.
