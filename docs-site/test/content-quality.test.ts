@@ -103,6 +103,21 @@ function listMdxFilesRecursive(dir: string): string[] {
   return files;
 }
 
+function listAllFilesRecursive(dir: string): string[] {
+  if (!existsSync(dir)) return [];
+  const files: string[] = [];
+  for (const entry of readdirSync(dir)) {
+    const fullPath = join(dir, entry);
+    const stat = statSync(fullPath);
+    if (stat.isDirectory()) {
+      files.push(...listAllFilesRecursive(fullPath));
+    } else {
+      files.push(fullPath);
+    }
+  }
+  return files;
+}
+
 export function scanAuthoredDocsForViolations(directory: string = docsDir): ContentViolation[] {
   const files = listMdxFilesRecursive(directory);
   const violations: ContentViolation[] = [];
@@ -340,24 +355,52 @@ describe('Content Quality Scanner & Contract Helpers', () => {
 });
 
 describe('Authored MDX Content Audit', () => {
-  it('scans authored MDX files and reports content quality violations to be fixed in subsequent tasks', () => {
-    const violations = scanAuthoredDocsForViolations(docsDir);
+  it('scans authored MDX files and asserts zero content quality violations', () => {
+    assertNoInvalidContentClaims(docsDir);
+  });
 
-    if (process.env.STRICT_CONTENT_CHECK === 'true') {
-      assertNoInvalidContentClaims(docsDir);
-    } else {
-      expect(Array.isArray(violations)).toBe(true);
+  it('verifies quickstart page contract', () => {
+    assertQuickstartContract(quickstartPath);
+  });
+
+  it('file traversal recurses through docs-site/src/content/docs only and excludes public/api/ and dist/', () => {
+    const files = listMdxFilesRecursive(docsDir);
+    expect(files.length).toBeGreaterThan(0);
+    for (const file of files) {
+      expect(file).toContain('src/content/docs');
+      expect(file).not.toContain('public/api');
+      expect(file).not.toContain('/dist/');
     }
   });
 
-  it('quickstart page contract verification helper', () => {
-    if (process.env.STRICT_CONTENT_CHECK === 'true') {
-      assertQuickstartContract(quickstartPath);
-    } else {
-      const content = readFileSync(quickstartPath, 'utf8');
-      const check = verifyQuickstartContract(content);
-      expect(check).toBeDefined();
+  it('sidebar links in astro.config.mjs point to valid existing MDX files', () => {
+    const astroConfigPath = join(repoRoot, 'docs-site/astro.config.mjs');
+    const astroConfig = readFileSync(astroConfigPath, 'utf8');
+    const slugMatches = [...astroConfig.matchAll(/slug:\s*['"]([^'"]+)['"]/g)];
+    expect(slugMatches.length).toBeGreaterThan(0);
+
+    for (const match of slugMatches) {
+      const slug = match[1];
+      const mdxPath = join(docsDir, `${slug}.mdx`);
+      const mdPath = join(docsDir, `${slug}.md`);
+      const exists = existsSync(mdxPath) || existsSync(mdPath);
+      expect(exists, `Sidebar slug "${slug}" does not map to an existing file in ${docsDir}`).toBe(true);
     }
+  });
+
+  it('no source file under src/ references obsolete symbols (CapabilityMatrix, basicAdsRepo, capabilityVerifiedOn, FAQPage)', () => {
+    const srcDir = fileURLToPath(new URL('../src', import.meta.url));
+    const allSrcFiles = listAllFilesRecursive(srcDir);
+    const obsoleteRegex = /CapabilityMatrix|basicAdsRepo|capabilityVerifiedOn|FAQPage/;
+
+    const matches: string[] = [];
+    for (const file of allSrcFiles) {
+      const content = readFileSync(file, 'utf8');
+      if (obsoleteRegex.test(content)) {
+        matches.push(file);
+      }
+    }
+    expect(matches, `Found obsolete references in source files: ${matches.join(', ')}`).toEqual([]);
   });
 });
 

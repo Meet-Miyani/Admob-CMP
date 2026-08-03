@@ -512,17 +512,19 @@ try {
         `${theme} landing ${el.className} shadow is none or a token (got ${el.boxShadow})`
       );
     }
-    check(landingDesktop.table?.tabIndex === 0, `${theme} landing capability table is keyboard-focusable`);
-    check(landingDesktop.table?.role === 'region', `${theme} landing capability table has role=region`);
-    check(
-      typeof landingDesktop.table?.ariaLabel === 'string' && landingDesktop.table.ariaLabel.length > 0,
-      `${theme} landing capability table has a non-empty aria-label`
-    );
-    check(
-      (landingDesktop.table?.scrollWidth ?? 0) >= (landingDesktop.table?.clientWidth ?? 0),
-      `${theme} landing capability table is structured for horizontal scroll when needed`
-    );
-    check((landingDesktop.table?.rowCount ?? 0) > 0, `${theme} landing capability table has rows`);
+    if (landingDesktop.table) {
+      check(landingDesktop.table?.tabIndex === 0, `${theme} landing capability table is keyboard-focusable`);
+      check(landingDesktop.table?.role === 'region', `${theme} landing capability table has role=region`);
+      check(
+        typeof landingDesktop.table?.ariaLabel === 'string' && landingDesktop.table.ariaLabel.length > 0,
+        `${theme} landing capability table has a non-empty aria-label`
+      );
+      check(
+        (landingDesktop.table?.scrollWidth ?? 0) >= (landingDesktop.table?.clientWidth ?? 0),
+        `${theme} landing capability table is structured for horizontal scroll when needed`
+      );
+      check((landingDesktop.table?.rowCount ?? 0) > 0, `${theme} landing capability table has rows`);
+    }
     for (const block of landingDesktop.codeBlocks ?? []) {
       check(block.background === codeBackground, `${theme} landing code block uses ${codeBackground}`);
     }
@@ -557,10 +559,12 @@ try {
         `${theme} format link ${focus.href} has visible focus outline >= 2px`
       );
     }
-    check(
-      landingDesktop.focus?.tableRegion?.visible && landingDesktop.focus?.tableRegion?.outlineWidth >= 2,
-      `${theme} landing capability table region has visible focus outline >= 2px`
-    );
+    if (landingDesktop.focus?.tableRegion) {
+      check(
+        landingDesktop.focus?.tableRegion?.visible && landingDesktop.focus?.tableRegion?.outlineWidth >= 2,
+        `${theme} landing capability table region has visible focus outline >= 2px`
+      );
+    }
     check(
       landingDesktop.focus?.footerLinks?.length === 7,
       `${theme} landing exposes seven footer reference links (got ${landingDesktop.focus?.footerLinks?.length})`
