@@ -6,24 +6,19 @@ description: "KMP app-open ads with AppOpenAdCoordinator — foreground detectio
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import FullScreenLifecycle from '../../../components/diagrams/FullScreenLifecycle.astro';
 
-## What are app-open ads and when do they show?
+## App-open ad overview
 
 App-open ads show while the app is loading, typically when a user
 returns to it from the background. They are a full-screen format with
 its own TTL (four hours, not the one-hour default of other
 full-screen formats) and its own lifecycle plumbing because the
-trigger is process state, not user action. The format is unusually
-easy to get wrong because it depends on the app's lifecycle
-plumbing working correctly, and the consequence of getting it wrong
-is an ad showing at the wrong moment — over a consent form, during
-a purchase, or when the user did not actually return.
+trigger is process state, not user action. The format requires
+careful lifecycle handling so an ad never shows over a consent form,
+during a purchase, or when the user did not return.
 
-`AppOpenAdCoordinator` is the library's answer to that problem. It
-implements the entire recommended lifecycle: preload, foreground
+`AppOpenAdCoordinator` manages this lifecycle: preload, foreground
 detection, minimum-background gating, cooldown, and reload after
-consumption. Hand-rolling the same behaviour is the most common
-source of app-open ad bugs, and the coordinator exists to make
-the hand-rolled version unnecessary.
+consumption, making manual lifecycle state handling unnecessary.
 
 A note on naming: this is the only controller in the library with
 a coordinator layer above it. The interstitial, rewarded,
@@ -34,7 +29,7 @@ lifecycle, not user action, and the state that drives the trigger
 lives outside the controller. The coordinator is the bridge
 between the platform lifecycle APIs and the controller API.
 
-## How do I wire up AppOpenAdCoordinator?
+## Configuring AppOpenAdCoordinator
 
 ```kotlin
 val placement = remember {
@@ -68,7 +63,7 @@ coordinator must be created inside `remember` so a recomposition
 does not build a second one and double-register the lifecycle
 observer.
 
-## What does each AppOpenConfig setting do?
+## AppOpenConfig settings
 
 | Setting | What it does |
 |---|---|
@@ -83,7 +78,7 @@ users who switch apps to copy a code; four seconds is a reasonable
 floor. A `cooldownBetweenShows` of a few hours keeps the format
 from feeling like an ad wall.
 
-The judgement call on `showOnColdStart`: a cold-start ad competes
+The decision on `showOnColdStart`: a cold-start ad competes
 with the app's own splash for the user's attention. Most apps have
 a meaningful cold-start experience (a logo, a sign-in flow, a
 first-run tutorial) and disabling cold-start shows is the right
@@ -99,7 +94,7 @@ value throws, and passing a very long cooldown is honoured
 verbatim. The defaults are designed for the common case, not
 edge cases.
 
-## How do I stop an app-open ad interrupting checkout?
+## Preventing ad interruptions during sensitive flows
 
 ```kotlin
 coordinator.isBlocked = true    // entering checkout or onboarding
@@ -130,7 +125,7 @@ point of the sensitive flow and clear it at the exit, in a
 `try`/`finally` so a thrown exception cannot leak the blocked
 state.
 
-## Why did my app-open ad not show?
+## Diagnostic checklist
 
 A short triage:
 
@@ -151,7 +146,7 @@ A short triage:
 The full symptom table is on
 [Troubleshooting](/reference/troubleshooting/).
 
-## Can I control app-open ads manually?
+## Manual controller management
 
 ```kotlin
 val appOpen = adManager.appOpen(placement)
@@ -167,12 +162,11 @@ no-op when `isReady()` is `false` rather than returning
 `AdShowResult.NotReady` — useful for a single-tap flow where the
 caller does not want to handle a not-ready branch.
 
-Hand-rolling the lifecycle means reimplementing foreground
-detection, cooldowns, minimum-background gating, and reload after
-consumption, which is the coordinator's entire reason to exist.
-Most production code should use the coordinator; the manual path
-exists for tests and for apps that have a custom foreground
-detector they need to integrate with.
+Manual control requires managing foreground detection, cooldowns,
+minimum-background gating, and reload after consumption, which is
+what the coordinator provides automatically. Most production code
+should use the coordinator; the manual path exists for tests and for
+apps integrating custom foreground detectors.
 
 The full surface of `AppOpenAdCoordinator` is therefore: a
 constructor taking the manager, controller, and config; `start(scope)`
@@ -191,12 +185,3 @@ so the observer is released on screen exit. Forgetting `stop()` is
 not catastrophic — the next `start` will replace the observer — but
 it does leak the previous `WillEnterForeground` / `ProcessLifecycleOwner`
 listener until the coordinator is garbage-collected.
-
-## Where to next?
-
-<CardGrid>
-  <LinkCard title="Interstitial ads" href="/formats/interstitial/" description="The shared full-screen controller contract." />
-  <LinkCard title="UMP consent" href="/privacy/consent/" description="Why app-open never covers a consent form." />
-  <LinkCard title="Caching, retry and timeouts" href="/advanced/caching-retry-timeouts/" description="TTLs and the four-hour app-open default." />
-  <LinkCard title="Troubleshooting" href="/reference/troubleshooting/" description="When an ad does not appear." />
-</CardGrid>

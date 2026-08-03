@@ -269,7 +269,6 @@ export default defineConfig({
           items: [
             { slug: 'project/roadmap' },
             { slug: 'project/contributing' },
-            { slug: 'project/ai-agents' },
           ],
         },
       ],

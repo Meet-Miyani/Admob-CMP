@@ -6,7 +6,7 @@ description: "AdMob banners in Compose Multiplatform — BannerAdView, adaptive 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import BannerGeometry from '../../../components/diagrams/BannerGeometry.astro';
 
-## How do I show a banner ad in Compose Multiplatform?
+## Showing a banner ad in Compose Multiplatform
 
 Size and refresh behaviour come from the **placement**, not from
 composable parameters, which is why the same banner behaves identically
@@ -57,7 +57,7 @@ work bounded. The
 [revenue and paid events guide](/advanced/revenue-events/) has the
 full event-stream pattern.
 
-## Which banner size should I use?
+## Banner size policies
 
 ```kotlin
 AdPlacement(
@@ -88,7 +88,7 @@ the screen in portrait may grow when the device rotates to landscape,
 which is correct behaviour for an anchored ad and is the reason the
 size comes from the platform SDK rather than from a fixed number.
 
-## How do collapsible banners work?
+## Collapsible banners
 
 ```kotlin
 bannerSizePolicy = AdSizePolicy.LargeAnchoredAdaptive(
@@ -97,13 +97,11 @@ bannerSizePolicy = AdSizePolicy.LargeAnchoredAdaptive(
 ```
 
 `CollapsiblePlacement` is `Top` or `Bottom`. Collapsible is a property
-of the anchored adaptive policy rather than a separate format. The part
-that wastes people's afternoons: **regular banner test ids never serve
-collapsible fill.** Testing requires
+of the anchored adaptive policy rather than a separate format. Important for testing:
+**regular banner test IDs do not serve collapsible fill.** Testing requires
 `TestAdIds.ANDROID_COLLAPSIBLE_BANNER` and
-`TestAdIds.IOS_COLLAPSIBLE_BANNER`. With regular test ids, the banner
-loads and renders normally, but never collapses, which looks like a
-bug in the size policy rather than a test-id mismatch.
+`TestAdIds.IOS_COLLAPSIBLE_BANNER`. With regular test IDs, the banner
+loads and renders normally, but never collapses.
 
 Collapsible banners expand on a user tap and stay expanded until the
 user dismisses them, then return to a small anchor at the configured
@@ -112,7 +110,7 @@ policies, and the publisher's AdMob account must have collapsible
 enabled — a unit from an account without collapsible enabled behaves
 the same as a regular banner.
 
-## How often does a banner refresh?
+## Banner refresh policies
 
 ```kotlin
 AdPlacement(
@@ -143,7 +141,7 @@ throwing, which is the design choice that lets the same placement
 work across reasonable timer settings without forcing the caller to
 validate.
 
-## How is the banner width resolved?
+## Banner width resolution
 
 A banner's width is an **input**, not something the SDK can always
 discover. `BannerAdView` measures its own container and supplies it. A
@@ -177,7 +175,7 @@ change that is invisible until the day you depend on it. The
 [changelog](/reference/changelog/) entry for 1.1.0 calls it out
 explicitly.
 
-## Can I use banners without Compose?
+## Headless banner usage without Compose
 
 Yes. `adManager.banner(placement)` returns a `BannerAdController` with
 `load(geometry, sizePolicy, requestOptions)`, `refresh()`, `clear()`,
@@ -195,7 +193,7 @@ it can observe and an `events` flow it can pipe into the rest of the
 app's analytics. The geometry parameter is mandatory in this case,
 because there is no Compose `Modifier` to measure.
 
-## Why is my banner blank?
+## Diagnostic checklist for blank banners
 
 Each line is one common cause:
 
@@ -221,12 +219,3 @@ fluctuates by region, time of day, and ad unit age, and the right
 behaviour is to keep retrying on the configured refresh schedule.
 Retrying more aggressively — for instance, on every recomposition —
 risks invalid-traffic flags.
-
-## Where to next?
-
-<CardGrid>
-  <LinkCard title="Native ads" href="/formats/native/" description="Ads that match your own layout." />
-  <LinkCard title="Caching, retry and timeouts" href="/advanced/caching-retry-timeouts/" description="Retry backoff and load bounds." />
-  <LinkCard title="Revenue and paid events" href="/advanced/revenue-events/" description="AdValue and the mediation chain." />
-  <LinkCard title="Troubleshooting" href="/reference/troubleshooting/" description="Blank banners and no fill." />
-</CardGrid>

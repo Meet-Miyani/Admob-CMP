@@ -6,7 +6,7 @@ description: "Compose Multiplatform interstitial ads with suspend load and show,
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import FullScreenLifecycle from '../../../components/diagrams/FullScreenLifecycle.astro';
 
-## How do I show an interstitial ad in Compose Multiplatform?
+## Showing an interstitial ad in Compose Multiplatform
 
 Interstitial, rewarded, rewarded interstitial and app-open controllers
 all implement `FullScreenAdController`, whose surface is `load()`,
@@ -58,7 +58,7 @@ across recompositions of the same screen. A typical app also owns
 the placement list as a `val` in a `CompositionLocal` or a top-level
 object so every screen shares the same `AdPlacement` instances.
 
-## What does show() actually return?
+## Show result semantics
 
 The three-case sealed result explicitly:
 
@@ -85,7 +85,7 @@ A common shape is to use `Shown` as the trigger to launch the next
 screen, hide the loading indicator, or restore UI that was disabled
 during the presentation.
 
-## What happens between load and show?
+## Interstitial ad lifecycle state machine
 
 <FullScreenLifecycle />
 
@@ -114,7 +114,7 @@ ads the cache currently holds. The two views are consistent — the
 cache never claims more than `maxSize` and never reports an
 expired entry — but they answer different questions.
 
-## How do I cache more than one interstitial?
+## Caching policies and multi-ad caching
 
 ```kotlin
 AdPlacement(
@@ -153,7 +153,7 @@ incurred the network cost of a request — but the timing is
 guaranteed, and the user never sees a "loading" state because no
 ad is currently being shown.
 
-## Why does a second show() return NotReady?
+## Non-reentrancy of show()
 
 `show()` is **not reentrant per controller.** Calling it again while
 a previous `show()` on the *same* controller is still on screen
@@ -177,7 +177,7 @@ refill, and TTL-evict while a presentation is on screen. The
 not-ready rule is about presentation ownership, not about cache
 state.
 
-## How do I check availability before showing?
+## Checking ad availability
 
 ```kotlin
 if (interstitial.isReady()) {
@@ -203,12 +203,3 @@ expires, because that is the next one `show()` will consume. The
 field is useful for telemetry — "how long before we lose warm
 inventory?" — but not for control flow, because the same ad can
 expire between reading the value and acting on it.
-
-## Where to next?
-
-<CardGrid>
-  <LinkCard title="Rewarded ads" href="/formats/rewarded/" description="Rewards, and granting them exactly once." />
-  <LinkCard title="App-open ads" href="/formats/app-open/" description="AppOpenAdCoordinator and cooldowns." />
-  <LinkCard title="Caching, retry and timeouts" href="/advanced/caching-retry-timeouts/" description="TTL, backoff, and load bounds." />
-  <LinkCard title="Revenue and paid events" href="/advanced/revenue-events/" description="AdValue and response info." />
-</CardGrid>

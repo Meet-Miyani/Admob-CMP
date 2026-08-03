@@ -5,7 +5,7 @@ description: "Contributing to admob-cmp — how to build and test the library, w
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-## How do I build and test the library?
+## Building and testing the library
 
 The commands and what each one is for:
 
@@ -35,7 +35,7 @@ the test suite. The test suite is a contract test, not an
 integration test, and its purpose is to lock the public
 behaviour of the library's common code.
 
-## Why is the public API surface frozen?
+## Public API frozen surface model
 
 The mechanism and the reason together: the module uses
 `explicitApi()` plus Kotlin Gradle plugin ABI validation, and
@@ -58,32 +58,28 @@ public surface, not a tool for sweeping API changes under the
 rug.
 </Aside>
 
-## What does a good pull request look like?
+## Pull request guidelines
 
 - Has a test that fails before the change and passes after it.
 - Runs both test tasks and `checkKotlinAbi` locally.
 - **Ships its documentation in the same pull request.** Docs
   live in this repository at `docs-site/src/content/docs/`, so
-  an API change and its guide update version together — that
-  is the entire reason the docs site is not a separate
-  repository.
+  an API change and its guide update version together.
 - Updates `/reference/changelog/` when it changes behaviour a
   consumer can observe.
 - Keeps the trademark and neutrality rules intact: nominative
   use of "AdMob" only, and no comparative claims about other
   projects beyond verifiable capability facts.
 
-The "ships its documentation in the same pull request" line
-deserves emphasis. The docs site is intentionally co-located
-with the library so an API change cannot ship without its
-guide update. A change to `AdPlacement` requires a change to
-the relevant guide; a change to a controller surface requires
-a change to the relevant format page; a change to the public
-ABI requires a regenerated `api/*.klib.api` dump. The
-`./scripts/release-readiness.sh` script bundles these checks
-and is the only verification step in the project.
+Before opening a pull request, you MUST execute the mandatory repository readiness verification:
 
-## What must never change?
+```bash
+./scripts/release-readiness.sh
+```
+
+Passing `./scripts/release-readiness.sh` (`READINESS: PASS`) is required for every pull request. Note that even after obtaining a passing readiness result, **owner confirmation is explicitly required** before opening or merging any pull request.
+
+## Core repository invariants
 
 The hard invariants, stated so a contributor does not propose
 them in good faith:
@@ -111,7 +107,7 @@ to defend. The rule is enforceable in code review, but the
 intent is to prevent well-meaning additions that look harmless
 and quietly double the manager.
 
-## How is a release cut?
+## Release procedure
 
 Short and routed to the maintainer guide rather than duplicated:
 releases bump `VERSION_NAME` in `gradle.properties`, publish to
@@ -132,11 +128,3 @@ versions. The version-catalog form described in
 [Installation](/start/installation/) is the right shape for
 consumers; the two-file form is the right shape for the
 library.
-
-## Where to next?
-
-<CardGrid>
-  <LinkCard title="Architecture" href="/reference/architecture/" description="Where the code lives and why." />
-  <LinkCard title="Using with AI agents" href="/project/ai-agents/" description="AGENTS.md and llms.txt." />
-  <LinkCard title="Roadmap" href="/project/roadmap/" description="What is gated, and on what." />
-</CardGrid>

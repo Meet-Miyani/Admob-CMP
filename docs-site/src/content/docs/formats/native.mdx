@@ -6,7 +6,7 @@ description: "Compose Multiplatform native ads — the adLayout DSL, ad pooling,
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import NativePoolLifecycle from '../../../components/diagrams/NativePoolLifecycle.astro';
 
-## What are native ads, and why does AdMob CMP support them?
+## Native ads overview
 
 Native ads deliver ad assets — headline, body, icon, media, call to
 action, advertiser, star rating, price, store — without a fixed
@@ -22,14 +22,10 @@ reason clicks and impressions are attributed correctly. A native ad
 that is *rendered* correctly but not *registered* correctly will
 appear in the app without ever being billed.
 
-Native ads are also the format with the most asymmetric support
-across the Kotlin Multiplatform AdMob wrapper ecosystem. Most
-wrappers stop at the three full-screen-plus-banner formats and
-treat native as a "future" feature. AdMob CMP supports native
-today because the publisher feed pattern is the most common reason
-people reach for an AdMob SDK in the first place.
+Native ads are also supported natively across platforms in AdMob CMP,
+giving Compose Multiplatform applications a first-class feed ad integration.
 
-## How do I render a native ad in Compose Multiplatform?
+## Rendering native ads in Compose Multiplatform
 
 ```kotlin
 val placement = remember {
@@ -99,7 +95,7 @@ on every recomposition, for example) shows up as a slow leak of
 ads rather than a crash. The [troubleshooting
 guide](/reference/troubleshooting/) has the symptom table.
 
-## How does the adLayout DSL work?
+## The adLayout DSL
 
 Three properties. Each `adLayout { … }` construction recursively
 validates the tree and computes a structural identity string, so it
@@ -122,7 +118,7 @@ That matters for caching: the validator does not re-run when a
 layout's identity string matches a previously-validated one, and the
 platform-side view construction can be reused.
 
-## Which layout nodes are available?
+## Available layout nodes
 
 | Node | Asset | Notes |
 |---|---|---|
@@ -154,7 +150,7 @@ similar — the former is a generic value, the latter is a
 shape-aware alternative that maps to `CALayer.cornerRadius` on iOS
 and to a `Shape` drawable on Android.
 
-## Do I have to write a custom layout?
+## Built-in templates and custom layouts
 
 No. `AdTemplates` ships four ready-made layouts: `AdTemplates.mediaCard`
 (the `NativeAdView` default), `AdTemplates.feedCard`,
@@ -184,7 +180,7 @@ another — is a different shape: build each variant in its own
 `remember { adLayout { … } }` and select the right one at the
 call site, rather than parameterising a single layout.
 
-## How does the native ad pool work?
+## Native ad pool lifecycle
 
 Native ads are single-use, so a native placement is served by a
 **pool** rather than a single controller. `NativeAdView` acquires
@@ -240,7 +236,7 @@ neither is required. The defaults are conservative: AdChoices at
 top-right, media at the platform default aspect ratio, video
 options set by GMA.
 
-## Why does acquire() return null, and how do I recover?
+## Pool recovery when acquire() returns null
 
 Set up the failure exactly: with `maxSize = 1` and one row holding
 the ad, `preload()` returns early and `acquire()` returns `null` for
@@ -281,7 +277,7 @@ the next page has warm inventory. The wrong size — too small —
 shows blank rows; the wrong size — too large — wastes memory and
 inflates the time-to-first-ad.
 
-## How do I read media info and detect video?
+## Querying NativeMediaInfo and video content
 
 ```kotlin
 val info = pool.mediaInfo(token)
@@ -303,7 +299,7 @@ once after `acquire()` and use the values to drive the layout's
 measured height, so the row does not jump when the image first
 loads.
 
-## Why do native video events only fire on iOS?
+## Platform differences in native video events
 
 <Aside type="caution">
 **Platform gap — native video events on Android.** iOS emits five
@@ -323,7 +319,7 @@ it, but no event is emitted. Cross-platform telemetry should query
 `hasVideoContent` for inventory purposes and skip the video-event
 stream on Android.
 
-## What does AdMob policy require of a native layout?
+## AdMob policy requirements for native layouts
 
 Three rules, all enforced by `AdLayoutValidator`:
 
@@ -365,12 +361,3 @@ report and a code change can be correlated directly. The `code` is
 a stable string identifier suitable for filtering — for example, a
 linter rule could fail CI on `ad_badge_missing` while allowing
 `media_placeholder_default_aspect`.
-
-## Where to next?
-
-<CardGrid>
-  <LinkCard title="Banner ads" href="/formats/banner/" description="When a fixed ad slot is the better fit." />
-  <LinkCard title="Caching, retry and timeouts" href="/advanced/caching-retry-timeouts/" description="TTL and cache sizing for pools." />
-  <LinkCard title="Revenue and paid events" href="/advanced/revenue-events/" description="Attributing native ad revenue." />
-  <LinkCard title="Troubleshooting" href="/reference/troubleshooting/" description="Blank rows and null acquires." />
-</CardGrid>

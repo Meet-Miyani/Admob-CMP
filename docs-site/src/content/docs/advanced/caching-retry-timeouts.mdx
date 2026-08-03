@@ -7,7 +7,7 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import RetryTimeline from '../../../components/diagrams/RetryTimeline.astro';
 import FullScreenLifecycle from '../../../components/diagrams/FullScreenLifecycle.astro';
 
-## Which knobs does AdMob CMP actually expose?
+## Configurable policies on AdPlacement
 
 Everything on this page is per-placement configuration on
 `AdPlacement`, so different placements can behave differently in
@@ -29,7 +29,7 @@ first `load()`.
 | `AdRetryPolicy` | How a failed load is retried | 2 attempts, 2s initial delay, 30s cap, 2.0 multiplier |
 | `AdTimeoutPolicy` | How long a load or a presentation hand-off may take | 30s load, 10s presentation hand-off |
 
-## How does the ad cache work?
+## Ad cache mechanics and AdCachePolicy
 
 ```kotlin
 AdPlacement(
@@ -78,7 +78,7 @@ A native-pool cross-reference in one sentence: for native
 placements the same `maxSize` budgets **available + in-use** ads
 together — see the [native ads guide](/formats/native/).
 
-## When and how does a failed load retry?
+## Retry policies and backoff behaviour
 
 ```kotlin
 AdPlacement(
@@ -121,12 +121,12 @@ disables the retry layer entirely — the call returns whatever
 the platform SDK returns, including transient failures. The
 right shape for that policy is a caller that has its own retry
 mechanism (a button-driven retry, a backoff at a higher level).
-The wrong shape is "I want to load faster" — `maxAttempts = 1`
+The right shape is not "I want to load faster" — `maxAttempts = 1`
 is not faster than `maxAttempts = 2` unless the network is
 consistently failing on the first try, in which case the
 underlying problem needs investigation, not a policy tweak.
 
-## What stops a load or a presentation hanging forever?
+## Timeouts for load and presentation
 
 ```kotlin
 AdPlacement(
@@ -165,7 +165,7 @@ ad presence counter is permanently off-by-one. The timeout is
 the safety valve that releases the token after a bounded wait
 even if the SDK never reports.
 
-## How should I size all of this?
+## Placement configuration guidelines
 
 Concrete recommendations rather than platitudes:
 
@@ -195,12 +195,3 @@ requests; for a placement that fires twice a day, that is two.
 The math favours `reloadAfterShow = true` whenever the
 placement is in a hot path, and `false` when the placement is
 shown at a moment the user is unlikely to reach twice.
-
-## Where to next?
-
-<CardGrid>
-  <LinkCard title="Interstitial ads" href="/formats/interstitial/" description="The shared full-screen controller contract." />
-  <LinkCard title="Native ads" href="/formats/native/" description="How maxSize budgets a pool." />
-  <LinkCard title="Architecture" href="/reference/architecture/" description="Generation counters and the state machine." />
-  <LinkCard title="Troubleshooting" href="/reference/troubleshooting/" description="No fill, timeouts, and error codes." />
-</CardGrid>

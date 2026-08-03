@@ -5,7 +5,7 @@ description: "What is next for this Compose Multiplatform AdMob SDK — the Kotl
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-## What is on the roadmap, and what is not promised?
+## Roadmap overview and expectations
 
 This page describes intent, not commitments. **No item here has a
 date**, and none will get one until its blockers are cleared.
@@ -18,7 +18,7 @@ about removing setup friction, not about missing functionality.
 | **Planned, gated** | SwiftPM import migration — removes both the Gradle plugin and the manual Xcode package step |
 | **Not planned** | Direct support for ad networks other than AdMob (mediation covers this), and renaming the published Maven coordinate |
 
-## What is the SwiftPM import migration?
+## The SwiftPM import migration
 
 The Kotlin Gradle plugin has gained first-class Swift Package
 Manager dependencies via `swiftPMDependencies {}`. A Kotlin
@@ -50,7 +50,7 @@ library has stated this as policy in the
 [contributing guide](/project/contributing/) so the maintenance
 window is committed, not implied.
 
-## Which four gates does it wait on?
+## Prerequisite migration gates
 
 The gates, with the reason for each, exactly as the Track 3 plan
 defines them. None of them can be unblocked by work in this
@@ -79,7 +79,7 @@ KSP would strand them.
 The composable surface is part of the published artifact, so
 Compose Multiplatform must support the same Kotlin version.
 
-## What is the one question nobody has answered yet?
+## Technical unknowns for package linkage
 
 <Aside type="caution">
 The blocking unknown: **does a Maven-published library that uses
@@ -125,7 +125,7 @@ klink hypothesis, which is the only behaviour that matters for
 the migration's viability. A negative result is conclusive; a
 positive result is suggestive but not yet a commitment to ship.
 
-## Why not do what other SDKs do and embed the binary?
+## Rationale for binding-only architecture
 
 A factual contrast, no criticism of anyone. RevenueCat's
 `purchases-kmp` 3.0.0 reaches the same outcome by a different
@@ -143,7 +143,7 @@ avoids. Same destination, different vehicle. The
 [architecture reference](/reference/architecture/) has the
 full rationale.
 
-## What happens if the gates never clear?
+## Fallback and long-term maintenance
 
 Plainly, because it reassures rather than worries: the Gradle
 plugin is a perfectly serviceable permanent answer. It is a
@@ -154,12 +154,3 @@ on principle; it will happen when the official path is genuinely
 stable and the ecosystem has caught up. Until then, the plugin
 is the answer, and the [installation guide](/start/installation/)
 walks through it as the supported path.
-
-## Where to next?
-
-<CardGrid>
-  <LinkCard title="Architecture" href="/reference/architecture/" description="Why iOS ships bindings, not binaries." />
-  <LinkCard title="Compatibility" href="/reference/compatibility/" description="Today's Kotlin floor, and the cinterop caveat." />
-  <LinkCard title="Contributing" href="/project/contributing/" description="How to help move a gate." />
-  <LinkCard title="Changelog" href="/reference/changelog/" description="What has already shipped." />
-</CardGrid>

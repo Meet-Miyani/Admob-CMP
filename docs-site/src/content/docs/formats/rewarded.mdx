@@ -6,7 +6,7 @@ description: "Kotlin Multiplatform rewarded ads and rewarded interstitials — g
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import FullScreenLifecycle from '../../../components/diagrams/FullScreenLifecycle.astro';
 
-## How do I show a rewarded ad in Kotlin Multiplatform?
+## Showing a rewarded ad in Kotlin Multiplatform
 
 `RewardedAdController` and `RewardedInterstitialAdController` both
 extend `FullScreenAdController` and add exactly one thing: a `show()`
@@ -57,7 +57,7 @@ rewarded adds is the per-show callback and the fact that the
 reward grant is part of the platform SDK's presentation lifecycle,
 not the consumer's coroutine.
 
-## When exactly is the reward earned?
+## Reward grant timing
 
 Four facts, because this is where money is lost:
 
@@ -82,7 +82,7 @@ fires at the platform's natural moment — which is during the ad,
 not after it. UI that needs to react to a reward in real time
 should observe the callback, not `show()`'s result.
 
-## How do I make sure I grant the reward only once?
+## Preventing double-granting of rewards
 
 ```kotlin
 // Correct — one grant point
@@ -123,7 +123,7 @@ controller, no event-listener registration, and no global
 "reward granted" signal. The grant point is the callback
 parameter, and that is deliberate.
 
-## How do I set up server-side verification?
+## Server-side verification (SSV)
 
 ```kotlin
 AdPlacement(
@@ -161,7 +161,7 @@ is on, the resource they were trying to buy, the campaign that
 triggered the offer. The library does not parse it; the server
 does.
 
-## How is a rewarded interstitial different?
+## Rewarded interstitials vs. rewarded ads
 
 A rewarded interstitial is a full-screen format that offers a reward
 without an explicit opt-in prompt from your UI. It uses the same
@@ -194,7 +194,7 @@ contract. A rewarded interstitial is a placement-level decision
 integration-level decision, which is why the controller interface
 is identical.
 
-## What does the load and show cycle look like?
+## Rewarded ad lifecycle
 
 <FullScreenLifecycle />
 
@@ -221,12 +221,3 @@ fill and `show()` returned `NotReady`, or the platform reported
 the ad as failed and the terminal callback was the only outcome.
 None of these are bugs in the library; they are the platform
 SDKs behaving as documented.
-
-## Where to next?
-
-<CardGrid>
-  <LinkCard title="Interstitial ads" href="/formats/interstitial/" description="The shared full-screen controller contract." />
-  <LinkCard title="Caching, retry and timeouts" href="/advanced/caching-retry-timeouts/" description="Preloading rewarded inventory." />
-  <LinkCard title="Revenue and paid events" href="/advanced/revenue-events/" description="Attributing rewarded revenue." />
-  <LinkCard title="Test safety" href="/advanced/test-safety/" description="Never request live rewarded ads in debug." />
-</CardGrid>
