@@ -26,7 +26,10 @@ const CF_BEACON_TOKEN = process.env.PUBLIC_CF_BEACON_TOKEN;
 
 export default defineConfig({
   site: SITE,
-  build: { format: 'directory' },
+  build: {
+    format: 'directory',
+    inlineStylesheets: 'always',
+  },
   markdown: {
     processor: unified({
       rehypePlugins: [
@@ -113,6 +116,16 @@ export default defineConfig({
           attrs: {
             rel: 'preload',
             href: '/fonts/jetbrains-mono-400.woff2',
+            as: 'font',
+            type: 'font/woff2',
+            crossorigin: 'anonymous',
+          },
+        },
+        {
+          tag: 'link',
+          attrs: {
+            rel: 'preload',
+            href: '/fonts/jetbrains-mono-500.woff2',
             as: 'font',
             type: 'font/woff2',
             crossorigin: 'anonymous',

@@ -971,6 +971,13 @@ describe('landing.css footer and roadmap rules', () => {
     const block = css.match(/\.content-panel:has\(\.landing-hero\)[\s\S]*?\{([^}]*)\}/);
     expect(block![1]).toMatch(/max-width\s*:\s*var\(--admob-content-max\)/);
   });
+
+  it('styles landing-meta dt with full opacity for WCAG AA contrast', () => {
+    const block = css.match(/\.landing-meta\s+dt\s*\{([^}]*)\}/);
+    expect(block, '.landing-meta dt rule must be present').not.toBeNull();
+    expect(block![1]).toMatch(/font-weight\s*:\s*500/);
+    expect(block![1]).not.toMatch(/opacity/);
+  });
 });
 
 const projectMetadataPath = fileURLToPath(

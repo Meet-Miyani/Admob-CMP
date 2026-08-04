@@ -87,7 +87,7 @@ const scrollStyle = minWidth ? `--dg-min-w:${minWidth}px` : undefined;
     expand.type = 'button';
     expand.className = 'dg-expand';
     expand.textContent = 'Expand';
-    expand.setAttribute('aria-label', `Open ${label} at full size`);
+    expand.setAttribute('aria-label', `Expand ${label} to full size`);
     caption.append(expand);
 
     const anchor = document.createComment('dg-scroll');

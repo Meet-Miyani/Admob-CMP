@@ -111,4 +111,8 @@ describe('expand-to-dialog is progressive enhancement', () => {
     expect(html).toContain('class="dg-scroll"');
     expect(html).toContain('tabindex="0"');
   });
+
+  it('sets aria-label starting with visible button text to satisfy WCAG 2.5.3', () => {
+    expect(figureSource).toMatch(/setAttribute\(\s*['"]aria-label['"],\s*`Expand/);
+  });
 });
