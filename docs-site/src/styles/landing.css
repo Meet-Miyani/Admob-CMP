@@ -173,13 +173,13 @@
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.6875rem 1.125rem;
+  padding: 0.6875rem 1.25rem;
   border: 1px solid var(--admob-accent);
   border-radius: var(--admob-radius);
   background: var(--admob-accent);
   color: var(--admob-accent-contrast);
-  font-size: 0.9375rem;
-  font-weight: 600;
+  font-size: 1.1875rem;
+  font-weight: 700;
   letter-spacing: var(--admob-tracking-tight);
   text-decoration: none;
   transition: background-color 160ms var(--admob-ease),
