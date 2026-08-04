@@ -221,6 +221,7 @@ export default defineConfig({
             { slug: 'start/installation' },
             { slug: 'start/android-setup' },
             { slug: 'start/ios-setup' },
+            { slug: 'start/migrate-from-expect-actual' },
           ],
         },
         {
@@ -258,6 +259,10 @@ export default defineConfig({
             { slug: 'reference/compatibility' },
             { slug: 'reference/troubleshooting' },
             { slug: 'reference/changelog' },
+            // Previously reachable only through the per-diagram "described in
+            // words" links in DiagramFigure.astro, so it had no navigational
+            // entry point at all despite being one of the longest pages.
+            { slug: 'reference/diagrams-in-words' },
             {
               label: 'API reference (Dokka)',
               link: '/api/',
@@ -270,6 +275,9 @@ export default defineConfig({
           items: [
             { slug: 'project/roadmap' },
             { slug: 'project/contributing' },
+            // Was a true orphan: in the sitemap, but with no inbound link from
+            // any page, component or sidebar entry in the repository.
+            { slug: 'project/ai-agents' },
           ],
         },
       ],

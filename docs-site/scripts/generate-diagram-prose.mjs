@@ -35,10 +35,15 @@ export function renderProsePage(descriptions) {
 
   return [
     '---',
-    'title: Every diagram in words',
+    // The title carries the keywords because it drives <title> and the OG card;
+    // sidebar.label keeps the navigation entry short. Keep the rendered
+    // `<title> | AdMob CMP` under ~60 chars.
+    'title: "Architecture diagrams described in words"',
     'description: >-',
     '  Plain-text descriptions of every architecture diagram in the AdMob CMP',
     '  documentation, for screen readers, text-only clients and AI agents.',
+    'sidebar:',
+    '  label: "Diagrams in words"',
     '---',
     '',
     '{/* GENERATED FILE — do not edit by hand.',

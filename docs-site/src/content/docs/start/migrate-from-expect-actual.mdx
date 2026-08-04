@@ -1,0 +1,203 @@
+---
+title: "Migrate from expect/actual to AdMob CMP"
+description: "Replace a hand-rolled expect class AdManager with AdMob CMP — what maps to what, which platform code you delete, and what stays your responsibility."
+sidebar:
+  label: "Migrate from expect/actual"
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+Most Compose Multiplatform apps reach AdMob the same way: an `expect class AdManager` in
+`commonMain`, an `actual` per platform, and a `expect @Composable fun BannerAd()` for the one
+format that needs a view. That works, and for a single banner it is the right amount of code.
+This guide is for the point where it stops working — usually the third format, the first consent
+requirement, or the first Kotlin/Native test run.
+
+## What the hand-rolled pattern looks like
+
+The shape is nearly identical across every tutorial that teaches it:
+
+```kotlin
+// commonMain
+expect class AdManager {
+    fun initialize()
+    fun loadInterstitial(adUnitId: String)
+    fun showInterstitial()
+}
+
+// androidMain
+actual class AdManager(private val context: Context) {
+    private var interstitial: InterstitialAd? = null
+
+    actual fun initialize() {
+        MobileAds.initialize(context)
+    }
+
+    actual fun loadInterstitial(adUnitId: String) {
+        InterstitialAd.load(
+            context,
+            adUnitId,
+            AdRequest.Builder().build(),
+            object : InterstitialAdLoadCallback() {
+                override fun onAdLoaded(ad: InterstitialAd) { interstitial = ad }
+                override fun onAdFailedToLoad(error: LoadAdError) { interstitial = null }
+            },
+        )
+    }
+
+    actual fun showInterstitial() {
+        interstitial?.show(context as Activity)
+    }
+}
+```
+
+Then the same again in `iosMain` against `GADInterstitialAd`, with a different callback shape, a
+different threading model, and a different notion of what "the current activity" means.
+
+## What maps to what
+
+| Hand-rolled | AdMob CMP |
+|---|---|
+| `expect class AdManager` | `AdManager` interface, already in `commonMain` |
+| `actual class AdManager(context)` on Android | `AdMob.manager(context)`, or `rememberAdManager()` in Compose |
+| `actual class AdManager()` on iOS | Nothing — the iOS binding ships with the library |
+| `MobileAds.initialize(context)` | `adManager.initialize(config)` or `gatherConsentAndInitialize(config)` |
+| Hardcoded ad unit `String` parameters | `AdPlacement`, resolved per platform |
+| `InterstitialAdLoadCallback` / `GADFullScreenContentDelegate` | `AdEvent` on a single `SharedFlow` |
+| A nullable `var interstitial` you manage | `adManager.interstitial(placement)`, a placement-keyed controller |
+| `expect @Composable fun BannerAd()` | `BannerAdView` from `admob-cmp-compose` |
+| Manual retry timers | `AdRetryPolicy` on the placement |
+| Nothing (usually) | `ConsentController`, gated on `canRequestAds` |
+
+## Step 1: Delete the expect/actual declarations
+
+Remove `expect class AdManager` and both `actual` implementations. The replacement is an
+interface you obtain rather than a class you write:
+
+```kotlin
+// commonMain — Compose
+@Composable
+fun App() {
+    val adManager = rememberAdManager()
+}
+```
+
+```kotlin
+// Android, outside Compose — the same process-wide singleton
+val adManager = AdMob.manager(context)
+```
+
+## Step 2: Move initialisation behind consent
+
+The hand-rolled version calls `MobileAds.initialize()` directly. That is the single most common
+correctness gap in a hand-rolled integration: on a first launch in the EEA, ads are requested
+before a UMP consent decision exists.
+
+```kotlin
+LaunchedEffect(adManager) {
+    adManager.gatherConsentAndInitialize(
+        AdConfig(
+            androidAppId = "ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX",
+            iosAppId = "ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX",
+        )
+    )
+}
+```
+
+`gatherConsentAndInitialize` runs UMP first and only then starts Google Mobile Ads. If you need
+the phases separately, `initialize(config, consentMode)` takes a
+[`ConsentMode`](/privacy/consent/) — `GatherBeforeInitialize` is the default,
+`InitializeOnlyIfAlreadyAllowed` updates UMP without showing a form, and `SkipConsent` bypasses
+UMP entirely.
+
+<Aside type="caution">
+On iOS the required order is consent, then App Tracking Transparency, then initialise. ATT is
+requested from an `AdInitializationHook` on the `BeforeMobileAdsInitialize` phase, not from your
+own launch code. See [App Tracking Transparency](/privacy/app-tracking-transparency/).
+</Aside>
+
+## Step 3: Replace load and show
+
+A placement replaces the ad unit string, and a controller replaces the nullable field:
+
+```kotlin
+val placement = AdPlacement(
+    id = "level_complete",
+    format = AdFormat.Interstitial,
+    androidAdUnitId = "ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX",
+    iosAdUnitId = "ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX",
+)
+
+val interstitial = adManager.interstitial(placement)
+
+// suspend, and it returns rather than calling you back
+interstitial.load()
+
+when (val result = interstitial.show()) {
+    is AdShowResult.Shown -> Unit
+    is AdShowResult.NotReady -> Unit
+    is AdShowResult.Failed -> println(result)
+}
+```
+
+Controllers are keyed by `placement.id` and outlive recomposition, so `adManager.interstitial(placement)`
+returns the same controller each time rather than starting a second load.
+
+For banners, `BannerAdView` replaces the `expect @Composable` shim:
+
+```kotlin
+BannerAdView(placement = bannerPlacement, modifier = Modifier.fillMaxWidth())
+```
+
+## Step 4: Collapse the callbacks
+
+Every platform callback pair becomes one `AdEvent` stream — `Loaded`, `LoadFailed`, `Impression`,
+`Clicked`, `Paid`, `RewardEarned`, `OpenedFullScreen`, `ClosedFullScreen`, `ShowFailed`, and the
+video events. Subscribe per controller, or to `adManager.events` for all of them:
+
+```kotlin
+LaunchedEffect(interstitial) {
+    interstitial.events.collect { event ->
+        when (event) {
+            is AdEvent.Paid -> analytics.track(event)
+            is AdEvent.LoadFailed -> log(event.error)
+            else -> Unit
+        }
+    }
+}
+```
+
+## What changes in behaviour
+
+Four things a hand-rolled integration usually does not have, which you get on migrating:
+
+- **Consent gating.** Requests check `canRequestAds` before reaching the network, so a premature
+  load is not silently a policy problem.
+- **Controller lifetime.** Placement-keyed controllers survive recomposition. The hand-rolled
+  equivalent typically reloads on every navigation.
+- **Caching and retry.** `AdCachePolicy`, `AdExpirationPolicy`, `AdRetryPolicy` and
+  `AdTimeoutPolicy` replace ad-hoc timers. See [Caching, retry and timeouts](/advanced/caching-retry-timeouts/).
+- **Kotlin/Native test linking.** Shared code that touches ad symbols fails to link in
+  `iosSimulatorArm64Test` without Xcode. The Gradle plugin fixes that; see
+  [Troubleshooting](/reference/troubleshooting/).
+
+## What stays your responsibility
+
+Migrating does not move these off your plate:
+
+- Ad unit IDs, AdMob account configuration, and production consent policy.
+- The Android manifest entry and the iOS `Info.plist` keys — see
+  [Android setup](/start/android-setup/) and [iOS setup](/start/ios-setup/).
+- Store disclosures: [Play Data safety](/privacy/play-data-safety/) and
+  [App Store data disclosure](/privacy/app-store-data-disclosure/).
+- Mediation adapters, which stay in your native builds so that GMA SDK versions are not pinned
+  for everyone. See [Mediation](/advanced/mediation/).
+
+## Where to next?
+
+<CardGrid>
+  <LinkCard title="Quickstart" href="/start/quickstart/" description="Render a test ad end to end." />
+  <LinkCard title="Installation" href="/start/installation/" description="Gradle coordinates and the version catalog." />
+  <LinkCard title="UMP consent" href="/privacy/consent/" description="Consent modes and canRequestAds." />
+  <LinkCard title="Architecture" href="/reference/architecture/" description="Why the platform split looks the way it does." />
+</CardGrid>

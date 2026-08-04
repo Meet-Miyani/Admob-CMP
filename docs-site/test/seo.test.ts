@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import * as seo from '../src/lib/seo';
 import {
@@ -104,4 +106,46 @@ describe('FAQPage structured data removal', () => {
   it('does not export faqPageJsonLd from seo module', () => {
     expect((seo as any).faqPageJsonLd).toBeUndefined();
   });
+});
+
+/**
+ * Needs `npm run build` first, like the rendered guards in landing.test.ts.
+ *
+ * `title` carries the SERP keywords and is deliberately long, so the breadcrumb
+ * trail must fall back to the short `sidebar.label` instead. Without this,
+ * a trail reads "Home > Start here > AdMob Quickstart for Compose Multiplatform".
+ */
+describe('breadcrumb labels stay short while headlines keep the keywords', () => {
+  const cases = [
+    { page: 'start/quickstart', crumb: 'Quickstart', headline: 'AdMob Quickstart for Compose Multiplatform' },
+    { page: 'privacy/consent', crumb: 'UMP consent', headline: 'UMP consent for AdMob on Kotlin Multiplatform' },
+    { page: 'reference/diagrams-in-words', crumb: 'Diagrams in words', headline: 'Architecture diagrams described in words' },
+  ];
+
+  function structuredData(page: string): Record<string, any>[] {
+    const html = readFileSync(
+      fileURLToPath(new URL(`../dist/${page}/index.html`, import.meta.url)),
+      'utf8'
+    );
+    return [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map(
+      (match) => JSON.parse(match[1])
+    );
+  }
+
+  for (const { page, crumb, headline } of cases) {
+    it(`${page} uses the sidebar label in its breadcrumb`, () => {
+      const blocks = structuredData(page);
+      const breadcrumb = blocks.find((block) => block['@type'] === 'BreadcrumbList');
+      expect(breadcrumb, `${page} must emit a BreadcrumbList`).toBeDefined();
+
+      const names = breadcrumb!.itemListElement.map((item: { name: string }) => item.name);
+      expect(names.at(-1)).toBe(crumb);
+    });
+
+    it(`${page} keeps the full keyword title as the TechArticle headline`, () => {
+      const article = structuredData(page).find((block) => block['@type'] === 'TechArticle');
+      expect(article, `${page} must emit a TechArticle`).toBeDefined();
+      expect(article!.headline).toBe(headline);
+    });
+  }
 });
