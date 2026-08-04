@@ -1,11 +1,14 @@
 ---
-title: "What is AdMob CMP?"
+title: "What is AdMob CMP? Compose Multiplatform ads"
 description: "An orientation to AdMob CMP — a Kotlin Multiplatform library bringing AdMob ad formats and UMP consent to Compose Multiplatform on Android and iOS."
+sidebar:
+  label: "What is AdMob CMP?"
 ---
 
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 import PlatformMatrix from '../../../components/diagrams/PlatformMatrix.astro';
 
-## Library Overview
+## What the library does
 
 AdMob CMP is a Kotlin Multiplatform (KMP) library that provides a unified Kotlin API for Google Mobile Ads (GMA) and User Messaging Platform (UMP) consent across Android and iOS. Built primarily for Compose Multiplatform applications, it enables developers to manage ad lifecycles, load states, and user privacy compliance using declarative Kotlin constructs.
 
@@ -13,7 +16,7 @@ The published facade dependency coordinate is `dev.avinya.ads:admob-cmp:1.1.0`. 
 - **Android**: Binds the GMA Next-Gen SDK (version 1.3.0) and UMP SDK (version 4.0.0) transitively via Maven.
 - **iOS**: Provides cinterop bindings for the GMA iOS SDK (version 13.x) and UMP iOS SDK (version 3.x), with the host application linking Google's framework binaries directly via Swift Package Manager.
 
-## Architectural Model
+## How the modules are structured
 
 The project is structured into two main modules behind the umbrella coordinate:
 - `admob-cmp-core`: Contains core controllers (`BannerAdController`, `InterstitialAdController`, etc.), lifecycle state machines, ad caching logic, retry policies, and platform-specific adapters. Non-Compose KMP applications can depend directly on this module.
@@ -21,7 +24,7 @@ The project is structured into two main modules behind the umbrella coordinate:
 
 Platform specificities remain strictly isolated. Manifest metadata and application identity reside in native configuration files (`AndroidManifest.xml` on Android and `Info.plist` on iOS), while all ad management, state flows, and consent handling take place in shared Kotlin code.
 
-## Supported Ad Formats
+## Which ad formats are supported?
 
 The library supports six distinct ad format configurations across five core ad types:
 
@@ -36,7 +39,7 @@ The library supports six distinct ad format configurations across five core ad t
 
 Controllers are placement-keyed singletons retained across screen recompositions, ensuring load state continuity and preventing redundant ad requests.
 
-## Core Capabilities
+## Core capabilities
 
 AdMob CMP addresses common ad-integration challenges in shared Kotlin code:
 
@@ -45,16 +48,25 @@ AdMob CMP addresses common ad-integration challenges in shared Kotlin code:
 3. **Consent-Gated Requests**: Automatically checks `canRequestAds` before making network requests, preventing policy violations from premature loading.
 4. **Unified Reactive Event Stream**: Exposes a single `AdEvent` `StateFlow` covering `Loaded`, `LoadFailed`, `Impression`, `Clicked`, `Paid`, and `RewardEarned`.
 
-## Supported Platforms and Boundaries
+## Which platforms are supported?
 
 <PlatformMatrix />
 
 - **Android**: Target API 26 (Android 8.0) or higher.
 - **iOS**: Target iOS 15.0 or higher.
 
-### Platform Scope & Intentional Boundaries
+### Intentional boundaries and scope
 
 - **No Bundled Mediation Adapters**: Mediation network adapters (such as Meta or Unity Ads) must be added to native project dependencies directly to avoid locking GMA SDK versions.
 - **Bindings-Only iOS Distribution**: Objective-C cinterop bindings are shipped without embedding binary dependencies. Host applications link `GoogleMobileAds` via Swift Package Manager to avoid Objective-C duplicate symbol conflicts when mediation adapters are used.
 - **KMP Scope**: Designed specifically for mobile targets (Android and iOS). Desktop and Web targets are not supported ad-serving platforms.
 - **Naming Context**: The acronym CMP refers to Compose Multiplatform within this project. While the library integrates Google's UMP SDK for GDPR and TCF compliance, it is an SDK integration wrapper rather than a Consent Management Platform vendor.
+
+## Where to next?
+
+<CardGrid>
+  <LinkCard title="Quickstart" href="/start/quickstart/" description="Render a test ad end to end." />
+  <LinkCard title="Installation" href="/start/installation/" description="Gradle coordinates and the version catalog." />
+  <LinkCard title="UMP consent" href="/privacy/consent/" description="Gather consent before initialising." />
+  <LinkCard title="Using with AI agents" href="/project/ai-agents/" description="Point a coding agent at the frozen API." />
+</CardGrid>

@@ -1,6 +1,8 @@
 ---
-title: "Quickstart"
+title: "AdMob Quickstart for Compose Multiplatform"
 description: "End-to-end setup guide for AdMob CMP — render official test ads in Compose Multiplatform and transition cleanly to production initialisation."
+sidebar:
+  label: "Quickstart"
 ---
 
 import { Aside, Steps } from '@astrojs/starlight/components';
@@ -8,7 +10,7 @@ import InitSequence from '../../../components/diagrams/InitSequence.astro';
 
 This guide walks through rendering a test ad unit on Android and iOS using Compose Multiplatform, followed by the complete configuration required for a production launch.
 
-## Step 1: Add the Facade Dependency
+## Step 1: Add the facade dependency
 
 Add the umbrella library coordinate to your shared module's build script:
 
@@ -36,7 +38,7 @@ plugins {
 
 For full version catalog instructions, see [Installation](/start/installation/).
 
-## Step 2: Configure Test Application Identity
+## Step 2: Configure test application identity
 
 Google Mobile Ads requires a valid Application Identifier declared in platform manifest files before initialisation. For test purposes, use Google's official test Application IDs:
 
@@ -59,7 +61,7 @@ On iOS, add the application identifier to `iosApp/iosApp/Info.plist`:
 <string>ca-app-pub-3940256099942544~1458002511</string>
 ```
 
-## Step 3: Create AdManager and Display a Test Banner
+## Step 3: Create AdManager and show a test banner
 
 In your top-level `@Composable` entry point, obtain the process-wide `AdManager` singleton using `rememberAdManager()` and trigger test initialisation inside a `LaunchedEffect`:
 
@@ -117,7 +119,7 @@ fun MainAdScreen() {
 
 Setting `strictTestMode = true` ensures that the placement throws an exception if configured with a non-test ad unit ID in debug builds.
 
-## Step 4: Verify Test Ad Output
+## Step 4: Verify the test ad renders
 
 Run the application on an Android emulator or iOS simulator:
 1. Verify that `adManager.status` transitions from `AdManagerStatus.Initializing` to `AdManagerStatus.Ready`.
@@ -126,11 +128,11 @@ Run the application on an Android emulator or iOS simulator:
 
 ---
 
-## Moving to Production
+## Moving to production
 
 Transitioning from a local test setup to a production distribution involves configuring legal consent flows, platform tracking, and control-plane requirements.
 
-### Initialisation Sequence: UMP, ATT, and Mobile Ads
+### What is the correct initialisation order?
 
 Production ad requests in GDPR regions or on iOS require explicit handling of user consent and App Tracking Transparency (ATT). The canonical sequence mirrors the library's demo startup flow:
 
@@ -191,7 +193,7 @@ fun ProductionApp() {
 
 On Android, `adManager.tracking.requestAuthorization()` resolves immediately as `AdTrackingAuthorization.NotApplicable`.
 
-### Production Control-Plane Checklist
+### Production checklist
 
 Replacing test IDs with production strings is only one part of preparing for release. Complete the following control-plane steps before distributing your application:
 

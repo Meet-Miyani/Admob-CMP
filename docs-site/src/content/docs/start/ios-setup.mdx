@@ -1,17 +1,19 @@
 ---
-title: "iOS setup"
+title: "AdMob iOS setup for Kotlin Multiplatform"
 description: "iOS platform configuration for AdMob CMP — Swift Package Manager setup, Info.plist metadata, App Tracking Transparency hooks, and build verification."
+sidebar:
+  label: "iOS setup"
 ---
 
-import { Aside, Steps } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard, Steps } from '@astrojs/starlight/components';
 
 This guide covers the iOS setup required for AdMob CMP, including framework linkage via Swift Package Manager (SPM), `Info.plist` keys, App Tracking Transparency (ATT) initialisation hooks, and diagnostic checks.
 
-## Architecture and Framework Linkage
+## How the iOS frameworks are linked
 
 AdMob CMP distributes Objective-C cinterop bindings in its Kotlin Multiplatform binaries without embedding Google's static framework binaries. The host iOS application links the native SDKs directly using Swift Package Manager.
 
-### Swift Package Manager Setup
+### Swift Package Manager setup
 
 <Steps>
 
@@ -35,7 +37,7 @@ OTHER_LDFLAGS = $(inherited) -framework JavaScriptCore
 
 Omitting this linker flag when using a static Kotlin framework results in `Undefined symbol: _OBJC_CLASS_$_JSContext` at link time.
 
-## Info.plist Configuration
+## Info.plist configuration
 
 Configure your iOS application target's `Info.plist` with required metadata keys:
 
@@ -57,11 +59,11 @@ Configure your iOS application target's `Info.plist` with required metadata keys
 - `GADApplicationIdentifier`: Application identifier with a tilde separator (`ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX`).
 - `SKAdNetworkItems`: Array of ad network identifiers enabling privacy-preserving ad attribution.
 
-## App Tracking Transparency (ATT) Setup
+## App Tracking Transparency (ATT) setup
 
 To request user authorisation for accessing the Identifier for Advertisers (IDFA) on iOS 14.5+, configure `Info.plist` and implement an initialisation hook.
 
-### 1. System Usage Description String
+### 1. System usage description string
 
 Add `NSUserTrackingUsageDescription` to your `Info.plist`:
 
@@ -74,7 +76,7 @@ Add `NSUserTrackingUsageDescription` to your `Info.plist`:
 Adding `NSUserTrackingUsageDescription` to `Info.plist` configures the iOS system description string; it does **not** trigger the ATT prompt by itself. The application must explicitly invoke `requestAuthorization()` programmatically prior to initialising Google Mobile Ads.
 </Aside>
 
-### 2. Pre-Initialisation ATT Hook
+### 2. Pre-initialisation ATT hook
 
 Invoke `adManager.tracking.requestAuthorization()` using an `AdInitializationHook` targeting the `BeforeMobileAdsInitialize` phase. This guarantees that ATT authorization is requested after UMP consent gathering but before native ad engine startup:
 
@@ -100,7 +102,7 @@ val config = AdConfig(
 
 On non-iOS platforms, `requestAuthorization()` completes immediately without displaying a prompt.
 
-## Kotlin/Native Test Cinterop Linkage
+## Kotlin/Native test cinterop linkage
 
 Executing Kotlin/Native test tasks (such as `./gradlew :shared:iosSimulatorArm64Test`) invokes the Kotlin compiler directly without Xcode or SPM. Apply the `dev.avinya.ads.admob-cmp` Gradle plugin to your shared module to inject required framework search paths into test executables:
 
@@ -113,7 +115,7 @@ plugins {
 
 The plugin downloads reference framework headers and configures test link tasks without altering your production Xcode framework outputs.
 
-## iOS Verification
+## Verifying the iOS integration
 
 Verify your iOS setup using diagnostic tooling and build tasks:
 
@@ -130,3 +132,15 @@ Verify your iOS setup using diagnostic tooling and build tasks:
 
 3. **Xcode Build & Run**:
    Open `iosApp.xcworkspace` in Xcode, build and run on an iOS simulator or device, and confirm initialisation succeeds with ATT and UMP prompts operating as configured.
+
+## Where to next?
+
+App Tracking Transparency comes next, not last: the required order is consent,
+then ATT, then initialise.
+
+<CardGrid>
+  <LinkCard title="App Tracking Transparency" href="/privacy/app-tracking-transparency/" description="The iOS consent, ATT, initialize order." />
+  <LinkCard title="UMP consent" href="/privacy/consent/" description="Gather consent before initialising." />
+  <LinkCard title="App Store data disclosure" href="/privacy/app-store-data-disclosure/" description="Privacy details for the App Store listing." />
+  <LinkCard title="Troubleshooting" href="/reference/troubleshooting/" description="Undefined GAD symbols and test linking." />
+</CardGrid>

@@ -12,7 +12,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { isProductionPreviewHost, onRequest } from '../functions/_middleware.js';
+import { isGeneratedApiPage, isProductionPreviewHost, onRequest } from '../functions/_middleware.js';
 
 const CANONICAL = 'ads.avinya.dev';
 
@@ -91,6 +91,47 @@ describe('host guard routing', () => {
     const response = await onRequest(contextFor('https://unexpected.example.com/'));
     expect(response.status).toBe(200);
     expect(response.headers.get('X-Robots-Tag')).toBe('noindex, nofollow');
+  });
+});
+
+describe('generated Dokka pages are kept out of the index', () => {
+  it('treats the /api/ entry point as a real page', () => {
+    for (const path of ['/api/', '/api/index.html']) {
+      expect(isGeneratedApiPage(path), path).toBe(false);
+    }
+  });
+
+  it('treats everything below /api/ as generated', () => {
+    for (const path of [
+      '/api/admob-cmp-core/index.html',
+      '/api/admob-cmp-compose/dev.avinya.ads.debug/-ad-debug-catalog/banner.html',
+      '/api/admob-cmp/dev.avinya.ads/-ad-manager/',
+    ]) {
+      expect(isGeneratedApiPage(path), path).toBe(true);
+    }
+  });
+
+  it('does not match authored pages, including ones merely starting with "api"', () => {
+    for (const path of ['/', '/start/quickstart/', '/reference/architecture/', '/apiary/']) {
+      expect(isGeneratedApiPage(path), path).toBe(false);
+    }
+  });
+
+  it('serves generated pages with noindex but keeps them crawlable', async () => {
+    const response = await onRequest(
+      contextFor(`https://${CANONICAL}/api/admob-cmp-core/dev.avinya.ads/-ad-manager/index.html`)
+    );
+    expect(response.status).toBe(200);
+    // `follow`, not `nofollow`: link equity must still flow, and the API
+    // reference is advertised to AI crawlers in robots.txt and /llms.txt.
+    expect(response.headers.get('X-Robots-Tag')).toBe('noindex, follow');
+    expect(await response.text()).toContain('<!doctype html>');
+  });
+
+  it('leaves the /api/ entry point indexable — it is the URL in the sitemap', async () => {
+    const response = await onRequest(contextFor(`https://${CANONICAL}/api/`));
+    expect(response.status).toBe(200);
+    expect(response.headers.get('X-Robots-Tag')).toBeNull();
   });
 });
 

@@ -1,13 +1,15 @@
 ---
-title: "Android setup"
+title: "AdMob Android setup for Kotlin Multiplatform"
 description: "Android platform configuration for AdMob CMP — manifest metadata, AD_ID permission management, build requirements, and verification."
+sidebar:
+  label: "Android setup"
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 This guide details the Android-specific configuration required to initialize and serve ads using AdMob CMP.
 
-## Manifest Configuration
+## Manifest configuration
 
 Google Mobile Ads requires an Application Identifier declared in your Android application module's `AndroidManifest.xml`.
 
@@ -22,17 +24,17 @@ Google Mobile Ads requires an Application Identifier declared in your Android ap
 </manifest>
 ```
 
-### Key Requirements
+### Key requirements
 
 - **Metadata Location**: Place `<meta-data>` inside the `<application>` tag of the runnable Android application module (`androidApp`), not inside a shared Kotlin library module.
 - **Identifier Format**: Application IDs use a tilde separator (`ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX`). Providing an Ad Unit ID (which uses a slash separator) will cause initialisation failure or runtime crashes.
 - **Runtime Enforcement**: Omitting `com.google.android.gms.ads.APPLICATION_ID` causes the Google Mobile Ads SDK to crash upon app launch.
 
-## AD_ID Permission Management
+## Managing the AD_ID permission
 
 The Google Mobile Ads SDK transitively merges the `com.google.android.gms.permission.AD_ID` permission into your application manifest to access the Android Advertising ID on devices targeting API 33 (Android 13) or higher.
 
-### Opting Out for Child-Directed Applications
+### Opting out for child-directed apps
 
 If your application is child-directed or subject to strict privacy restrictions, remove the permission explicitly using manifest merging rules:
 
@@ -51,7 +53,7 @@ If your application is child-directed or subject to strict privacy restrictions,
 Removing `AD_ID` disables access to the device advertising identifier on Android 13+ devices, which affects ad personalisation. Ensure your Google Play Data Safety declaration accurately reflects the status of this permission.
 </Aside>
 
-## Android Build Requirements
+## Android build requirements
 
 AdMob CMP 1.1.0 is built and tested against the following toolchain specifications:
 
@@ -64,7 +66,7 @@ AdMob CMP 1.1.0 is built and tested against the following toolchain specificatio
 | Google Mobile Ads Next-Gen SDK | 1.3.0 (transitive) |
 | User Messaging Platform SDK | 4.0.0 (transitive) |
 
-### Repository Resolution
+### Repository resolution
 
 Google Mobile Ads relies on Cronet dependencies hosted on Google's Maven repository. Ensure `google()` is included in your repository configuration:
 
@@ -80,7 +82,7 @@ dependencyResolutionManagement {
 
 Missing `google()` repository configuration will result in unresolved dependency errors during Gradle build resolution.
 
-## Registering Test Devices
+## Registering test devices
 
 To test live ad units during development without triggering invalid traffic violations on your AdMob account, register test device hashed IDs:
 
@@ -94,10 +96,19 @@ GlobalRequestConfiguration.testDeviceIds = listOf(
 
 During initialisation, check Android `logcat` output for log messages containing `Use RequestConfiguration.Builder.setTestDeviceIds(...)` to locate your test device hash.
 
-## Android Verification
+## Verifying the Android integration
 
 Verify your Android integration:
 
 1. **Merged Manifest Inspection**: Open Android Studio's **Merged Manifest** tab on `AndroidManifest.xml` and confirm `com.google.android.gms.ads.APPLICATION_ID` is present.
 2. **Process Singleton Verification**: Outside Compose, `AdMob.manager(context)` resolves to the same process-wide `AdManager` singleton as `rememberAdManager()`.
 3. **Runtime Execution**: Launch the app on an Android emulator or device and confirm that `adManager.status` reaches `AdManagerStatus.Ready`.
+
+## Where to next?
+
+<CardGrid>
+  <LinkCard title="Quickstart" href="/start/quickstart/" description="Render a test ad end to end." />
+  <LinkCard title="UMP consent" href="/privacy/consent/" description="Gather consent before initialising." />
+  <LinkCard title="Play Data safety" href="/privacy/play-data-safety/" description="What to declare in the Play Console." />
+  <LinkCard title="Banner ads" href="/formats/banner/" description="The first format most apps ship." />
+</CardGrid>

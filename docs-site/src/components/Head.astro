@@ -26,8 +26,14 @@ const key = normalizeEntryId(entry.id);
 const ogImage = new URL(ogImagePath(key), site).href;
 const description = entry.data.description ?? '';
 
+// A breadcrumb is navigational shorthand, so it takes the short `sidebar.label`
+// when the page defines one. `title` carries the SERP keywords and is too long
+// to read as a trail segment — "Home > Start here > AdMob Quickstart for Compose
+// Multiplatform". The TechArticle headline below still uses the full title.
+const crumbLabel = entry.data.sidebar?.label ?? entry.data.title;
+
 const structuredData: object[] = [
-  breadcrumbListJsonLd(pathname, entry.data.title, site.href),
+  breadcrumbListJsonLd(pathname, crumbLabel, site.href),
 ];
 
 if (isHome) {

@@ -1,13 +1,15 @@
 ---
-title: "Installation"
+title: "Install AdMob CMP in Kotlin Multiplatform"
 description: "Dependency configuration guide for AdMob CMP — Gradle setup, version catalog alignment, module selection, and Kotlin/Native test linking."
+sidebar:
+  label: "Installation"
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 This guide describes how to add AdMob CMP dependencies to a Kotlin Multiplatform project, align versions using Gradle version catalogs, and resolve platform build requirements.
 
-## Repository Setup
+## Repository setup
 
 Ensure your project's repository configuration includes both Maven Central and Google's Maven repository. Add `google()` to your repository declarations in `settings.gradle.kts`:
 
@@ -23,11 +25,11 @@ dependencyResolutionManagement {
 
 `google()` is required because Google Mobile Ads transitive dependencies (such as Cronet) are hosted on Google's Maven repository rather than Maven Central.
 
-## Dependency Coordinate Selection
+## Which dependency coordinate should I use?
 
 AdMob CMP is published on Maven Central under the group `dev.avinya.ads`.
 
-### Umbrella Facade Artifact (Recommended)
+### Umbrella facade artifact (recommended)
 
 Most Compose Multiplatform applications should depend on the umbrella coordinate:
 
@@ -44,14 +46,14 @@ kotlin {
 
 The umbrella artifact includes both `admob-cmp-core` and `admob-cmp-compose`.
 
-### Granular Module Dependencies
+### Granular module dependencies
 
 For projects that do not use Compose Multiplatform or require decoupled architectures, the underlying modules can be imported individually:
 
 - `dev.avinya.ads:admob-cmp-core:1.1.0`: Contains core controllers (`AdManager`, `BannerAdController`, `InterstitialAdController`), lifecycle state machines, ad caching, retry policies, and platform adapters. Has no Compose Multiplatform dependencies.
 - `dev.avinya.ads:admob-cmp-compose:1.1.0`: Contains Compose Multiplatform composables (`rememberAdManager()`, `BannerAdView`, `NativeAdView`). Depends on `admob-cmp-core`.
 
-## Version Catalog Configuration
+## Version catalog configuration
 
 For multi-module Gradle projects, manage library dependencies and plugin definitions using `gradle/libs.versions.toml`:
 
@@ -84,7 +86,7 @@ kotlin {
 
 Maintaining identical versions across library coordinates and the Gradle plugin ensures ABI compatibility.
 
-## Gradle Plugin & Kotlin/Native Test Linking
+## Why Kotlin/Native tests need the Gradle plugin
 
 When running Kotlin/Native unit tests (such as `./gradlew :shared:iosSimulatorArm64Test`), the Kotlin compiler produces a standalone test binary without Xcode or Swift Package Manager build phases. If shared code references native Google Mobile Ads Objective-C symbols, the linker fails with undefined symbol errors (`_OBJC_CLASS_$_GADMobileAds`, `_OBJC_CLASS_$_GADRequest`, etc.).
 
@@ -97,7 +99,7 @@ plugins {
 }
 ```
 
-### Plugin Responsibilities
+### What the plugin does
 
 - **XCFramework Download**: Automatically fetches the required GoogleMobileAds and UserMessagingPlatform XCFramework binaries into `build/admob-cmp-ios-frameworks/`.
 - **Test-Only Linker Configuration**: Injects `-framework GoogleMobileAds`, `-framework UserMessagingPlatform`, and `-framework JavaScriptCore` linker flags exclusively into test compilation tasks.
@@ -108,7 +110,7 @@ plugins {
 Adding additional SPM packages to Xcode will not fix `:linkDebugTestIosSimulatorArm64` failures, as SPM dependencies are not consulted during standalone Kotlin/Native compiler invocations. The Gradle plugin is the required solution.
 </Aside>
 
-## Verifying the Installation
+## Verifying the installation
 
 Execute the following verification commands to confirm correct dependency resolution and framework linking:
 
@@ -124,3 +126,12 @@ Execute the following verification commands to confirm correct dependency resolu
 ```
 
 `doctorIos` verifies framework download caches, Xcode project references, and required `Info.plist` key declarations. Successful execution of test tasks confirms that native bindings link correctly across all targets.
+
+## Where to next?
+
+<CardGrid>
+  <LinkCard title="Android setup" href="/start/android-setup/" description="Manifest metadata and the AD_ID permission." />
+  <LinkCard title="iOS setup" href="/start/ios-setup/" description="Swift packages, Info.plist, and ATT hooks." />
+  <LinkCard title="Quickstart" href="/start/quickstart/" description="Render a test ad end to end." />
+  <LinkCard title="Troubleshooting" href="/reference/troubleshooting/" description="Undefined GAD symbols and test linking." />
+</CardGrid>
