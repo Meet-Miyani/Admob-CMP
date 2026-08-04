@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import * as seo from '../src/lib/seo';
 import {
   breadcrumbListJsonLd,
-  faqPageJsonLd,
   normalizeEntryId,
   ogImagePath,
   softwareSourceCodeJsonLd,
@@ -100,19 +100,8 @@ describe('softwareSourceCodeJsonLd', () => {
   });
 });
 
-describe('faqPageJsonLd', () => {
-  it('maps question/answer pairs to Question nodes', () => {
-    const ld = faqPageJsonLd(
-      [{ q: 'Does it support native ads?', a: 'Yes, with a layout DSL.' }],
-      'https://ads.avinya.dev/formats/native/'
-    ) as any;
-    expect(ld['@type']).toBe('FAQPage');
-    expect(ld.mainEntity).toEqual([
-      {
-        '@type': 'Question',
-        name: 'Does it support native ads?',
-        acceptedAnswer: { '@type': 'Answer', text: 'Yes, with a layout DSL.' },
-      },
-    ]);
+describe('FAQPage structured data removal', () => {
+  it('does not export faqPageJsonLd from seo module', () => {
+    expect((seo as any).faqPageJsonLd).toBeUndefined();
   });
 });

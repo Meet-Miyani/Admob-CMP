@@ -1,36 +1,16 @@
 ---
 title: "Quickstart"
-description: "The fastest Compose Multiplatform AdMob setup — render a test ad in five minutes using Google's sample ad units, with no AdMob account required."
-faq:
-  - q: Do I need an AdMob account to try AdMob CMP?
-    a: No. TestAdIds ships Google's official sample app ids and ad-unit ids for every format on both platforms, so you can render a test ad before you have an account.
-  - q: Why is my ad not showing yet?
-    a: Ad requests are gated on initialization and consent. Until AdManager.status is AdManagerStatus.Ready, loads fail fast with AdErrorCode.SDK_NOT_READY and nothing reaches the network.
+description: "End-to-end setup guide for AdMob CMP — render official test ads in Compose Multiplatform and transition cleanly to production initialisation."
 ---
 
-import { Aside, Steps, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Aside, Steps } from '@astrojs/starlight/components';
 import InitSequence from '../../../components/diagrams/InitSequence.astro';
 
-## What will you have at the end?
+This guide walks through rendering a test ad unit on Android and iOS using Compose Multiplatform, followed by the complete configuration required for a production launch.
 
-Five minutes from now, an Android or iOS app that renders a real banner ad
-inside a Compose Multiplatform screen, using Google's public sample ad
-units. No AdMob account, no ad unit of your own, no App Store / Play Store
-ceremony. The integration is exactly the integration you will ship — only
-the test ids will be replaced with your own before release.
+## Step 1: Add the Facade Dependency
 
-The five minutes assume you already have a working Kotlin Multiplatform
-project with a Compose Multiplatform screen in `commonMain`. If you do not,
-start from the [KMP project wizard](https://kmp.jetbrains.com/) in your
-IDE; the only deviation from the default is adding the dependency line in
-the next step.
-
-## How do I add the dependency?
-
-The quickstart deliberately uses Google's sample ad units so no AdMob
-account is needed. The full installation story — version catalogs, the
-Gradle plugin, Kotlin/Native test linking — is on
-[Installation](/start/installation/).
+Add the umbrella library coordinate to your shared module's build script:
 
 ```kotlin
 // shared/build.gradle.kts
@@ -43,35 +23,55 @@ kotlin {
 }
 ```
 
-The Android GMA Next-Gen SDK and UMP arrive as transitive Maven
-dependencies, so no extra Android dependency is needed. iOS deliberately
-does not include the binaries — the app links them through Swift Package
-Manager. That sounds like extra work for a greenfield project, and it is
-the first time only: see [iOS setup](/start/ios-setup/) for the two
-package URLs and the three `Info.plist` keys. The
-[architecture reference](/reference/architecture/) explains why the
-distribution works that way.
+The Android dependencies for GMA Next-Gen and UMP arrive transitively via Maven. On iOS, native frameworks must be linked in Xcode via Swift Package Manager; see [iOS setup](/start/ios-setup/) for details.
 
-<Aside type="note">
-If the project runs Kotlin/Native tests (`:shared:iosSimulatorArm64Test`),
-it also needs the `dev.avinya.ads.admob-cmp` Gradle plugin. Without it
-those links fail with undefined `_OBJC_CLASS_$_GAD*` symbols, because a
-Kotlin/Native test binary cannot use Swift Package Manager. See
-[Installation](/start/installation/) and
-[Troubleshooting](/reference/troubleshooting/).
-</Aside>
-
-## How do I initialize AdMob in Compose Multiplatform?
-
-Initialize once at the root of your app, ideally as a side effect on first
-composition. The library gathers consent and starts Mobile Ads in one call:
+If your project executes Kotlin/Native unit tests (`:shared:iosSimulatorArm64Test`), also apply the Gradle plugin to prevent linker errors:
 
 ```kotlin
+// shared/build.gradle.kts
+plugins {
+    id("dev.avinya.ads.admob-cmp") version "1.1.0"
+}
+```
+
+For full version catalog instructions, see [Installation](/start/installation/).
+
+## Step 2: Configure Test Application Identity
+
+Google Mobile Ads requires a valid Application Identifier declared in platform manifest files before initialisation. For test purposes, use Google's official test Application IDs:
+
+On Android, add the metadata entry to `androidApp/src/main/AndroidManifest.xml`:
+
+```xml
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-3940256099942544~3347511713" />
+    </application>
+</manifest>
+```
+
+On iOS, add the application identifier to `iosApp/iosApp/Info.plist`:
+
+```xml
+<key>GADApplicationIdentifier</key>
+<string>ca-app-pub-3940256099942544~1458002511</string>
+```
+
+## Step 3: Create AdManager and Display a Test Banner
+
+In your top-level `@Composable` entry point, obtain the process-wide `AdManager` singleton using `rememberAdManager()` and trigger test initialisation inside a `LaunchedEffect`:
+
+```kotlin
+import androidx.compose.runtime.CompositionLocalProvider
+import dev.avinya.ads.LocalAdManager
+
 @Composable
 fun App() {
     val adManager = rememberAdManager()
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(adManager) {
         adManager.gatherConsentAndInitialize(
             AdConfig(
                 androidAppId = TestAdIds.ANDROID_APP_ID,
@@ -83,132 +83,142 @@ fun App() {
 
     val status by adManager.status.collectAsState()
     if (status is AdManagerStatus.Ready) {
-        AdScreen()
+        CompositionLocalProvider(LocalAdManager provides adManager) {
+            MainAdScreen()
+        }
+    }
+}
+
+@Composable
+fun MainAdScreen() {
+    val placement = remember {
+        AdPlacement(
+            id = "main_banner",
+            format = AdFormat.Banner,
+            androidAdUnitId = TestAdIds.ANDROID_BANNER,
+            iosAdUnitId = TestAdIds.IOS_BANNER,
+            strictTestMode = true,
+        )
+    }
+
+    BannerAdView(
+        placement = placement,
+        modifier = Modifier.fillMaxWidth(),
+        onEvent = { event ->
+            when (event) {
+                is AdEvent.Loaded -> println("Test banner loaded successfully")
+                is AdEvent.LoadFailed -> println("Test banner failed to load: ${event.error}")
+                else -> Unit
+            }
+        },
+    )
+}
+```
+
+Setting `strictTestMode = true` ensures that the placement throws an exception if configured with a non-test ad unit ID in debug builds.
+
+## Step 4: Verify Test Ad Output
+
+Run the application on an Android emulator or iOS simulator:
+1. Verify that `adManager.status` transitions from `AdManagerStatus.Initializing` to `AdManagerStatus.Ready`.
+2. Confirm that the `BannerAdView` displays Google's "Nice job! This is an ad title" test banner overlay.
+3. Inspect console logs for `Test banner loaded successfully`.
+
+---
+
+## Moving to Production
+
+Transitioning from a local test setup to a production distribution involves configuring legal consent flows, platform tracking, and control-plane requirements.
+
+### Initialisation Sequence: UMP, ATT, and Mobile Ads
+
+Production ad requests in GDPR regions or on iOS require explicit handling of user consent and App Tracking Transparency (ATT). The canonical sequence mirrors the library's demo startup flow:
+
+<InitSequence />
+
+1. **User Messaging Platform (UMP)**: Gathers European Economic Area (EEA) and UK privacy consent.
+2. **App Tracking Transparency (ATT)**: On iOS, requests authorization to access the Identifier for Advertisers (IDFA).
+3. **Google Mobile Ads Initialisation**: Initialises ad serving according to user consent choices.
+
+To enforce this order, register an `AdInitializationHook` targeting the `BeforeMobileAdsInitialize` phase. This hook executes conditionally on iOS prior to native SDK initialisation:
+
+```kotlin
+@Composable
+fun ProductionApp() {
+    val adManager = rememberAdManager()
+    val status by adManager.status.collectAsState()
+
+    val config = remember(adManager) {
+        AdConfig(
+            androidAppId = "ca-app-pub-YOUR_PUBLISHER_ID~YOUR_ANDROID_APP_ID",
+            iosAppId = "ca-app-pub-YOUR_PUBLISHER_ID~YOUR_IOS_APP_ID",
+            testMode = false,
+            initializationHooks = listOf(
+                object : AdInitializationHook {
+                    override suspend fun onPhase(
+                        phase: AdInitializationPhase,
+                        config: AdConfig,
+                    ) {
+                        if (phase == AdInitializationPhase.BeforeMobileAdsInitialize) {
+                            // Prompt for ATT on iOS prior to native GMA initialisation
+                            adManager.tracking.requestAuthorization()
+                        }
+                    }
+                }
+            ),
+        )
+    }
+
+    LaunchedEffect(adManager, config) {
+        // Gather UMP consent (shows form if required) and initialise
+        adManager.initialize(
+            config = config,
+            consentMode = ConsentMode.GatherBeforeInitialize,
+        )
+    }
+
+    when (status) {
+        AdManagerStatus.Ready -> {
+            CompositionLocalProvider(LocalAdManager provides adManager) {
+                ContentScreen(adManager)
+            }
+        }
+        is AdManagerStatus.Failed -> ErrorScreen(status as AdManagerStatus.Failed)
+        else -> LoadingScreen()
     }
 }
 ```
 
-Each piece is doing real work. `rememberAdManager()` returns a process-wide
-singleton — the same one `AdMob.manager(context)` returns on Android, so
-there is never a second manager in a process. `gatherConsentAndInitialize`
-runs the UMP consent flow, invokes any initialization hooks, then starts
-Mobile Ads. And `status` is the gate the rest of the UI is built on:
-`AdManagerStatus` is `Idle`, `Initializing`, `ConsentRequired`, `Ready`,
-`Disabled(reason)`, or `Failed(error, retryable)`.
+On Android, `adManager.tracking.requestAuthorization()` resolves immediately as `AdTrackingAuthorization.NotApplicable`.
 
-A practical note on the gate: gating the entire ad screen on `Ready` is
-fine for the first integration, but the production app usually wants to
-preload placements in the background and only block the *first* show. The
-common shape is to keep showing app content while `Initializing`, and to
-flip the global UI gate the first time a `show()` button is pressed. The
-[interstitial guide](/formats/interstitial/) covers the preload-and-show
-pattern in detail.
+### Production Control-Plane Checklist
 
-<InitSequence />
+Replacing test IDs with production strings is only one part of preparing for release. Complete the following control-plane steps before distributing your application:
 
-The order on iOS matters. UMP consent, then App Tracking Transparency, then
-the first ad request — that is the only sequence that preserves the IDFA
-for personalised ads. [App Tracking Transparency](/privacy/app-tracking-transparency/)
-explains why requesting ads before ATT resolves permanently forfeits the
-IDFA for those requests.
+<Steps>
 
-<Aside type="caution">
-`AdDebugOptions.testMode` configures **UMP consent debugging** only. It
-does **not** make GMA serve test ads. Only registering the device in
-`GlobalRequestConfiguration.testDeviceIds`, or using a `TestAdIds` unit,
-does that. See [Test safety](/advanced/test-safety/).
-</Aside>
+1. **Register Applications in AdMob Console**
+   Create separate Android and iOS app entries in your Google AdMob account to obtain production Application IDs.
 
-## How do I show my first banner?
+2. **Create Production Ad Units**
+   Generate placement-specific Ad Unit IDs for Banner, Interstitial, Rewarded, or Native formats in the AdMob console.
 
-```kotlin
-val placement = remember {
-    AdPlacement(
-        id = "home_banner",
-        format = AdFormat.Banner,
-        androidAdUnitId = TestAdIds.ANDROID_BANNER,
-        iosAdUnitId = TestAdIds.IOS_BANNER,
-        strictTestMode = true,
-    )
-}
+3. **Configure AdMob Privacy & Messaging**
+   Set up GDPR/TCF consent forms and US state privacy messages in the AdMob console so UMP can present valid consent dialogs.
 
-BannerAdView(
-    placement = placement,
-    modifier = Modifier.fillMaxWidth(),
-    onEvent = { event ->
-        when (event) {
-            is AdEvent.Loaded -> println("banner loaded")
-            is AdEvent.LoadFailed -> println("banner failed: ${event.error}")
-            else -> Unit
-        }
-    },
-)
-```
+4. **Update Application Metadata & Code Configurations**
+   Replace sample Application IDs in `AndroidManifest.xml` and `Info.plist`, and update `AdPlacement` identifiers in shared Kotlin code.
 
-`BannerAdView` measures its own container, supplies the width, loads,
-attaches, refreshes and disposes the platform banner view for you. Setting
-`strictTestMode = true` throws at construction if the placement points at
-a production ad unit, which is exactly what you want in a debug build — a
-test build can never request live ads. The `remember` around the placement
-matters because controllers are placement-keyed and cached for the
-manager's lifetime, so ids must be static and finite.
+5. **Configure iOS App Tracking Transparency**
+   Add `NSUserTrackingUsageDescription` to `Info.plist` and confirm the `requestAuthorization()` hook executes before native initialisation.
 
-The `onEvent` callback exposes the full `AdEvent` sealed hierarchy: `Loaded`,
-`LoadFailed`, `Impression`, `Clicked`, `OpenedFullScreen`, `ClosedFullScreen`
-and `Paid`. Most apps only log in development. Production code usually
-hoists ad events up to a single analytics collector — see
-[Revenue and paid events](/advanced/revenue-events/) for the paid-event
-shape and the cross-platform gotchas.
+6. **Complete Store Privacy Disclosures**
+   Fill out Google Play Data Safety and Apple App Store Privacy Nutrition Labels reflecting SDK data practices. See [Play Data safety](/privacy/play-data-safety/).
 
-## Why is nothing rendering yet?
+7. **Register Test Devices**
+   Add developer test device IDs via `GlobalRequestConfiguration.testDeviceIds` or `AdDebugOptions.testDeviceIds` to test live ad units safely without risking account suspension for invalid impressions.
 
-A short triage, each item the one thing that is usually wrong:
+8. **Validate Release Builds**
+   Perform final validation using signed release builds on physical devices across both platforms.
 
-- The manager is not `AdManagerStatus.Ready` yet. Gate the UI on `status`
-  before placing any `BannerAdView` or calling `load()`.
-- Consent has not been granted, so loads fail with
-  `AdErrorCode.CONSENT_REQUIRED`. Run `gatherConsentAndInitialize` and
-  check `adManager.consent.canRequestAds`.
-- The Android manifest is missing
-  `com.google.android.gms.ads.APPLICATION_ID`. GMA crashes at startup if
-  it is missing. See [Android setup](/start/android-setup/).
-- The iOS app has not added the two Swift Package Manager packages. See
-  [iOS setup](/start/ios-setup/).
-- The banner placement uses `BannerRefreshPolicy.Manual` and nothing
-  called `refresh()`. Manual policy is no auto-load; you must call
-  `adManager.banner(placement).refresh()` yourself.
-- The UMP consent form was dismissed without a choice, so `canRequestAds`
-  is still `false`. The privacy-options form must be reopened and the
-  user must accept before any request reaches the network.
-
-When none of those explain it, the full symptom table is on
-[Troubleshooting](/reference/troubleshooting/).
-
-## What changes before you ship?
-
-Five swaps. None of them changes the structure of the integration:
-
-1. Replace both sample app ids and every sample ad-unit id with your own.
-2. Set `testMode = false` on `AdConfig`. Leaving it on means the consent
-   debug settings still apply.
-3. Keep `strictTestMode = true` in debug builds only.
-4. Complete the [Play Data safety](/privacy/play-data-safety/) declaration
-   in the Play Console.
-5. Add `NSUserTrackingUsageDescription` to the iOS `Info.plist`, or every
-   iOS request will serve non-personalised ads at materially lower eCPM.
-   See [App Tracking Transparency](/privacy/app-tracking-transparency/).
-
-The test ids are recognisable on sight: `TestAdIds.ANDROID_BANNER` is
-`ca-app-pub-3940256099942544/9211549742`, which is the same id Google uses
-in its own sample apps. The release-time checklist above is the simplest
-way to keep a debug build from ever being mistaken for a release build
-once you are past the quickstart.
-
-## Where to next?
-
-<CardGrid>
-  <LinkCard title="Installation" href="/start/installation/" description="Version catalogs, modules, and the Gradle plugin." />
-  <LinkCard title="iOS setup" href="/start/ios-setup/" description="SPM packages, Info.plist, ATT, and doctorIos." />
-  <LinkCard title="UMP consent" href="/privacy/consent/" description="Consent modes and the privacy options form." />
-  <LinkCard title="Troubleshooting" href="/reference/troubleshooting/" description="Symptom to cause to fix." />
-</CardGrid>
+</Steps>

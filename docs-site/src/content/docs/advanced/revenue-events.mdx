@@ -1,18 +1,11 @@
 ---
 title: "Revenue and paid events"
 description: "Track the AdMob paid event on Kotlin Multiplatform — AdValue micros, precision, response info, and sending impression-level revenue to your analytics."
-faq:
-  - q: How do I get impression-level ad revenue in Kotlin Multiplatform?
-    a: Collect AdEvent.Paid from adManager.events or from a controller's events flow. Each event carries a PaidEvent with an AdValue holding valueMicros, currencyCode and precision.
-  - q: What does AdValuePrecision mean?
-    a: It says how trustworthy the number is — Precise, Estimated, PublisherProvided or Unknown. Aggregate estimated values with care and never present them as billed revenue.
-  - q: Which ad network won an impression?
-    a: Read responseInfo.loadedAdNetworkResponseInfo from the load event or the paid event. The full waterfall, including failures, is in adNetworkResponseInfos.
 ---
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-## How do I observe ad events at all?
+## Observing ad event streams
 
 There are two collection points. `adManager.events` is a global
 `SharedFlow<AdEvent>` covering every placement, while each
@@ -56,7 +49,7 @@ lifetime of the manager. The per-controller `events` flow is
 useful for tests, where the controller's lifetime is the test's
 lifetime.
 
-## How do I read impression-level revenue?
+## Impression-level revenue and AdValue
 
 ```kotlin
 LaunchedEffect(Unit) {
@@ -105,7 +98,7 @@ currencies. Mixing USD micros with EUR micros is the most
 common cause of "the eCPM went up by 30% after we changed
 networks" bugs.
 
-## What does ResponseInfo tell me?
+## AdResponseInfo and mediation telemetry
 
 ```kotlin
 val info: AdResponseInfo? = event.paidEvent.responseInfo
@@ -149,7 +142,7 @@ for Meta, a v3 entry for the next network, and the analytics
 upstream keeps the historical records. Free-form forwarding is
 faster to ship and slower to retire.
 
-## How should I send this to analytics?
+## Analytics integration patterns
 
 Three short points, drawn from production patterns:
 
@@ -186,11 +179,3 @@ serialises them on `Dispatchers.Main.immediate`. The ordering
 guarantee is that callbacks for the same ad arrive in causal
 order (Loaded before Impression before Paid); cross-ad
 ordering is not guaranteed.
-
-## Where to next?
-
-<CardGrid>
-  <LinkCard title="Mediation" href="/advanced/mediation/" description="Reading the waterfall behind a paid event." />
-  <LinkCard title="Rewarded ads" href="/formats/rewarded/" description="Why events are not the grant point." />
-  <LinkCard title="Architecture" href="/reference/architecture/" description="How events flow from the platform SDKs." />
-</CardGrid>

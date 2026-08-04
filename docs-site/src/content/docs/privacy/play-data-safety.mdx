@@ -1,68 +1,47 @@
 ---
 title: "Play Data safety"
-description: "The AdMob Play Data safety and AD_ID declaration — which data categories the Google Mobile Ads SDK collects, and what to tick in the Play Console form."
-faq:
-  - q: What does the Google Mobile Ads SDK collect for Play Data safety?
-    a: In its default configuration it collects device or other IDs (the advertising ID), app activity such as ad impressions and clicks, and approximate location derived from IP for ad targeting.
-  - q: Do I have to declare data sharing with third parties?
-    a: Yes. Ad serving sends this data to Google and, when mediation is enabled, to the mediated networks, so the collected categories must be declared as shared.
-  - q: What happens if I remove the AD_ID permission?
-    a: Your app can no longer access the advertising ID on API 33 and above, which reduces ad revenue. It also changes what you declare in the Data safety form.
+description: "Google Play Data safety guidance for apps using the Google Mobile Ads SDK via admob-cmp — data categories, purposes, and publisher responsibility."
 ---
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-## Why does adding AdMob change my Data safety form?
+This guide outlines the data collection practices of the Google Mobile Ads (GMA) SDK on Android to assist you when completing the Google Play Data safety declaration in the Play Console.
 
-This page explains what the SDK does so the form can be filled in
-accurately. It is not legal advice, and the app's own data
-collection must be declared alongside the SDK's. The categories
-below cover the Google Mobile Ads SDK in its default
-configuration; changes in GMA release notes can change the
-collection behaviour, and the canonical source is Google's
-per-SDK data-disclosure guide for the current version.
+> [!NOTE]
+> This documentation is provided for informational purposes and does not constitute legal advice. Data safety requirements depend on your full application architecture, including mediation adapters, third-party analytics, backend logging, and custom app logic. Always refer to Google's official [Google Play Data Disclosure documentation for GMA Next-Gen](https://developers.google.com/admob/android/next-gen/privacy/play-data-disclosure).
 
-`admob-cmp` itself declares only the `INTERNET` permission. Every
-data category below is collected by the Google Mobile Ads SDK
-through transitive dependencies, and removing the library would
-remove the API surface but not the data collection, which is
-driven by GMA directly.
+## Overview and SDK scope
 
-## Which data categories does the Google Mobile Ads SDK collect?
+The `admob-cmp` library acts as a Kotlin Multiplatform wrapper for the Google Mobile Ads SDK. While `admob-cmp` itself only requests the `INTERNET` permission, the underlying Google Mobile Ads SDK automatically collects specific data points required for ad serving, analytics, and fraud prevention.
 
-The Play form asks for data type, category, and purpose. Each row
-in this list maps to a row in the form:
+When completing your Google Play Data safety declaration, you must account for all data collected by your application, including data collected transitively by SDK dependencies.
 
-| Data type | Play category | Purpose |
-|---|---|---|
-| Advertising ID | Device or other IDs | Advertising or marketing |
-| Ad impressions and clicks | App activity → App interactions | Advertising or marketing, analytics |
-| Coarse location derived from IP | Location → Approximate location | Advertising or marketing |
+## Automatically collected data categories
 
-All three should be declared as **collected and shared with third
-parties**, because ad serving sends the data to Google and, when
-mediation is enabled, to the mediated networks. The
-[mediation guide](/advanced/mediation/) has the implications of
-enabling mediation for the Data safety form.
+According to Google's current GMA Next-Gen data disclosure guidance, the Google Mobile Ads SDK collects the following data categories by default:
 
-A short note on what is *not* in the default collection. GMA does
-not collect precise location by default; the location it derives
-from IP is coarse. It does not collect the user's name, email, or
-phone number, and it does not collect contacts, photos, or audio.
-Apps that add any of these via custom request options or
-mediation need to declare them in addition to the three rows
-above.
+| Data category | Stated purposes |
+|---|---|
+| **Device or other IDs** | Advertising or marketing, Analytics, Fraud prevention, security, and compliance |
+| **IP address** | Advertising or marketing, Analytics, Fraud prevention, security, and compliance |
+| **User product interactions** | Advertising or marketing, Analytics |
+| **Diagnostic information** | Analytics, Fraud prevention, security, and compliance |
 
-## What is the AD_ID permission?
+Google provides these as raw SDK disclosures. You must evaluate how these categories map to specific Play Console form fields and determine your final "Collection & sharing" declarations based on your complete application binary.
 
-The Google Mobile Ads SDK merges
-`com.google.android.gms.permission.AD_ID` into the app's manifest.
-Apps targeting API 33 or above that do not declare it cannot
-access the advertising ID, which reduces ad revenue. The
-permission is opt-in by default; opting out is a deliberate
-choice.
+### Purpose breakdown
 
-To opt out, remove the permission explicitly:
+1. **Advertising or marketing**: Data such as ad interactions and identifiers enable Google and demand sources to evaluate ad performance and serve contextual or personalised ads.
+2. **Analytics**: Performance data and product interaction metrics help evaluate SDK performance, fill rates, and ad delivery metrics.
+3. **Fraud prevention, security, and compliance**: IP addresses, diagnostic information, and app set IDs are used to detect invalid click activity, prevent bot traffic, and enforce platform security policies.
+
+## Advertising ID (AD_ID) permission
+
+The Google Mobile Ads SDK automatically merges the `com.google.android.gms.permission.AD_ID` permission into your application manifest. For apps targeting Android 13 (API level 33) or higher, this permission is required to access the Google Advertising ID.
+
+### Opting out of AD_ID
+
+If your application is child-directed or requires an explicit opt-out from advertising identifier collection, you can remove the permission in your `AndroidManifest.xml`:
 
 ```xml
 <uses-permission
@@ -70,88 +49,41 @@ To opt out, remove the permission explicitly:
     tools:node="remove" />
 ```
 
-State plainly: this reduces ad revenue and is not recommended
-unless the app is child-directed or there is another compliance
-reason. If the permission is removed, the Data safety declaration
-should reflect that the advertising ID is no longer collected —
-but ad impressions and coarse location still are.
+Removing `AD_ID` prevents the SDK from accessing the device advertising ID. When `AD_ID` is removed, update your Data safety declaration accordingly. Note that non-identifier data categories—such as IP address, diagnostic information, and app product interactions—continue to be collected for ad delivery and fraud prevention.
 
-<Aside type="note">
-A child-directed app should also set
-`GlobalRequestConfiguration(ageRestrictedTreatment = AgeRestrictedTreatment.Child)`,
-and `AdConfig.consentTagForUnderAgeOfConsent` is a **separate**
-UMP-only flag. The library deliberately does not infer either
-setting from the other. Show it:
-</Aside>
+### Age-restricted and child-directed treatment
+
+Applications aimed at children or mixed audiences must configure ad request settings in addition to UMP consent options. `AdConfig` separates UMP consent flags from Google Mobile Ads request flags:
 
 ```kotlin
 AdConfig(
-    androidAppId = "ca-app-pub-…",
-    iosAppId = "ca-app-pub-…",
-    consentTagForUnderAgeOfConsent = true,                 // UMP consent-flow setting
-    ageRestrictedTreatment = AgeRestrictedTreatment.Child, // GMA ad-request setting
+    androidAppId = "ca-app-pub-...",
+    iosAppId = "ca-app-pub-...",
+    consentTagForUnderAgeOfConsent = true,                 // UMP consent flow configuration
+    ageRestrictedTreatment = AgeRestrictedTreatment.Child, // GMA ad request configuration
 )
 ```
 
-`AgeRestrictedTreatment` is `Unspecified`, `Child` or `Teen`, and
-`Teen` should be used only when the app has determined that
-treatment is appropriate. The two flags are independent because
-they govern different layers of the stack: UMP consent for
-GDPR-style flows, GMA for the ad request itself. A child-directed
-app that has only set the UMP flag has still sent ad requests
-without the GMA child-treatment hint, which the SDK silently
-ignores for non-child configurations.
+Setting `ageRestrictedTreatment` to `Child` or `Teen` instructs the Google Mobile Ads SDK to serve appropriate non-personalised or restricted ad requests regardless of manifest permissions (see [Google's child-directed setting documentation](https://developers.google.com/admob/android/targeting#child-directed_setting)).
 
-## Can I opt out of the advertising ID?
+## Publisher evaluation checklist
 
-The opt-out is the manifest removal above. Its cost is the
-reduction in ad revenue, because Google's bidding depends on the
-advertising ID for cross-app personalisation. An app that
-removes the ID sees the same fill rate but materially lower
-eCPM, because personalised bids are worth more than the
-non-personalised floor.
+Because Google Play Data safety declarations reflect the entire application binary rather than a single SDK, you must make the final decisions about your form answers. Verify the following before submitting your Play Console declaration:
 
-For a child-directed app, the trade-off is correct. For an
-app that is not child-directed and has no other compliance
-reason, the trade-off is rarely worth it. The
-[Android setup guide](/start/android-setup/) has the manifest
-mechanics.
+- [ ] **Mediation adapters**: Have you checked the specific data safety disclosures for each mediation partner (e.g. Meta Audience Network, AppLovin, Unity Ads)? Additional adapters often collect extra device identifiers or user data.
+- [ ] **Custom analytics and backend logging**: Does your application send ad revenue events (`onPaidEvent`) or diagnostic details to your own backend server or third-party analytics services?
+- [ ] **Location services**: Does your app request precise location permissions (`ACCESS_FINE_LOCATION`)? While GMA derives coarse location from IP address, custom app logic requesting fine location requires separate Play form declarations.
+- [ ] **Regional consent settings**: Are you using UMP consent forms to restrict data collection in applicable regions?
 
-## What changes when I enable mediation?
+## Primary vendor references
 
-Each mediated network is its own SDK with its own collection
-behaviour, so enabling mediation can add data categories the
-base declaration does not cover. Every adapter's data-disclosure
-documentation must be checked and the form updated. The
-[mediation guide](/advanced/mediation/) has the integration
-mechanics; the data-disclosure check is the publisher's
-responsibility and changes per network.
+For official guidance from Google, review the following primary sources:
 
-A common concrete example: enabling Meta's Audience Network
-adapter adds `User ID` and `Device ID` collection under the
-"Social Media" and "Device or other IDs" categories, both as
-shared with Meta. Enabling the Pangle adapter adds similar
-fields under Bytedance. The full list is documented per
-adapter, and the publisher is responsible for re-declaring
-when adapters change.
-
-The form's "shared with third parties" flag deserves more
-attention than it usually gets. Every ad request your app
-sends is shared with Google at minimum, because Google's
-network is the auction host. Mediation extends that sharing
-list to every mediated network whose adapter you have
-installed and whose waterfall is configured. The
-"shared" flag is a yes/no answer, but the answer is
-"yes" for any app that has AdMob at all, and the form
-text is what tells the reviewer which networks are
-involved. A vague "shared with ad partners" is correct in
-spirit but rejected by reviewers who want specifics; a
-named list of networks is what the form is asking for.
-
-## Where to next?
+- [Google Play Data Disclosure for GMA Next-Gen](https://developers.google.com/admob/android/next-gen/privacy/play-data-disclosure)
+- [Google Play Safety Section Overview](https://support.google.com/googleplay/android-developer/answer/10787469)
 
 <CardGrid>
-  <LinkCard title="Android setup" href="/start/android-setup/" description="Manifest and the AD_ID permission." />
-  <LinkCard title="UMP consent" href="/privacy/consent/" description="The EU consent obligation." />
-  <LinkCard title="Mediation" href="/advanced/mediation/" description="Extra SDKs, extra disclosures." />
+  <LinkCard title="App Store Data Disclosure" href="/privacy/app-store-data-disclosure/" description="Privacy disclosures for iOS apps." />
+  <LinkCard title="UMP consent" href="/privacy/consent/" description="Managing UMP consent states." />
+  <LinkCard title="Mediation" href="/advanced/mediation/" description="Disclosures for extra ad network adapters." />
 </CardGrid>

@@ -1,18 +1,11 @@
 ---
 title: "Roadmap"
-description: "What is next for AdMob CMP — the Kotlin Multiplatform SwiftPM import migration, the four gates it waits on, one unresolved question, and no promised dates."
-faq:
-  - q: Will AdMob CMP ever remove the Xcode Swift Package Manager step?
-    a: That is the intent of the planned SwiftPM import migration, using JetBrains' official swiftPMDependencies. It is gated on four upstream conditions and one unresolved technical question, and no date is promised.
-  - q: Why not embed the Google Mobile Ads binary like some other SDKs do?
-    a: Google Mobile Ads is a closed-source prebuilt binary with no redistribution grant, and embedding it would reintroduce the duplicate Objective-C class problem that breaks mediation adapters.
-  - q: Will the Gradle plugin be removed?
-    a: Only if the SwiftPM import migration ships. If the gates never clear, the plugin is a perfectly serviceable permanent answer and stays.
+description: "What is next for this Compose Multiplatform AdMob SDK — the Kotlin Multiplatform SwiftPM import migration, four gates it waits on, and no promised dates."
 ---
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-## What is on the roadmap, and what is not promised?
+## Roadmap overview and expectations
 
 This page describes intent, not commitments. **No item here has a
 date**, and none will get one until its blockers are cleared.
@@ -25,7 +18,7 @@ about removing setup friction, not about missing functionality.
 | **Planned, gated** | SwiftPM import migration — removes both the Gradle plugin and the manual Xcode package step |
 | **Not planned** | Direct support for ad networks other than AdMob (mediation covers this), and renaming the published Maven coordinate |
 
-## What is the SwiftPM import migration?
+## The SwiftPM import migration
 
 The Kotlin Gradle plugin has gained first-class Swift Package
 Manager dependencies via `swiftPMDependencies {}`. A Kotlin
@@ -48,8 +41,7 @@ step. It would raise the Kotlin floor for every consumer and
 would therefore ship as **2.0.0**, with the 1.x line continuing
 to receive fixes for as long as the ecosystem lags.
 
-A note on the "fixes for as long as the ecosystem lags"
-commitment. The 1.x line is not abandoned when 2.0.0 ships; it
+The 1.x line is not abandoned when 2.0.0 ships; it
 is maintained in parallel until the migration is provably
 complete for every consumer. The cost of a parallel line is
 small relative to the cost of a forced migration, and the
@@ -57,11 +49,10 @@ library has stated this as policy in the
 [contributing guide](/project/contributing/) so the maintenance
 window is committed, not implied.
 
-## Which four gates does it wait on?
+## Prerequisite migration gates
 
-The gates, with the reason for each, exactly as the Track 3 plan
-defines them. None of them can be unblocked by work in this
-repository, which is the honest reason there is no date.
+The gates and the reason for each are listed below. None of them can be
+unblocked by work in this repository.
 
 ### Gate 1 — Kotlin 2.4.20 or later is a stable release
 
@@ -86,7 +77,7 @@ KSP would strand them.
 The composable surface is part of the published artifact, so
 Compose Multiplatform must support the same Kotlin version.
 
-## What is the one question nobody has answered yet?
+## Technical unknowns for package linkage
 
 <Aside type="caution">
 The blocking unknown: **does a Maven-published library that uses
@@ -96,46 +87,24 @@ module dependencies inside one Gradle build. It says nothing
 about a klib resolved from Maven Central by a stranger.
 </Aside>
 
-The direction of travel honestly:
 [KT-84420](https://youtrack.jetbrains.com/issue/KT-84420) concluded
 that Kotlin should start emitting a `Package.swift` structure
 describing the direct and transitive SwiftPM dependencies needed
 for linkage — that is, linkage requirements travel as **metadata
 the consumer resolves**, not as embedded binaries. Whether the
 equivalent reaches a Maven consumer's
-`linkDebugTestIosSimulatorArm64` is exactly what has to be
-proven.
+`linkDebugTestIosSimulatorArm64` is the open question that must
+be proven experimentally.
 
-The four steps the experiment will use: build a trivial Kotlin
-Multiplatform library declaring a `swiftPMDependencies` package
-and exposing one function touching its API; publish it to Maven
-Local; in a *separate* Gradle build with no SwiftPM declaration
-of its own, depend on it from `commonMain`, add a trivial test,
-and run `iosSimulatorArm64Test`; if it links, the migration is
-viable, and if it fails with undefined symbols, **the migration
-is dead for a published SDK**, because the consumer would then
-have to declare the SwiftPM dependency themselves — no better
-than today's Gradle plugin and worse than the status quo, since
-it would also drag every consumer onto a new Kotlin minor.
+The secondary technical prerequisite is that `swiftPMDependencies`
+must handle binary-target packages, as GoogleMobileAds'
+`Package.swift` is a `.binaryTarget`. The official documentation's
+own example is a binary distribution, which is encouraging evidence
+but not proof for this package specifically.
 
-The secondary technical prerequisite settled by the same
-experiment: GoogleMobileAds' `Package.swift` is a
-`.binaryTarget`, so `swiftPMDependencies` must handle
-binary-target packages. The official documentation's own example
-is a binary distribution, which is encouraging evidence but not
-proof for this package specifically.
+## Rationale for binding-only architecture
 
-A note on the experiment's scope. It is intentionally a single
-trivial library, not a port of `admob-cmp` itself. The point of
-the experiment is to validate the metadata-passes-through-the-
-klink hypothesis, which is the only behaviour that matters for
-the migration's viability. A negative result is conclusive; a
-positive result is suggestive but not yet a commitment to ship.
-
-## Why not do what other SDKs do and embed the binary?
-
-A factual contrast, no criticism of anyone. RevenueCat's
-`purchases-kmp` 3.0.0 reaches the same outcome by a different
+RevenueCat's `purchases-kmp` 3.0.0 reaches the same outcome by a different
 route: a home-grown `swiftPackage` DSL in their own build logic
 that compiles `purchases-ios` **from source**, pinned as a git
 submodule, and statically links the result into the published
@@ -150,10 +119,9 @@ avoids. Same destination, different vehicle. The
 [architecture reference](/reference/architecture/) has the
 full rationale.
 
-## What happens if the gates never clear?
+## Fallback and long-term maintenance
 
-Plainly, because it reassures rather than worries: the Gradle
-plugin is a perfectly serviceable permanent answer. It is a
+The Gradle plugin is a perfectly serviceable permanent answer. It is a
 small amount of code in one place, it is dogfooded by this
 repository's own modules, and it is invisible to consumers
 beyond a single `plugins {}` line. The migration will not happen
@@ -161,12 +129,3 @@ on principle; it will happen when the official path is genuinely
 stable and the ecosystem has caught up. Until then, the plugin
 is the answer, and the [installation guide](/start/installation/)
 walks through it as the supported path.
-
-## Where to next?
-
-<CardGrid>
-  <LinkCard title="Architecture" href="/reference/architecture/" description="Why iOS ships bindings, not binaries." />
-  <LinkCard title="Compatibility" href="/reference/compatibility/" description="Today's Kotlin floor, and the cinterop caveat." />
-  <LinkCard title="Contributing" href="/project/contributing/" description="How to help move a gate." />
-  <LinkCard title="Changelog" href="/reference/changelog/" description="What has already shipped." />
-</CardGrid>

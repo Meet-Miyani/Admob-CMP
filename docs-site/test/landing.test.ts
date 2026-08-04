@@ -5,9 +5,6 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import {
   authorName,
   authorUrl,
-  basicAdsRepo,
-  capabilities,
-  capabilityVerifiedOn,
   formats,
   landingMeta,
   originStory,
@@ -190,9 +187,8 @@ function checkFileForStylingViolations(filePath: string): string[] {
 }
 
 describe('landing.ts data module exports are wired', () => {
-  it('exports six format records, capability rows, and roadmap items as defined types', () => {
+  it('exports six format records and roadmap items as defined types', () => {
     expect(formats).toHaveLength(6);
-    expect(capabilities.length).toBeGreaterThan(0);
     expect(roadmapItems).toHaveLength(2);
   });
 });
@@ -292,29 +288,8 @@ describe('legal and repository contracts', () => {
     );
   });
 
-  it('basic-ads repo is the canonical URL', () => {
-    expect(basicAdsRepo).toBe('https://github.com/LexiLabs-App/basic-ads');
-  });
-
   it('repo URL is the canonical GitHub URL', () => {
     expect(repoUrl).toBe('https://github.com/Meet-Miyani/admob-compose-multiplatform');
-  });
-
-  it('capabilityVerifiedOn is the dated 31 July 2026 marker', () => {
-    expect(capabilityVerifiedOn).toBe('31 July 2026');
-  });
-});
-
-describe('capabilities contract', () => {
-  it('contains the canonical 14 capability rows', () => {
-    expect(capabilities).toHaveLength(14);
-  });
-
-  it('every row has a non-empty capability and non-empty admobCmp value', () => {
-    for (const row of capabilities) {
-      expect(row.capability.length).toBeGreaterThan(0);
-      expect(row.admobCmp.length).toBeGreaterThan(0);
-    }
   });
 });
 
@@ -561,123 +536,44 @@ const indexMdxPath = fileURLToPath(
   new URL('../src/content/docs/index.mdx', import.meta.url)
 );
 
-describe('CapabilityMatrix.astro contracts', () => {
-  const source = readFileSync(capabilityMatrixPath, 'utf8');
-
-  it('exists as an Astro component', () => {
-    expect(existsSync(capabilityMatrixPath)).toBe(true);
+describe('competitor data and comparison matrix absence', () => {
+  it('CapabilityMatrix.astro file is deleted', () => {
+    expect(existsSync(capabilityMatrixPath)).toBe(false);
   });
 
-  it('imports capabilities, capabilityVerifiedOn, and basicAdsRepo from the data module', () => {
-    expect(source).toMatch(
-      /import\s*\{[^}]*\bcapabilities\b[^}]*\}\s*from\s*['"]\.\.\/\.\.\/data\/landing(?:\.ts)?['"]/
+  it('index.mdx does not import or render CapabilityMatrix', () => {
+    const source = readFileSync(indexMdxPath, 'utf8');
+    expect(source).not.toMatch(/CapabilityMatrix/);
+  });
+
+  it('competitor data (basic-ads, comparisonMatrix, capabilities) is absent from landing page sources', () => {
+    const mdx = readFileSync(indexMdxPath, 'utf8');
+    const dataTs = readFileSync(
+      fileURLToPath(new URL('../src/data/landing.ts', import.meta.url)),
+      'utf8'
     );
-    expect(source).toMatch(
-      /import\s*\{[^}]*\bcapabilityVerifiedOn\b[^}]*\}\s*from\s*['"]\.\.\/\.\.\/data\/landing(?:\.ts)?['"]/
-    );
-    expect(source).toMatch(
-      /import\s*\{[^}]*\bbasicAdsRepo\b[^}]*\}\s*from\s*['"]\.\.\/\.\.\/data\/landing(?:\.ts)?['"]/
-    );
-  });
-
-  it('wraps the table in a focusable, labelled, .table-scroll--wide region', () => {
-    const wrapperRe =
-      /<div[\s\S]*?class="table-scroll table-scroll--wide"[\s\S]*?tabindex="0"[\s\S]*?role="region"[\s\S]*?aria-label=\{ariaLabel\}[\s\S]*?>/;
-    expect(source).toMatch(wrapperRe);
-  });
-
-  it('aria-label mentions basic-ads and the verified date', () => {
-    expect(source).toMatch(/aria-label=\{ariaLabel\}/);
-    const labelBinding = source.match(/const\s+ariaLabel\s*=\s*[`'"`]([^`'"`]+)[`'"`]/);
-    expect(labelBinding, 'ariaLabel is a literal string template').not.toBeNull();
-    const label = labelBinding![1];
-    expect(label).toMatch(/basic-ads/i);
-    expect(label).toContain('${capabilityVerifiedOn}');
-  });
-
-  it('renders a <thead> with three column headers in the canonical order', () => {
-    expect(source).toMatch(/<thead>/);
-    expect(source).toMatch(/<th\s+scope="col">Capability<\/th>/);
-    expect(source).toMatch(/<th\s+scope="col">AdMob CMP<\/th>/);
-    expect(source).toMatch(/<th\s+scope="col">basic-ads<\/th>/);
-  });
-
-  it('iterates the imported `capabilities` array, not a hard-coded set of rows', () => {
-    expect(source).toMatch(/capabilities\.map\(/);
-    const firstRowFirstCell = (capabilities[0] as { capability: string }).capability;
-    const lastRowFirstCell = (capabilities[capabilities.length - 1] as { capability: string })
-      .capability;
-    expect(firstRowFirstCell).toBe('Banner ads');
-    expect(lastRowFirstCell).toBe('Maven Central publication');
-    expect(source).toMatch(/<th\s+scope="row">\{row\.capability\}<\/th>/);
-    expect(source).toMatch(/<td>\{row\.admobCmp\}<\/td>/);
-    expect(source).toMatch(/<td>\{row\.basicAds\}<\/td>/);
-  });
-
-  it('renders exactly 14 rows from the canonical capabilities array', () => {
-    expect(capabilities).toHaveLength(14);
-    expect(source).not.toMatch(/<\s*tr\s*>[\s\S]{0,200}<\s*td\s*>\s*Yes\s*<\s*\/\s*td\s*>/);
-  });
-
-  it('footnotes the comparison with the verified date and a neutral "Not documented" definition', () => {
-    expect(source).toMatch(/class="landing-capabilities__footnote"/);
-    expect(source).toMatch(/\{capabilityVerifiedOn\}/);
-    const footnote = source.match(
-      /class="landing-capabilities__footnote"[^>]*>([\s\S]*?)<\/p>/
-    );
-    expect(footnote, 'footnote paragraph is present').not.toBeNull();
-    const text = footnote![1].replace(/\s+/g, ' ');
-    expect(text).toMatch(/Not documented/);
-    expect(text).toMatch(/public documentation does not describe/i);
-    expect(text).toMatch(/older and larger/i);
-    expect(text).toMatch(/earlier publisher|API reference/i);
-    expect(text).toMatch(/open an issue/i);
-    expect(text).toContain('capabilityVerifiedOn');
-  });
-
-  it('rejects marketing or evaluative language in the footnote', () => {
-    const denylist = [
-      'best',
-      'leading',
-      'superior',
-      'only',
-      'incredible',
-      'powerful',
-      'amazing',
-      'fastest',
-      'easiest',
-      'revolutionary',
-      'ultimate',
-    ];
-    const footnote = source.match(
-      /class="landing-capabilities__footnote"[^>]*>([\s\S]*?)<\/p>/
-    );
-    expect(footnote, 'footnote paragraph is present').not.toBeNull();
-    const text = footnote![1].replace(/\s+/g, ' ').toLowerCase();
-    for (const word of denylist) {
-      const re = new RegExp(`\\b${word}\\b`, 'i');
-      expect(re.test(text), `footnote must not contain '${word}'`).toBe(false);
-    }
-  });
-
-  it('uses sentence-case headings and no uppercase mono eyebrows', () => {
-    const allCapsHeadingRe = />\s*CAPABILITY\s+COMPARISON\s*</;
-    expect(source.match(allCapsHeadingRe), 'component h2 must not be all-caps').toBeNull();
-    expect(source).toMatch(/<h2>Capability comparison<\/h2>/);
+    expect(mdx).not.toMatch(/basic-ads|comparisonMatrix|CapabilityMatrix/i);
+    expect(dataTs).not.toMatch(/basic-ads|comparisonMatrix|capabilityVerifiedOn|CapabilityRow/i);
   });
 });
 
-describe('index.mdx quickstart and iOS note', () => {
+describe('index.mdx quickstart, product facts, and iOS note', () => {
   const source = readFileSync(indexMdxPath, 'utf8');
 
-  it('imports the CapabilityMatrix component', () => {
-    expect(source).toMatch(
-      /import\s+CapabilityMatrix\s+from\s+['"]\.\.\/\.\.\/components\/landing\/CapabilityMatrix\.astro['"]/
-    );
+  it('asserts presence of supported platforms (Android, iOS), ad formats, facade dependency, and production responsibility wording', () => {
+    expect(source).toMatch(/dev\.avinya\.ads:admob-cmp/);
+    expect(source).toMatch(/Android/);
+    expect(source).toMatch(/iOS/);
+    expect(source).toMatch(/Banner/);
+    expect(source).toMatch(/Interstitial/);
+    expect(source).toMatch(/Rewarded/);
+    expect(source).toMatch(/App Open/);
+    expect(source).toMatch(/Native/);
+    expect(source).toMatch(/configured by the application|configured by the app/i);
   });
 
-  it('renders the CapabilityMatrix component', () => {
-    expect(source).toMatch(/<CapabilityMatrix\s*\/>/);
+  it('does not contain time-based promises like 5-minute quickstart', () => {
+    expect(source).not.toMatch(/5-minute/i);
   });
 
   it('keeps the install line on the canonical Maven coordinate and version 1.1.0', () => {
@@ -692,8 +588,7 @@ describe('index.mdx quickstart and iOS note', () => {
   it('keeps the iOS note mentioning ConsentMode.InitializeOnlyIfAlreadyAllowed and the UMP -> ATT -> initialize ordering', () => {
     expect(source).toMatch(/ConsentMode\.InitializeOnlyIfAlreadyAllowed/);
     expect(source).toMatch(/UMP consent/i);
-    expect(source).toMatch(/ATT[^.]*tracking authorization|tracking authorization/i);
-    expect(source).toMatch(/then initialize/i);
+    expect(source).toMatch(/ATT/i);
   });
 
   it('links the Quickstart example to /start/quickstart/ with a trailing slash', () => {
@@ -703,7 +598,10 @@ describe('index.mdx quickstart and iOS note', () => {
     );
   });
 
-  it('imports the CompatibilityList, RoadmapSummary, and LandingFooter components', () => {
+  it('imports the OriginStory, CompatibilityList, RoadmapSummary, and LandingFooter components', () => {
+    expect(source).toMatch(
+      /import\s+OriginStory\s+from\s+['"]\.\.\/\.\.\/components\/landing\/OriginStory\.astro['"]/
+    );
     expect(source).toMatch(
       /import\s+CompatibilityList\s+from\s+['"]\.\.\/\.\.\/components\/landing\/CompatibilityList\.astro['"]/
     );
@@ -715,8 +613,8 @@ describe('index.mdx quickstart and iOS note', () => {
     );
   });
 
-  it('renders CompatibilityList, RoadmapSummary, and LandingFooter in plan order after CapabilityMatrix', () => {
-    const order = ['<CapabilityMatrix', '<CompatibilityList', '<RoadmapSummary', '<LandingFooter']
+  it('renders OriginStory, CompatibilityList, RoadmapSummary, and LandingFooter in plan order', () => {
+    const order = ['<OriginStory', '<CompatibilityList', '<RoadmapSummary', '<LandingFooter']
       .map((tag) => ({ tag, index: source.indexOf(tag) }))
       .map(({ tag, index }) => ({ tag, index }));
     for (const { tag, index } of order) {
@@ -1018,10 +916,10 @@ describe('OriginStory.astro contracts', () => {
     expect(source).toMatch(/originStory\.paragraphs\.map\(/);
   });
 
-  it('is placed between the capability comparison and compatibility on the landing page', () => {
+  it('is placed before compatibility on the landing page', () => {
     const mdx = readFileSync(indexMdxPath, 'utf8');
     const at = (tag: string) => mdx.indexOf(tag);
-    expect(at('<OriginStory')).toBeGreaterThan(at('<CapabilityMatrix'));
+    expect(at('<OriginStory')).toBeGreaterThan(-1);
     expect(at('<OriginStory')).toBeLessThan(at('<CompatibilityList'));
   });
 });

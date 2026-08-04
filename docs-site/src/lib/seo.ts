@@ -93,7 +93,7 @@ export function techArticleJsonLd(args: {
     },
     isPartOf: {
       '@type': 'WebSite',
-      name: 'AdMob CMP documentation',
+      name: 'Compose Multiplatform AdMob documentation',
       url: absolute(siteUrl, '/'),
     },
   };
@@ -114,21 +114,5 @@ export function softwareSourceCodeJsonLd(siteUrl: string, repoUrl: string): obje
     license: 'https://www.apache.org/licenses/LICENSE-2.0.txt',
     author: { '@type': 'Person', name: 'Meet Miyani' },
     maintainer: { '@type': 'Organization', name: 'Avinya' },
-  };
-}
-
-export function faqPageJsonLd(
-  faq: Array<{ q: string; a: string }>,
-  url: string
-): object {
-  return {
-    '@context': 'https://schema.org',
-    '@type': 'FAQPage',
-    mainEntityOfPage: { '@type': 'WebPage', '@id': url },
-    mainEntity: faq.map(({ q, a }) => ({
-      '@type': 'Question',
-      name: q,
-      acceptedAnswer: { '@type': 'Answer', text: a },
-    })),
   };
 }

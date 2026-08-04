@@ -1,18 +1,11 @@
 ---
 title: "Test safety"
 description: "AdMob test ads on Kotlin Multiplatform — why testMode does not serve test ads, what strictTestMode guards, and how to keep live ads out of debug builds."
-faq:
-  - q: Does testMode make AdMob serve test ads?
-    a: No. AdDebugOptions.testMode configures UMP consent debugging only. Test ads come from registering the device in GlobalRequestConfiguration.testDeviceIds or from using a TestAdIds ad unit.
-  - q: What does strictTestMode do?
-    a: AdPlacement.strictTestMode throws at construction if the placement points at a production ad unit. Turn it on in debug builds so a test build can never request live ads.
-  - q: Why does requesting live ads in a debug build matter?
-    a: It is invalid traffic, and invalid traffic gets AdMob accounts suspended. That is why the check fails closed with an exception rather than a warning.
 ---
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-## Why are there two different test flags?
+## Differentiating testMode and strictTestMode
 
 The confusion this page exists to remove, stated as an
 `<Aside type="danger">`:
@@ -38,13 +31,13 @@ accounts suspended. A debug build that sets
 the consent flow safely. The flags are independent and the
 debug build needs both, configured correctly.
 
-## What does testMode actually configure?
+## UMP consent debugging with testMode
 
 `testMode` gates the UMP debug settings: `consentDebugGeography`
 and `consentTestDeviceIds` change nothing unless `testMode` is
 `true`. The library ships a guardrail: if `testMode` is `true`
 and no test device ids are configured anywhere, the SDK logs a
-warning at initialization rather than silently doing nothing —
+warning at initialisation rather than silently doing nothing —
 because in that state requests may serve **live** ads. The
 warning is not a substitute for fixing the configuration; it is
 a hook to make the misconfiguration visible.
@@ -58,7 +51,7 @@ unfortunate — it is a consent-debug flag, not a "test ads"
 flag — and the [UMP consent guide](/privacy/consent/) has the
 full semantics.
 
-## How do I actually get test ads?
+## Requesting test ads safely
 
 From exactly two places:
 
@@ -106,7 +99,7 @@ build that exercises the publisher's real ad units wants path 2
 (test device hash, real unit ids, `strictTestMode = false`).
 Mixing them obscures which test mode is active.
 
-## What does strictTestMode protect me from?
+## Ad unit validation with strictTestMode
 
 The failure it prevents and why it fails closed. Because
 `testMode` only affects UMP, a developer who trusts it requests
@@ -142,7 +135,7 @@ context that is sometimes hard to map back to the offending
 placement. The exception message names the placement id, which
 is the key.
 
-## How should I wire this into debug and release builds?
+## Integrating test modes into debug and release builds
 
 The shape a real app should use — one flag, threaded through:
 
@@ -180,11 +173,3 @@ which is a different kind of bug than a debug build that
 serves live ads — both fail the publisher's expectations,
 both come from the same misconfiguration, and both are
 caught by the same release-time checklist.
-
-## Where to next?
-
-<CardGrid>
-  <LinkCard title="UMP consent" href="/privacy/consent/" description="Where testMode actually applies." />
-  <LinkCard title="Quickstart" href="/start/quickstart/" description="The sample-ad-unit path." />
-  <LinkCard title="Troubleshooting" href="/reference/troubleshooting/" description="When strictTestMode throws." />
-</CardGrid>

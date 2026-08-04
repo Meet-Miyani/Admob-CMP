@@ -1,12 +1,12 @@
 ---
 title: Compose Multiplatform AdMob SDK
-description: 'Open-source Compose Multiplatform AdMob SDK: six ad formats on Android and iOS from one Kotlin API, with UMP consent built into the init flow.'
+description: 'Open-source Compose Multiplatform AdMob SDK: single-coordinate facade dev.avinya.ads:admob-cmp for Android and iOS with UMP consent integration.'
 template: splash
 hero:
   title: Compose Multiplatform AdMob SDK for Android and iOS
-  tagline: Six AdMob formats on Android and iOS behind one Kotlin API — suspend functions, StateFlow, and UMP consent wired into initialization.
+  tagline: AdMob ad formats on Android and iOS behind a single Kotlin facade — dev.avinya.ads:admob-cmp. Suspend functions, StateFlow, and UMP consent integrated with lifecycle-aware components.
   actions:
-    - text: Start the 5-minute quickstart
+    - text: Quickstart
       link: /start/quickstart/
       icon: right-arrow
     - text: View on GitHub
@@ -24,7 +24,6 @@ head:
     Starlight `Hero` override in src/components/Hero.astro, driven by the
     `hero:` frontmatter above. Everything below is page body. */}
 
-import CapabilityMatrix from '../../components/landing/CapabilityMatrix.astro';
 import OriginStory from '../../components/landing/OriginStory.astro';
 import CompatibilityList from '../../components/landing/CompatibilityList.astro';
 import RoadmapSummary from '../../components/landing/RoadmapSummary.astro';
@@ -34,7 +33,7 @@ import LandingFooter from '../../components/landing/LandingFooter.astro';
 
 ## Quick start
 
-The integration has two required lines: one Maven dependency in `commonMain`, and one initialization call at the root of the app that gathers consent and starts Mobile Ads in a single step. The full setup — version catalogs, the Gradle plugin, Kotlin/Native test linking, the iOS-only Info.plist keys, and the `doctorIos` check — lives in the [Quickstart guide](/start/quickstart/).
+The SDK provides a single-coordinate facade (`dev.avinya.ads:admob-cmp`) for Android and iOS supporting Banner, Interstitial, Rewarded, App Open, and Native ad formats. It includes pre-initialization hooks and consent control APIs for ordering ATT and UMP consent before initialising Google Mobile Ads, while production consent policies, store disclosures, and unit IDs are configured by the application.
 
 <div class="landing-quickstart__pair">
 
@@ -67,15 +66,13 @@ adManager.gatherConsentAndInitialize(
     onto one line would render literal backticks and bracket syntax. */}
 <div class="landing-quickstart__note">
 
-On iOS, the production ordering is UMP consent, then ATT tracking authorization, then initialize with `ConsentMode.InitializeOnlyIfAlreadyAllowed`. See the [iOS setup guide](/start/ios-setup/) for the two Swift Package Manager package URLs and the three `Info.plist` keys.
+On iOS, the SDK provides pre-initialization hooks and consent control APIs to order UMP consent and ATT tracking authorization before Mobile Ads initialization with `ConsentMode.InitializeOnlyIfAlreadyAllowed`. Applications configure production consent policies and store disclosures according to their requirements. See the [Quickstart guide](/start/quickstart/) and [iOS setup guide](/start/ios-setup/).
 
 </div>
 
 [Continue to the full Quickstart →](/start/quickstart/)
 
 </section>
-
-<CapabilityMatrix />
 
 <OriginStory />
 

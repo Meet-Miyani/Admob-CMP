@@ -1,23 +1,35 @@
 ---
 title: "Installation"
-description: "Add the Kotlin Multiplatform AdMob library dev.avinya.ads:admob-cmp with a version catalog, plus the Gradle plugin that fixes iOS test linking."
-faq:
-  - q: Which Gradle dependency do I add for AdMob on Kotlin Multiplatform?
-    a: Add dev.avinya.ads:admob-cmp:1.1.0 to commonMain. The Android Google Mobile Ads Next-Gen SDK and UMP arrive as transitive Maven dependencies.
-  - q: Do I need the dev.avinya.ads.admob-cmp Gradle plugin?
-    a: Only if your project links Kotlin/Native test executables for iOS. Without it those links fail with undefined _OBJC_CLASS_$_GAD symbols, because a Kotlin/Native test binary cannot use Swift Package Manager.
-  - q: Which Kotlin version does admob-cmp 1.1.0 require?
-    a: It is compiled with Kotlin 2.3.20. Because it publishes cinterop klibs, consumers on a different Kotlin minor version may fail to resolve the klib.
+description: "Dependency configuration guide for AdMob CMP — Gradle setup, version catalog alignment, module selection, and Kotlin/Native test linking."
 ---
 
-import { Aside, Tabs, TabItem, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Aside } from '@astrojs/starlight/components';
 
-## How do I add AdMob CMP to a Kotlin Multiplatform project?
+This guide describes how to add AdMob CMP dependencies to a Kotlin Multiplatform project, align versions using Gradle version catalogs, and resolve platform build requirements.
 
-The artifact is a single umbrella coordinate that brings both the engine and
-the Compose surface. The Android GMA Next-Gen SDK and UMP arrive as
-transitive Maven dependencies, so no extra Android dependency is needed. iOS
-deliberately links Google's frameworks in the app, not in the artifact.
+## Repository Setup
+
+Ensure your project's repository configuration includes both Maven Central and Google's Maven repository. Add `google()` to your repository declarations in `settings.gradle.kts`:
+
+```kotlin
+// settings.gradle.kts
+dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+```
+
+`google()` is required because Google Mobile Ads transitive dependencies (such as Cronet) are hosted on Google's Maven repository rather than Maven Central.
+
+## Dependency Coordinate Selection
+
+AdMob CMP is published on Maven Central under the group `dev.avinya.ads`.
+
+### Umbrella Facade Artifact (Recommended)
+
+Most Compose Multiplatform applications should depend on the umbrella coordinate:
 
 ```kotlin
 // shared/build.gradle.kts
@@ -30,26 +42,18 @@ kotlin {
 }
 ```
 
-That is the whole dependency. Behind the umbrella artifact sits
-`admob-cmp-core` (the engine, controllers, platform adapters) and
-`admob-cmp-compose` (the composable surface). Most consumers depend on the
-umbrella `admob-cmp` and never need to know the split. Apps that want the
-controller API without Compose Multiplatform can depend on `admob-cmp-core`
-directly.
+The umbrella artifact includes both `admob-cmp-core` and `admob-cmp-compose`.
 
-The repository pattern matters less for a quickstart than for a long-lived
-project. A single shared module calling the ads API works fine for a small
-app, but most production projects split `commonMain` across modules by
-feature. The rules do not change with the module count: the dependency
-lives once in whichever module calls the controllers, and the Gradle
-plugin is applied in every module that compiles a Kotlin/Native test
-binary.
+### Granular Module Dependencies
 
-## Should I use a version catalog?
+For projects that do not use Compose Multiplatform or require decoupled architectures, the underlying modules can be imported individually:
 
-Yes for any non-trivial build. The library coordinate and the Gradle
-plugin id must stay on the same version, and a single `version.ref` makes
-that impossible to get wrong:
+- `dev.avinya.ads:admob-cmp-core:1.1.0`: Contains core controllers (`AdManager`, `BannerAdController`, `InterstitialAdController`), lifecycle state machines, ad caching, retry policies, and platform adapters. Has no Compose Multiplatform dependencies.
+- `dev.avinya.ads:admob-cmp-compose:1.1.0`: Contains Compose Multiplatform composables (`rememberAdManager()`, `BannerAdView`, `NativeAdView`). Depends on `admob-cmp-core`.
+
+## Version Catalog Configuration
+
+For multi-module Gradle projects, manage library dependencies and plugin definitions using `gradle/libs.versions.toml`:
 
 ```toml
 # gradle/libs.versions.toml
@@ -58,69 +62,33 @@ admob-cmp = "1.1.0"
 
 [libraries]
 admob-cmp = { module = "dev.avinya.ads:admob-cmp", version.ref = "admob-cmp" }
+admob-cmp-core = { module = "dev.avinya.ads:admob-cmp-core", version.ref = "admob-cmp" }
+admob-cmp-compose = { module = "dev.avinya.ads:admob-cmp-compose", version.ref = "admob-cmp" }
 
 [plugins]
 admob-cmp = { id = "dev.avinya.ads.admob-cmp", version.ref = "admob-cmp" }
 ```
 
+In your module build script:
+
 ```kotlin
 // shared/build.gradle.kts
-commonMain.dependencies {
-    implementation(libs.admob.cmp)
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            implementation(libs.admob.cmp)
+        }
+    }
 }
 ```
 
-When `VERSION_NAME` is bumped in `gradle.properties` for a release, the
-catalog entry moves in lockstep and every consuming module picks up the
-new version on the next Gradle sync. Without the catalog, the same bump
-becomes a search-and-replace across every `build.gradle.kts` in the
-project, and one of them is always missed.
+Maintaining identical versions across library coordinates and the Gradle plugin ensures ABI compatibility.
 
-The plugin id lives in the same catalog as the library for the same
-reason: applying the plugin and depending on the library are two
-versions of the same statement, and the consumer should never be in a
-state where one of them is one version behind.
+## Gradle Plugin & Kotlin/Native Test Linking
 
-## Which modules do I put the dependency in?
+When running Kotlin/Native unit tests (such as `./gradlew :shared:iosSimulatorArm64Test`), the Kotlin compiler produces a standalone test binary without Xcode or Swift Package Manager build phases. If shared code references native Google Mobile Ads Objective-C symbols, the linker fails with undefined symbol errors (`_OBJC_CLASS_$_GADMobileAds`, `_OBJC_CLASS_$_GADRequest`, etc.).
 
-The practical rule: put it in the shared module whose `commonMain` calls
-the ads API, once. Because controllers are placement-keyed and the manager
-is a process-wide singleton, adding it to several modules does not create
-several managers — but it does widen the set of modules whose
-Kotlin/Native test binaries need the Gradle plugin.
-
-Compose Multiplatform is required only if the composable surface
-(`BannerAdView`, `NativeAdView`, `rememberAdManager`) is used. The
-controller API — `AdManager`, the controllers, `AdPlacement` — has no
-Compose dependency. If a project only needs the controllers, depend on
-`admob-cmp-core` directly and skip `admob-cmp-compose`.
-
-A common arrangement is a `feature-ads` module that owns the `AdPlacement`
-list and the manager wiring, plus a `:shared` module that just consumes
-the controllers. Both still link to the same process-wide manager — there
-is no second instance — and only `feature-ads` needs the Gradle plugin if
-it is the only module with a Kotlin/Native test binary.
-
-## Why do my iOS tests fail to link, and what fixes it?
-
-This is the section that earns the page its inbound links, because the
-failure looks unrelated to ads.
-
-The app links Google's frameworks through Swift Package Manager, but
-tests do not. `./gradlew :yourModule:iosSimulatorArm64Test` makes the
-Kotlin/Native compiler link a standalone executable with no Xcode, no
-`.xcodeproj` and no Swift Package Manager anywhere in the picture, so
-every symbol must resolve at that link — including the `GAD*` and `UMP*`
-classes these bindings reference.
-
-That is true **even if none of the tests touch ads.** The test binary
-contains the module's whole main compilation, so any production code
-calling `rememberAdManager`, `NativeAdView` or the consent APIs drags those
-references in. A `FakeAdManager` does not help, because the requirement
-comes from the bindings being present in the link, not from anyone calling
-them. For faking ad *behaviour* in tests, the SDK ships `NoOpAdManager`.
-
-The fix:
+To resolve Kotlin/Native test linking, apply the `dev.avinya.ads.admob-cmp` Gradle plugin to modules containing Kotlin/Native test targets:
 
 ```kotlin
 // shared/build.gradle.kts
@@ -129,76 +97,30 @@ plugins {
 }
 ```
 
-```kotlin
-// settings.gradle.kts
-pluginManagement {
-    repositories {
-        mavenCentral()
-        gradlePluginPortal()
-    }
-}
-```
+### Plugin Responsibilities
 
-<Aside type="danger">
-Adding another Swift Package Manager package will **not** fix a
-`:linkDebugTestIos…` failure. Only the Gradle plugin does. See
-[Troubleshooting](/reference/troubleshooting/) for the full symptom table.
+- **XCFramework Download**: Automatically fetches the required GoogleMobileAds and UserMessagingPlatform XCFramework binaries into `build/admob-cmp-ios-frameworks/`.
+- **Test-Only Linker Configuration**: Injects `-framework GoogleMobileAds`, `-framework UserMessagingPlatform`, and `-framework JavaScriptCore` linker flags exclusively into test compilation tasks.
+- **Production Isolation**: Leaves production application framework builds unaffected, allowing Xcode to handle framework linkage via SPM.
+- **Diagnostic Task Registration**: Provides the `./gradlew :admob-cmp-core:doctorIos` verification task.
+
+<Aside type="note">
+Adding additional SPM packages to Xcode will not fix `:linkDebugTestIosSimulatorArm64` failures, as SPM dependencies are not consulted during standalone Kotlin/Native compiler invocations. The Gradle plugin is the required solution.
 </Aside>
 
-## What does the Gradle plugin actually do?
+## Verifying the Installation
 
-The plugin's behaviour, exactly as implemented:
-
-- It registers `downloadGmaIos` and `downloadUmpIos`, which fetch the
-  version-stamped GoogleMobileAds and UserMessagingPlatform XCFrameworks
-  into `build/admob-cmp-ios-frameworks/` with a SHA-256 check.
-- It applies linker options **to test executables only** — `-framework
-  GoogleMobileAds`, `-framework UserMessagingPlatform`, `-framework
-  JavaScriptCore`, plus the Swift compatibility library directory.
-- It supports the `iosArm64` and `iosSimulatorArm64` targets.
-- It deliberately leaves the shipped app framework alone, because
-  Kotlin/Native is supposed to leave those symbols undefined there for
-  Xcode to bind via SPM.
-- It registers `doctorIos`, the diagnostic task.
-
-Off macOS, the plugin contributes no linker options, so Linux CI can still
-configure the build — it just cannot actually link a test executable. On
-macOS, the linker options are applied through Kotlin/Native's
-`extraOpts`, which means the production app framework stays as a dynamic
-framework and Xcode still binds the SPM-resolved GMA at the final app
-link. That separation is the entire reason the published artifact is
-bindings-only on iOS.
-
-## How do I verify the installation?
-
-Three tasks, in order:
+Execute the following verification commands to confirm correct dependency resolution and framework linking:
 
 ```bash
-./gradlew :admob-cmp-core:doctorIos          # report-only; prints per-check status
-./gradlew :shared:iosSimulatorArm64Test      # must link and run
-./gradlew :shared:testAndroidHostTest        # JVM-side check
+# Run iOS setup diagnostic checks
+./gradlew :admob-cmp-core:doctorIos
+
+# Execute Kotlin/Native test compilation and execution
+./gradlew :shared:iosSimulatorArm64Test
+
+# Execute Android JVM unit tests
+./gradlew :shared:testAndroidHostTest
 ```
 
-`doctorIos` never fails the build — it is diagnostic only. It checks the
-framework download cache, whether the Xcode project references the SPM
-products, and whether `Info.plist` declares `GADApplicationIdentifier` and
-`SKAdNetworkItems`. The test tasks run the common-test suite on each
-platform's runner and confirm the install is real, not just a Gradle
-sync. The [architecture reference](/reference/architecture/) describes
-what the test suite exercises.
-
-If a verification step fails, the first thing to check is the order:
-`doctorIos` reports missing pieces with file paths, and a test link failure
-prints the unresolved symbol name. The symbol name alone usually points at
-either the GMA package, the UMP package, or JavaScriptCore — and
-[Troubleshooting](/reference/troubleshooting/) has a table that maps each
-to the right fix.
-
-## Where to next?
-
-<CardGrid>
-  <LinkCard title="Android setup" href="/start/android-setup/" description="Manifest, AD_ID, and Play Data safety." />
-  <LinkCard title="iOS setup" href="/start/ios-setup/" description="SPM packages, Info.plist, ATT, and doctorIos." />
-  <LinkCard title="Compatibility" href="/reference/compatibility/" description="Kotlin, Compose, minSdk and iOS versions." />
-  <LinkCard title="Troubleshooting" href="/reference/troubleshooting/" description="Undefined GAD symbols and other link failures." />
-</CardGrid>
+`doctorIos` verifies framework download caches, Xcode project references, and required `Info.plist` key declarations. Successful execution of test tasks confirms that native bindings link correctly across all targets.

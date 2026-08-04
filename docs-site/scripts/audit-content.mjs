@@ -2,9 +2,8 @@
 /**
  * docs-site/scripts/audit-content.mjs
  *
- * Enforces the content rules the Astro build cannot: description length,
- * question-shaped H2s, working internal links, no surviving diagram
- * placeholders, and a "Where to next?" section on every guide page.
+ * Enforces content quality rules: frontmatter title/description presence and length,
+ * prompt leakage scanning, working internal links, and no surviving diagram placeholders.
  *
  * Usage: node scripts/audit-content.mjs
  * Exits 1 on any violation, printing one line per problem.
@@ -36,12 +35,7 @@ const validUrls = new Set(
 validUrls.add('/');
 validUrls.add('/api/');
 
-/**
- * Pages exempt from the "every H2 is a question" rule. The generated
- * diagrams-in-words reference intentionally mirrors the diagram titles, which
- * are statements; it is a prose reference, not a guide.
- */
-const REFERENCE_PAGES = new Set(['/reference/diagrams-in-words/']);
+const LEAKED_DIRECTIVES = /\bThis\s+section\s+must\b|\bOne\s+short\s+paragraph\b|\bShow\s+it:\b|\bexactly\s+as\s+implemented\b/i;
 
 for (const file of files) {
   const raw = readFileSync(file, 'utf8');
@@ -52,26 +46,19 @@ for (const file of files) {
   }
   const front = fm[1];
 
+  const title = front.match(/^title:\s*(.+)$/m);
+  if (!title) problems.push(`${file}: no title in frontmatter`);
+
   const desc = front.match(/^description:\s*(.+)$/m);
   if (!desc) problems.push(`${file}: no description`);
   else if (desc[1].trim().length > 160)
     problems.push(`${file}: description is ${desc[1].trim().length} chars (max 160)`);
 
-  const body = raw.slice(fm[0].length);
-  const pageUrl = '/' + file.slice(DOCS.length + 1).replace(/\.mdx$/, '') + '/';
-  const isReference = REFERENCE_PAGES.has(pageUrl);
-
-  if (!isReference) {
-    // Every H2 must be a question, except the standard closing section.
-    for (const line of body.split('\n')) {
-      if (!line.startsWith('## ')) continue;
-      const heading = line.slice(3).trim();
-      if (heading === 'Where to next?') continue;
-      if (!heading.endsWith('?')) problems.push(`${file}: H2 is not a question — "${heading}"`);
-    }
-
-    if (!body.includes('## Where to next?')) problems.push(`${file}: no "Where to next?" section`);
+  if (LEAKED_DIRECTIVES.test(raw)) {
+    problems.push(`${file}: contains prompt leakage or editorial instruction phrase`);
   }
+
+  const body = raw.slice(fm[0].length);
 
   // Internal links must resolve to a real page and end in a slash.
   for (const m of body.matchAll(/href="(\/[^"]*)"|\]\((\/[^)]*)\)/g)) {

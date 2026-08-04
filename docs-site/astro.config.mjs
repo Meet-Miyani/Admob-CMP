@@ -19,6 +19,11 @@ const SITE_TITLE = 'AdMob CMP';
 const SITE_DESCRIPTION =
   'Plug-and-play AdMob for Compose Multiplatform: banner, interstitial, rewarded, app-open and native ads with UMP consent on Android and iOS.';
 
+// Both inert until the corresponding Cloudflare Pages build env var is set —
+// no placeholder tags ship to production without a real token.
+const GSC_VERIFICATION_TOKEN = process.env.PUBLIC_GSC_VERIFICATION;
+const CF_BEACON_TOKEN = process.env.PUBLIC_CF_BEACON_TOKEN;
+
 export default defineConfig({
   site: SITE,
   build: { format: 'directory' },
@@ -115,6 +120,23 @@ export default defineConfig({
         },
         // Must track --admob-paper in tokens.css. It drifted once already.
         { tag: 'meta', attrs: { name: 'theme-color', content: '#0c0a09' } },
+        // Google Search Console ownership verification. Inert until
+        // PUBLIC_GSC_VERIFICATION is set as a Cloudflare Pages env var.
+        ...(GSC_VERIFICATION_TOKEN
+          ? [{ tag: 'meta', attrs: { name: 'google-site-verification', content: GSC_VERIFICATION_TOKEN } }]
+          : []),
+        // Cloudflare Web Analytics beacon — zero-cookie, no npm dependency.
+        // Inert until PUBLIC_CF_BEACON_TOKEN is set.
+        ...(CF_BEACON_TOKEN
+          ? [{
+              tag: 'script',
+              attrs: {
+                defer: true,
+                src: 'https://static.cloudflareinsights.com/beacon.min.js',
+                'data-cf-beacon': JSON.stringify({ token: CF_BEACON_TOKEN }),
+              },
+            }]
+          : []),
       ],
       plugins: [
         starlightLlmsTxt({
@@ -139,7 +161,8 @@ export default defineConfig({
             '',
             '## Caveats',
             '',
-            'The public ABI is frozen and validated in CI. Suggestions that change',
+            'The public ABI is frozen and validated locally via `./scripts/release-readiness.sh`.',
+            'CI does not run SDK or ABI checks. Suggestions that change',
             'a public signature in `admob-cmp-core` or `admob-cmp-compose` will fail',
             '`checkKotlinAbi`.',
             '',
@@ -216,6 +239,7 @@ export default defineConfig({
             { slug: 'privacy/consent' },
             { slug: 'privacy/app-tracking-transparency' },
             { slug: 'privacy/play-data-safety' },
+            { slug: 'privacy/app-store-data-disclosure' },
           ],
         },
         {
@@ -246,7 +270,6 @@ export default defineConfig({
           items: [
             { slug: 'project/roadmap' },
             { slug: 'project/contributing' },
-            { slug: 'project/ai-agents' },
           ],
         },
       ],

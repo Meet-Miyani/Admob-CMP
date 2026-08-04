@@ -19,125 +19,125 @@ information the diagram carries, written out.
 
 _Encodes `admob-cmp/CLAUDE.md` invariants #1, #7._
 
-dev.avinya.ads:admob-cmp is an umbrella artifact. It holds essentially no code of its own; it exists so that a consumer adds one dependency and gets both real modules, which it re-exports with Gradle api scope: admob-cmp-core and admob-cmp-compose.
+dev.avinya.ads:admob-cmp is an umbrella artefact. It holds essentially no code of its own; it exists so that a consumer adds one dependency and gets both underlying modules, which it re-exports with Gradle api scope: admob-cmp-core and admob-cmp-compose.
 
-admob-cmp-core has no Compose dependency. Its commonMain holds the public API — AdManager, the per-format controllers, AdPlacement, AdConfig, AdEvent, AdError, consent and diagnostics — plus the internal shared state machines in dev.avinya.ads.internal: FullScreenSlotCore, BannerCore, NativePoolCore and AdRetry. dev.avinya.ads.appopen holds AppOpenAdCoordinator; dev.avinya.ads.nativead holds the native pool contract, its options and media info.
+admob-cmp-core has no Compose dependency. Its commonMain source set holds the public API — AdManager, the per-format controllers, AdPlacement, AdConfig, AdEvent, AdError, consent and diagnostics — plus the internal shared state machines in dev.avinya.ads.internal: FullScreenSlotCore, BannerCore, NativePoolCore and AdRetry. The package dev.avinya.ads.appopen holds AppOpenAdCoordinator, while dev.avinya.ads.nativead holds the native pool contract, options and media information.
 
-admob-cmp-compose holds everything that needs Compose: the dev.avinya.ads.ui composables BannerAdView and NativeAdView, the adLayout {} DSL with its validator and templates in dev.avinya.ads.nativead.layout, and the debug screen in dev.avinya.ads.debug.
+admob-cmp-compose holds everything that requires Compose Multiplatform: the dev.avinya.ads.ui composables BannerAdView and NativeAdView, the adLayout {} DSL with its validator and templates in dev.avinya.ads.nativead.layout, and the debug screen in dev.avinya.ads.debug.
 
-androidMain supplies AndroidGoogleAdManager and the Android slots, pool and banner over the GMA Next-Gen SDK on API 26 and above, the AdMob.manager(context) singleton, and a ProcessLifecycleOwner foreground signal. iosMain supplies IosGoogleAdManager and the iOS slots, pool, banner and consent over Kotlin/Native cinterop bindings against GMA 13.x on iOS 15 and above, a UIKit native-ad renderer, and an NSNotificationCenter foreground signal.
+androidMain supplies AndroidGoogleAdManager and the Android slots, pool and banner backed by the GMA Next-Gen SDK on API level 26 and above, the AdMob.manager(context) singleton, and a ProcessLifecycleOwner foreground signal. iosMain supplies IosGoogleAdManager and the iOS slots, pool, banner and consent over Kotlin/Native cinterop bindings against GMA 13.x on iOS 15 and above, a UIKit native-ad renderer, and an NSNotificationCenter foreground signal.
 
-The shape of the split is the whole point. Platform classes implement only loadAd, presentAd, destroyAd, canPresent and getResponseInfo for full-screen formats, and only the BannerPlatform and NativePoolPlatform interfaces for banners and native ads. Load, show, cache, retry and consent-gating logic all live in the shared core (invariants 1 and 7). Exactly three things stay platform-side by construction and must never migrate into commonMain: native batch-assembly locking, iOS delegate creation, retention and ordering, and iOS's activeLoad and activeLoads in-flight registries.
+Platform classes implement only low-level operations — loadAd, presentAd, destroyAd, canPresent and getResponseInfo for full-screen formats, alongside BannerPlatform and NativePoolPlatform for banners and native ads. High-level ad loading, presentation flow, caching, retry routines and consent-gating logic execute entirely within the shared core. Low-level platform adapters directly manage native batch-assembly locking, iOS delegate lifecycles, and in-flight request registries.
 <a id="init-sequence"></a>
 
-## Initialization order: UMP consent, then ATT, then initialize
+## Initialisation order: UMP consent, then ATT, then initialize
 
 _Encodes `admob-cmp/CLAUDE.md` invariants #5, #11._
 
-This is the highest-value correctness trap in the library. Three calls must happen in this order, and the order is not interchangeable.
+Initialising the library requires three sequential operations on iOS that must execute in strict order before loading ads.
 
-Step one: adManager.consent.gatherConsent(config). This runs Google's User Messaging Platform consent-info update and, under ConsentMode.GatherBeforeInitialize, shows the consent form where the user's region requires one. UMP returns a ConsentStatus and sets canRequestAds, which is the gate on whether any ad may be requested at all. The gate is checked in both load() and show(), and canPresent() is re-checked at present time (invariant 5).
+Step one: call adManager.consent.gatherConsent(config). This executes Google's User Messaging Platform consent update and, under ConsentMode.GatherBeforeInitialize, displays the consent form when required by regional privacy regulations. UMP updates ConsentStatus and updates canRequestAds, which gates all subsequent ad requests. The SDK evaluates canRequestAds during load() and show(), and re-checks canPresent() at presentation time.
 
-Step two: adManager.tracking.requestAuthorization(). On iOS 14.5 and later this shows the system App Tracking Transparency prompt and resolves to Authorized, Denied, Restricted or NotDetermined. The prompt cannot appear at all unless NSUserTrackingUsageDescription is present in the app target's Info.plist; without that key iOS silently withholds the IDFA and every request serves non-personalised ads at materially lower eCPM. Android has no ATT: adManager.tracking is a no-op there and always reports AdTrackingAuthorization.NotApplicable.
+Step two: call adManager.tracking.requestAuthorization(). On iOS 14.5 and later, this presents the system App Tracking Transparency prompt and resolves to Authorized, Denied, Restricted or NotDetermined. The system prompt requires the NSUserTrackingUsageDescription key in the app target's Info.plist; without this key, iOS withholds access to the advertising identifier (IDFA). On Android, App Tracking Transparency is not applicable: adManager.tracking operates as a no-op and always returns AdTrackingAuthorization.NotApplicable.
 
-Step three: adManager.initialize(config, ConsentMode.InitializeOnlyIfAlreadyAllowed). Only now does the Google Mobile Ads SDK initialize and the first ad request become possible. AdManagerStatus moves to Ready, and UI should gate on that.
+Step three: call adManager.initialize(config, ConsentMode.InitializeOnlyIfAlreadyAllowed). The Google Mobile Ads SDK initialises and AdManagerStatus transitions to Ready, allowing ad requests to proceed.
 
-Why the order is load-bearing: requesting ads before ATT resolves permanently forfeits the IDFA for those requests (invariant 11). It is not a delay or a degradation that later recovers — those requests are served without the identifier for good. Consent must precede ATT in turn, because UMP is what decides whether requests are permitted at all.
+The order is sequential because ad requests issued prior to App Tracking Transparency authorisation cannot retroactively attach an IDFA. Subsequent ad requests following user approval will attach the identifier subject to platform SDK rules. UMP consent gathering precedes the tracking prompt so the SDK can confirm whether ad requests are permitted for the current user session.
 <a id="full-screen-lifecycle"></a>
 
 ## Full-screen ad lifecycle: load, cache, show, reload
 
 _Encodes `admob-cmp/CLAUDE.md` invariants #1, #2, #9._
 
-FullScreenSlotCore is the shared state machine behind interstitial, rewarded, rewarded-interstitial and app-open ads. A controller starts Idle. load() moves it to Loading; success moves it to Loaded and admits the ad into the cache; failure moves it to Failed, after AdRetry's capped exponential backoff has been exhausted for retryable errors. show() presents the head of the cache.
+FullScreenSlotCore provides the shared state machine for interstitial, rewarded, rewarded-interstitial and app-open ad formats. A controller begins in the Idle state. Calling load() transitions the state to Loading; success transitions to Loaded and places the ad into the cache; failure transitions to Failed after AdRetry exhausts backoff attempts for retryable errors. Calling show() presents the ad at the head of the cache.
 
-The cache is a per-slot deque of at most AdCachePolicy.maxSize entries, default 1, shown first-in-first-out, with expired entries pruned on every touch. Time-to-live comes from AdExpirationPolicy: one hour for full-screen formats, four hours for app-open.
+The cache operates as a per-slot first-in-first-out queue bounded by AdCachePolicy.maxSize (defaulting to 1 entry). Expired entries are pruned upon access based on AdExpirationPolicy (one hour for standard full-screen formats, four hours for app-open ads).
 
-presentAd suspends until the ad is dismissed. A presented ad is destroyed on normal return only, never on cancellation — cancelling mid-show means the ad is still on screen (invariant 2). Presentation ownership is a one-shot FullScreenPresentationHandle: the core owns it until the platform slot calls tryHandOffToCallbacks() immediately before invoking the SDK's show, and from that moment only the SDK's terminal callback, or a cancellation that raced in before hand-off, may close it.
+The presentAd operation suspends until the ad is dismissed by the user. A presented ad is destroyed only upon normal completion, not upon coroutine cancellation, ensuring active screen presentation is preserved. Presentation ownership uses a single-use FullScreenPresentationHandle: shared core manages the handle until the platform layer invokes tryHandOffToCallbacks() immediately before calling the underlying SDK show method. From that point forward, only SDK terminal callbacks resolve presentation status.
 
-Because of that hand-off, show() is not reentrant per controller. A second show() while a presentation is live on the same controller returns AdShowResult.NotReady immediately rather than queuing behind it. Await one show()'s result before calling it again.
+Because presentation ownership hands off to the underlying platform SDK, show() is non-reentrant per controller instance. Calling show() while an ad is active on the same controller returns AdShowResult.NotReady immediately. Applications should await the outcome of a show() call before initiating another presentation.
 
-After dismissal, if AdCachePolicy.reloadAfterShow is true the core schedules a reload; otherwise the controller returns to Loaded if the cache still holds an ad, or Idle if it is empty.
+Following dismissal, if AdCachePolicy.reloadAfterShow is true, the core automatically schedules an ad reload. Otherwise, the controller transitions to Loaded if remaining cached ads exist, or returns to Idle when empty.
 
-clear() bumps a generation counter and retires the cached ads. Every load and every scheduled reload carries the generation it started with and re-checks it before publishing a result, so a load that was already in flight when clear() ran is discarded instead of repopulating a cache the caller just asked to be emptied.
+Calling clear() increments an internal generation counter and clears cached ads. Every load attempt and scheduled reload evaluates its originating generation counter before publishing results, ensuring in-flight loads initiated prior to clear() are discarded rather than repopulating the cache.
 
-Every suspending operation is bounded (invariant 9). Loads run inside withTimeoutOrNull(placement.timeoutPolicy.loadTimeout) in the shared core — never per platform — and that timeout bounds the whole attempt sequence including retry backoff. Presentation bounds only the pre-hand-off window; once the SDK owns the presentation it is never force-closed.
+All suspending operations enforce configured execution bounds. Ad loading operates within withTimeoutOrNull using placement.timeoutPolicy.loadTimeout, bounding the complete attempt sequence including backoff delays. Timeouts apply to the pre-hand-off window; once the underlying SDK assumes presentation control, presentation is not forcefully terminated.
 <a id="native-pool-lifecycle"></a>
 
 ## Native ad pool lifecycle and maxSize accounting
 
 _Encodes `admob-cmp/CLAUDE.md` invariants #3, #4, #8._
 
-The native pool serves per-item ads to a feed from a single placement id. pool.preload(count) asks the platform to run one batch load; the loaded ads enter the pool's available inventory. pool.acquire() leases one and returns a token; NativeAdView renders it; pool.release(token) hands it back.
+The native pool manages ad inventory for feeds and list items using a shared placement identifier. Calling pool.preload(count) requests a batch load from the platform adapter, adding loaded ads to available inventory. Calling pool.acquire() leases an ad and returns an acquisition token for rendering in NativeAdView, while pool.release(token) returns the leased slot.
 
-AdCachePolicy.maxSize budgets available plus in-use ads together, and must not be redefined (invariant 8). With maxSize = 1 and one row already holding the ad, preload() returns early and acquire() returns null for every other row — deterministically, not as a race.
+AdCachePolicy.maxSize defines the total capacity budget for available and leased ads combined. When maxSize is 1 and an ad is currently leased, subsequent calls to preload() return early and acquire() returns null until capacity is freed.
 
-pool.availableAds is a `StateFlow<Int>` that publishes only the available half of that budget. It is the signal that lets a view recover from a null acquire, so views key their acquisition effect on it.
+The property pool.availableAds is a `StateFlow<Int>` representing remaining available inventory capacity. Composables observe availableAds to trigger acquisition attempts when new capacity becomes available.
 
-The subtle part: release() destroys the ad, because native ads are single-use. It therefore frees a maxSize slot without incrementing availableAds. A view must re-run preload(), not just acquire(), or the freed slot is never refilled. The bundled NativeAdView composables already do this.
+Because native ad handles are single-use, calling release(token) destroys the native ad object and frees a slot in maxSize capacity without automatically incrementing availableAds. Applications or composables must invoke preload() to request a replacement ad into the newly freed capacity slot. Built-in NativeAdView composables manage this cycle automatically.
 
-clear() drains and destroys available inventory only. Ads currently leased stay alive until their release(), because a live view is still rendering them, so peek(token) keeps resolving after a clear(). One consequence follows directly: clearing a fully-leased pool frees no capacity at all until those views dispose.
+Calling clear() purges and destroys unleased available inventory. Currently leased ads remain valid until release(token) is called so active views complete rendering smoothly. Clearing a pool where all capacity is leased releases no slots until active views dispose and invoke release().
 
-A generation counter guards in-flight batches the same way it does for full-screen slots, so a batch completing after clear() cannot repopulate the pool.
+An internal generation counter tracks batch loading operations across clear() calls. Batch loading requests initiated prior to a clear() invocation are discarded upon completion, preventing stale ads from populating the pool.
 
-Two things stay platform-side by construction. Batch assembly is touched from two threads — the SDK callbacks on Dispatchers.Main.immediate and invokeOnCancellation from any thread — so every read and write of the pending list and the cancelled flag goes through the platform's own lock (invariant 3). And on iOS, ObjC delegates are weak, so the platform ad handle carries strong Kotlin references to them (invariant 4); because the core retains the ad handle, the delegate is alive by construction and the core never has to know delegates exist.
+Platform adapters handle concurrency and delegate management locally. Native ad batch assembly coordinates main-thread SDK callbacks with multi-threaded cancellation signals using thread-safe locking within the platform layer. On iOS, platform handles retain strong references to native delegates to prevent premature garbage collection.
 <a id="banner-geometry"></a>
 
 ## Banner geometry: host-supplied width to resolved adaptive size
 
 _Encodes `admob-cmp/CLAUDE.md` invariants #6._
 
-Banner controllers have no layout context, and must never acquire one. Geometry is a host-supplied input (invariant 6).
+Banner controllers operate independently of UI layout trees, receiving container width as a host-supplied parameter during ad loading.
 
-The normal path: BannerAdView measures its own container and passes the measured width in as BannerGeometry(widthDp). A headless caller driving the controller directly supplies it explicitly: adManager.banner(placement).load(geometry = BannerGeometry(widthDp = 320)).
+In Compose UI applications, BannerAdView measures its parent layout bounds and supplies the resulting width as BannerGeometry(widthDp). Callers interacting directly with BannerController provide geometry explicitly, such as adManager.banner(placement).load(geometry = BannerGeometry(widthDp = 320)).
 
-BannerCore then resolves the width as geometry?.widthDp ?: platform.fallbackWidthDp(). The fallback is nullable on both platforms, deliberately, so that BannerCore — not the platform — owns the failure policy. When it resolves to null the load fails with an explicit error telling the caller to supply a width or use BannerAdView, rather than guessing one.
+BannerCore resolves target width via geometry?.widthDp ?: platform.fallbackWidthDp(). The platform fallback returns null if window dimensions are unavailable, causing BannerCore to fail the load attempt with a clear error requiring explicit dimensions rather than applying arbitrary defaults.
 
-On Android the fallback comes from the current Activity and is null when there is none. On iOS it reads the key window's bounds, never UIScreen.mainScreen: window bounds are what is correct in Split View, Slide Over and popovers. The earlier UIScreen-based code silently produced full-screen width in those configurations, sizing every banner wrong with no error at all.
+On Android, the platform fallback derives width from the active Activity context when available. On iOS, fallback width is calculated from key window bounds to accommodate multitasking layouts such as Split View, Slide Over and popover windows.
 
-With a width in hand, the core calls platform.resolveSize(sizePolicy, widthDp) to produce the platform's own ad-size type, then loadBanner(size, sizePolicy, requestOptions, requiredGeneration).
+Once width is established, BannerCore invokes platform.resolveSize(sizePolicy, widthDp) to derive platform-native ad dimensions, then executes loadBanner(size, sizePolicy, requestOptions, requiredGeneration).
 
-refresh() replays the whole resolved request — geometry, size policy and request options — from the most recent load, not just the resolved size. registerGeometry() records a measured width without triggering a load, which is what lets a BannerRefreshPolicy.Manual placement refresh at the right width even though it performs no automatic load.
+Calling refresh() re-executes the complete resolved load request — including geometry, size policy and request options — from the previous load attempt. Calling registerGeometry() updates container measurements without triggering an immediate load, allowing manual refresh policies (BannerRefreshPolicy.Manual) to reload at updated container widths.
 <a id="consent-decision-tree"></a>
 
 ## Consent decision tree: canRequestAds and the privacy-options button
 
 _Encodes `admob-cmp/CLAUDE.md` invariants #5._
 
-Two independent decisions are routinely confused, and conflating them is the most common consent bug.
+Consent management involves two distinct operational decisions: gating ad requests and displaying user privacy settings.
 
-The first decision is runtime: may an ad be requested at all? The answer is consent.canRequestAds, a `StateFlow<Boolean>` that UMP sets after a consent-info update. When it is false, the consent gate rejects the request — and it is checked in both load() and show(), with canPresent() re-checked at present time, so neither check may be removed (invariant 5). Callers see AdErrorCode.CONSENT_REQUIRED. ConsentMode.GatherBeforeInitialize is what shows the UMP form where the region requires one and re-evaluates the gate afterwards.
+The first evaluation determines whether ad requests may proceed: adManager.consent.canRequestAds provides a `StateFlow<Boolean>` updated by the UMP SDK. When canRequestAds is false, load() and show() operations return AdErrorCode.CONSENT_REQUIRED, and canPresent() evaluates to false at presentation time. Configuring ConsentMode.GatherBeforeInitialize displays required consent forms during initialisation to establish this state.
 
-The second decision is user interface: should the app show a privacy-settings entry point? The answer is consent.privacyOptionsRequirementStatus == PrivacyOptionsRequirementStatus.Required, and only that. When it is Required, show the button and wire it to consent.showPrivacyOptions().
+The second evaluation determines whether the user interface should display a privacy settings button: apps check whether consent.privacyOptionsRequirementStatus equals PrivacyOptionsRequirementStatus.Required. When Required, the application presents a privacy options entry point linked to consent.showPrivacyOptions().
 
-ConsentStatus.Obtained gates neither decision. It mirrors UMP's own consent status and is distinct from canRequestAds, which can be true even when consent was never explicitly obtained — for example ConsentStatus.NotRequired outside the EEA, where no form is ever shown and ads still serve normally. Gating the privacy-options button on Obtained hides the button from exactly the users who are entitled to it.
+ConsentStatus.Obtained reflects UMP status but does not directly gate requests or UI buttons. For example, in regions outside the European Economic Area (EEA), UMP returns ConsentStatus.NotRequired while canRequestAds remains true, enabling ad serving without requiring consent form interaction.
 <a id="retry-timeline"></a>
 
 ## Retry timeline: capped exponential backoff
 
 _Encodes `admob-cmp/CLAUDE.md` invariants #9._
 
-AdRetryPolicy defaults to maxAttempts = 2, and maxAttempts counts the initial attempt. The default therefore means one initial attempt plus at most one retry. Set maxAttempts = 1 for no retry at all.
+AdRetryPolicy configures automatic retry attempts using maxAttempts, where maxAttempts includes the initial load attempt. By default, maxAttempts is set to 2 (one initial attempt plus one retry). Setting maxAttempts to 1 disables retry attempts.
 
-The delay before retry number n is min(initialDelay × backoffMultiplier^(n−1), maxDelay). With the defaults — initialDelay 2s, backoffMultiplier 2.0, maxDelay 30s — the delays run 2s, 4s, 8s, 16s and then flatten at 30s however many attempts are configured.
+Backoff delay prior to retry n is calculated using min(initialDelay × backoffMultiplier^(n−1), maxDelay). Default settings (initialDelay of 2s, backoffMultiplier of 2.0, maxDelay of 30s) yield retry delays of 2s, 4s, 8s and 16s before capping at 30s.
 
-Only transient failures are retried. On Android, LoadAdError.code is an enum in the GMA Next-Gen SDK, so its toString() yields the enum name, and the retryable set matches on those names: NETWORK_ERROR, TIMEOUT and INTERNAL_ERROR. On iOS the codes arrive as numeric strings, and the retryable set is 2 (network), 5 (timeout) and 11 (internal).
+Retry logic applies exclusively to transient network and system failures. On Android, retryable errors match GMA Next-Gen error codes NETWORK_ERROR, TIMEOUT and INTERNAL_ERROR. On iOS, retryable errors match numeric codes 2 (network), 5 (timeout) and 11 (internal).
 
-No fill is never retried: NO_FILL on Android, code 1 on iOS. It means the ad server had no inventory for this request, so retrying burns requests and depresses fill rate rather than recovering anything. Configuration failures — INVALID_REQUEST, APP_ID_MISSING, INVALID_AD_RESPONSE — are equally permanent and equally not retried. The gates consent_required and sdk_not_ready are not load failures at all and never enter the retry path.
+Non-retryable conditions include no-fill responses (Android NO_FILL, iOS code 1) and configuration errors (INVALID_REQUEST, APP_ID_MISSING, INVALID_AD_RESPONSE). Operational gates such as consent_required or sdk_not_ready represent prerequisite checks rather than load failures and do not enter retry backoff.
 
-The whole sequence, backoff included, runs inside withTimeoutOrNull(placement.timeoutPolicy.loadTimeout) in the shared core (invariant 9). The timeout deliberately bounds the sequence rather than each attempt: a listener that never calls back would otherwise restart the clock on every retry and still never finish.
+The entire retry sequence executes within a top-level timeout managed by withTimeoutOrNull(placement.timeoutPolicy.loadTimeout) in the shared core. This outer timeout bounds total execution time across all retry attempts and backoff intervals.
 <a id="platform-matrix"></a>
 
 ## Platform support matrix: six formats on Android and iOS
 
 _Encodes `admob-cmp/CLAUDE.md` invariants #11._
 
-All six ad formats are supported on both platforms: banner (anchored adaptive, inline adaptive, fixed and fluid, including collapsible), interstitial, rewarded, rewarded interstitial, app-open and native. Android requires API 26 or later on the GMA Next-Gen SDK; iOS requires iOS 15 or later on GMA 13.x.
+All six ad formats are supported on Android and iOS: banner (anchored adaptive, inline adaptive, fixed, fluid, and collapsible), interstitial, rewarded, rewarded interstitial, app-open, and native ads. Minimum platform versions are API level 26 for Android (GMA Next-Gen SDK) and iOS 15 for iOS (GMA 13.x SDK).
 
-UMP consent, the privacy-options form, mediation adapters, and paid/revenue events via AdEvent.Paid all work identically on both platforms.
+User Messaging Platform (UMP) consent flows, privacy settings forms, mediation adapter support, and revenue tracking via AdEvent.Paid operate across both platforms.
 
-App Tracking Transparency is iOS-only. Android has no equivalent and adManager.tracking always reports AdTrackingAuthorization.NotApplicable; advertising-id access there is governed instead by the AD_ID manifest permission. On iOS, ATT must be requested after UMP consent and before the first ad request (invariant 11).
+App Tracking Transparency (ATT) is an iOS-specific framework. On Android, adManager.tracking returns AdTrackingAuthorization.NotApplicable, and advertising identifier access relies on the AD_ID manifest permission. On iOS, ATT authorisation should be requested after UMP consent and prior to initialising the Google Mobile Ads SDK.
 
-One genuine gap exists, and it is upstream. iOS emits five native video events — VideoStarted, VideoPlayed, VideoPaused, VideoEnded and VideoMuted — through GADVideoControllerDelegate. The Android GMA Next-Gen SDK exposes no equivalent callback surface on NativeAd, so Android emits none. This is a Google SDK gap, not an admob-cmp omission, and it means cross-platform logic must not depend on native video events.
+Native video lifecycle callbacks differ between platforms due to underlying SDK surfaces. iOS provides native video events (VideoStarted, VideoPlayed, VideoPaused, VideoEnded, and VideoMuted) via GADVideoControllerDelegate. Android GMA Next-Gen NativeAd does not expose corresponding video lifecycle callbacks, so cross-platform video handling should not rely on native video events on Android.
 
-Five request options are Android-only and are silently ignored on iOS: immersiveMode, customClickGesture, publisherProvidedId, categoryExclusions and skipUninitializedAdapters. By contrast customTargeting and placementId are mapped on both platforms.
+Request options immersiveMode, customClickGesture, publisherProvidedId, categoryExclusions, and skipUninitializedAdapters apply to Android and are ignored on iOS. Request parameters customTargeting and placementId map across both platforms.

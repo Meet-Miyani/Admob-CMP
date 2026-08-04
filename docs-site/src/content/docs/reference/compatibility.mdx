@@ -1,33 +1,14 @@
 ---
 title: "Compatibility matrix"
-description: "AdMob CMP Kotlin version compatibility — Kotlin, Compose, Android minSdk, iOS versions each release supports, plus the cinterop klib caveat."
-faq:
-  - q: Which Kotlin version does admob-cmp require?
-    a: Every published release so far is compiled with Kotlin 2.3.20. Consumers on a different Kotlin minor version may fail to resolve the klib.
-  - q: Can I use a newer Kotlin than the library was built with?
-    a: Ordinary klibs are backwards compatible from Kotlin 1.9.20, but that guarantee explicitly excludes cinterop klibs, and admob-cmp publishes cinterop klibs. Verify per Kotlin minor rather than assuming.
-  - q: Do I need Compose Multiplatform to use AdMob CMP?
-    a: Only for the composable surface — BannerAdView, NativeAdView and rememberAdManager. The controller API has no Compose dependency.
+description: "Kotlin compatibility matrix for Compose Multiplatform AdMob SDK — toolchain, Android minSdk, iOS deployment targets, and bound Google SDK versions."
 ---
 
 import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import PlatformMatrix from '../../../components/diagrams/PlatformMatrix.astro';
 
-## Which versions does each release support?
+## Supported versions and platform targets
 
-Every row is a fact from `admob-cmp/README.md` and
-`gradle/libs.versions.toml`. The matrix is intentionally narrow:
-every 1.x release has been built with the same Kotlin and
-Compose Multiplatform versions, because the library was
-designed for stability across the 1.x line.
-
-A note on rows that are *not* in the table. The library has
-not yet shipped a 2.0.0 release. When it does, the Kotlin floor
-will rise — the [roadmap](/project/roadmap/) discusses the
-upstream gates that would force the rise. The 1.x line is
-expected to receive fixes for as long as the ecosystem lags
-the upstream conditions, which is the design that makes the
-Kotlin 2.3.20 floor safe to publish against.
+Every row in the matrix reflects the exact toolchain and platform SDK bindings published in the version catalog:
 
 | `admob-cmp` | Kotlin | Compose Multiplatform | Android `minSdk` | iOS deployment target |
 |---|---|---|---|---|
@@ -38,131 +19,62 @@ Kotlin 2.3.20 floor safe to publish against.
 
 <PlatformMatrix />
 
-Android and iOS are the supported ad targets, and a Kotlin
-Multiplatform project may target additional platforms — the ads
-API simply is not available in those source sets. The
-[architecture reference](/reference/architecture/) explains
-why desktop and web are out of scope.
+Android (API level 26+) and iOS (iOS 15.0+) are the supported ad-serving platform targets. Sample-only modules such as desktop, web, or CLI targets exist in the repository for demonstration or non-ad testing purposes, but are not supported ad-serving targets.
 
-## Which Kotlin version do I need, and why is it strict?
+For an explanation of the core architecture and multiplatform module boundaries, see [What is AdMob CMP?](/start/what-is-admob-cmp/).
 
-This section must not be softened.
+## Distinguishing Kotlin klib compatibility from native framework linkage
 
-The library is published as Kotlin/Native klibs **plus cinterop
-klibs**. Klibs are not binary-compatible across arbitrary Kotlin
-versions, so consumers must build with a compatible compiler.
-`admob-cmp` is compiled with **Kotlin 2.3.20**; consumers on a
-different Kotlin **minor** version may fail to resolve the klib.
-Patch versions are generally safe.
+When integrating or testing on iOS, it is vital to distinguish Kotlin klib ABI resolution from native iOS framework linkage:
+
+- **Kotlin klib / ABI resolution:** `admob-cmp` publishes compiled Kotlin Multiplatform klibs, which include cinterop bindings (`admob-cmp-core-iosSimulatorArm64Cinterop-gmaMain.klib` and `umpMain.klib`). Klibs carry compiler metadata and ABI compatibility constraints across Kotlin toolchain versions.
+- **Native iOS framework linkage:** Linking issues resulting in undefined Objective-C symbols (such as `_OBJC_CLASS_$_GADMobileAds` or `_OBJC_CLASS_$_UMPConsentInformation`) occur when the underlying Apple native frameworks (GoogleMobileAds, UserMessagingPlatform, or JavaScriptCore) are missing from the native link step.
 
 <Aside type="caution">
-From the Kotlin evolution principles: "klib binaries are
-backwards compatible starting with Kotlin 1.9.20." That
-guarantee **explicitly excludes cinterop klibs**: "The Kotlin
-**cinterop** klib binaries are still in Beta. Currently, we
-cannot give specific compatibility guarantees between different
-Kotlin versions for cinterop klib binaries."
+From the Kotlin evolution principles: "klib binaries are backwards compatible starting with Kotlin 1.9.20." However, that guarantee **explicitly excludes cinterop klibs**: "The Kotlin cinterop klib binaries are still in Beta."
 
-`admob-cmp` publishes cinterop klibs
-(`admob-cmp-core-iosSimulatorArm64Cinterop-gmaMain.klib` and
-`…-umpMain.klib`), so the backward-compatibility rule does
-**not** cover them. Running a newer Kotlin than the library is
-"probably fine, not promised" — verify it for your Kotlin minor
-rather than assuming it.
+`admob-cmp` publishes cinterop klibs, so standard klib backward-compatibility guarantees do not cover them. If your project uses a newer Kotlin minor version than the version used to compile the library (Kotlin 2.3.20), verify your link step.
 </Aside>
 
-The two directions, explicitly. Consumers on an **older** Kotlin
-than the library are unsupported in every case. Consumers on a
-**newer** Kotlin are the supported direction for ordinary klibs
-but are unverified for the cinterop klibs.
+If an iOS build or test task fails with undefined `GAD*` or `UMP*` symbols:
+1. **Xcode application build:** Ensure the official `GoogleMobileAds` and `UserMessagingPlatform` Swift packages are added to your Xcode target (see [iOS setup](/start/ios-setup/)).
+2. **Kotlin/Native test execution:** Ensure the `dev.avinya.ads.admob-cmp` Gradle plugin is applied to configure test linker flags and framework paths (see [Installation](/start/installation/)).
+3. **Missing JavaScriptCore:** Ensure `-framework JavaScriptCore` is included in `OTHER_LDFLAGS` if building a static framework without automatic linking.
 
-A practical note on how to verify. The
-[installation guide](/start/installation/) has the
-`./gradlew :shared:iosSimulatorArm64Test` command that exercises
-the cinterop klib path end-to-end. If the link succeeds, the
-consumer's Kotlin version resolves the klib. If it fails with
-undefined symbols related to GMA or UMP, the resolution is
-unsupported. The
-[troubleshooting guide](/reference/troubleshooting/) has the
-full symptom table; the conservative wording here is the policy
-that the symptom table is built on.
+Undefined native symbols indicate a native iOS framework or link configuration issue, not a Kotlin klib version mismatch.
 
 ## Do I need Compose Multiplatform?
 
-Compose Multiplatform is required only for the composable
-surface: `BannerAdView`, `NativeAdView` and `rememberAdManager`.
-The controller API — `AdManager`, the controllers,
-`AdPlacement` — has no Compose dependency. On Android outside
-Compose, `AdMob.manager(context)` returns the same process-wide
-singleton.
+Compose Multiplatform is required only for UI composable components (`BannerAdView`, `NativeAdView`, and `rememberAdManager`).
 
-A practical note: a project that depends on `admob-cmp-core`
-directly (skipping `admob-cmp-compose`) still gets the
-controllers, the consent API, the diagnostics, and the event
-streams. It does not get `BannerAdView`, `NativeAdView`, or
-`rememberAdManager`, because those live in the compose surface.
-Most production code uses both; server-side tools and CLIs use
-only `admob-cmp-core`.
+The core SDK module (`admob-cmp-core`) contains the underlying state machine, `AdManager`, full-screen controllers, placement models, consent handling, diagnostics, and event streams. Non-Compose UI layers or custom native UI wrappers can depend on `admob-cmp-core` directly without pulling in Compose Multiplatform dependencies.
 
-A related point: Compose Multiplatform itself requires a
-matching Kotlin version, and a project that uses
-Compose Multiplatform 1.11.1 is implicitly using Kotlin
-2.3.20, because Compose Multiplatform pins its Kotlin
-version. The "Kotlin 2.3.20 only" floor is therefore a
-no-op for most projects that use the composable surface — the
-floor is already set by the Compose Multiplatform version
-they have. The floor is binding for projects that depend
-on `admob-cmp-core` directly without Compose, where the
-Kotlin version is not otherwise constrained.
+The current library release is compiled against **Compose Multiplatform 1.11.1** and **Kotlin 2.3.20**. Consumer projects using Compose Multiplatform 1.11.1 fit naturally into this toolchain, whilst non-Compose projects depending strictly on `admob-cmp-core` should verify Kotlin compiler compatibility against 2.3.20.
 
 ## Which Google SDK versions are bound?
 
-| Platform | SDK | Version | How it arrives |
+The library provides Kotlin bindings generated against specific Google Mobile Ads and UMP SDK versions:
+
+| Platform | Native SDK | Bound Version | Delivery Mechanism |
 |---|---|---|---|
 | Android | Google Mobile Ads Next-Gen | 1.3.0 | Transitive Maven dependency |
-| Android | User Messaging Platform | 4.0.0 | Transitive, also pulled by GMA |
-| iOS | GoogleMobileAds | 13.7.0 headers; add the `13.x` SPM package | You add the Swift package |
-| iOS | GoogleUserMessagingPlatform | 3.1.0 headers; add the `3.x` SPM package | You add the Swift package |
+| Android | User Messaging Platform | 4.0.0 | Transitive dependency via GMA |
+| iOS | GoogleMobileAds | 13.7.0 headers | Added via Swift Package Manager (`13.x` major release) |
+| iOS | GoogleUserMessagingPlatform | 3.1.0 headers | Added via Swift Package Manager (`3.x` major release) |
 
-The rule that follows from bindings-only distribution: the
-SPM-resolved GMA **major** version must match the major these
-bindings were generated against. A package older than the bound
-headers fails to link on newly-added API symbols; the fix is to
-bump the SPM package. The
-[iOS setup guide](/start/ios-setup/) has the executable steps.
+The bound iOS headers require that the resolved SPM major version matches the major version used during cinterop generation (`13.x` for GMA and `3.x` for UMP). An older or newer major version may fail at link time due to missing or modified Objective-C symbol definitions.
 
-A note on "newer" SPM packages. A GMA SPM package newer than
-the bound headers is **unsupported** rather than supported,
-because the library has not validated the consumer's app
-against the new symbols. In practice, the failure mode is a
-link-time undefined symbol for an Objective-C class the new
-package introduces, which is the same failure mode as a too-old
-package — the difference is the direction. The supported
-range is the bound major version and any patch within it.
+## Consuming the library on iOS
 
-## Which platforms can consume the library?
+The iOS library targets Kotlin Multiplatform projects compiled into an iOS umbrella framework. Pure Swift iOS applications cannot import `admob-cmp` directly without a Kotlin Multiplatform wrapper module, because Kotlin/Native cinterop generates Kotlin-callable APIs rather than native Swift APIs.
 
-The SDK is consumable from Kotlin Multiplatform and Gradle
-projects only — it compiles into the consumer's umbrella
-framework. A pure-Swift iOS app cannot adopt it without a
-Kotlin Multiplatform shim. This is a deliberate consequence of
-the bindings-only distribution model: the iOS artifact has no
-Swift-callable surface, because cinterop generates a
-Kotlin-callable surface, not a Swift one.
-
-A pure-Swift consumer would need a thin Kotlin module that
-exposes the relevant controllers as Swift-callable functions.
-The shape of that module is the consumer's choice, but the
-absence of one is why a greenfield SwiftUI project cannot adopt
-`admob-cmp` directly. The
-[roadmap](/project/roadmap/) discusses the long-term direction,
-which would make this kind of project viable.
+For details on future platform capability targets, refer to the [Roadmap](/project/roadmap/).
 
 ## Where to next?
 
 <CardGrid>
-  <LinkCard title="Installation" href="/start/installation/" description="Adding the dependency and the plugin." />
-  <LinkCard title="Changelog" href="/reference/changelog/" description="What changed in each release." />
-  <LinkCard title="Roadmap" href="/project/roadmap/" description="Why the Kotlin floor may rise in 2.0.0." />
-  <LinkCard title="Architecture" href="/reference/architecture/" description="Why cinterop klibs exist at all." />
+  <LinkCard title="Installation" href="/start/installation/" description="Adding the dependency and Gradle plugin." />
+  <LinkCard title="Troubleshooting" href="/reference/troubleshooting/" description="Diagnosing native symbol linkage vs build errors." />
+  <LinkCard title="Architecture" href="/reference/architecture/" description="Understanding cinterop bindings and module design." />
+  <LinkCard title="Changelog" href="/reference/changelog/" description="Release history and API updates." />
 </CardGrid>

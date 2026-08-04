@@ -1,0 +1,81 @@
+---
+title: "App Store data disclosure"
+description: "App Store Privacy Details and Apple Privacy Label declarations for apps using the Google Mobile Ads SDK on iOS."
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+This guide describes the data collection practices of the Google Mobile Ads SDK on iOS to help you complete the App Privacy section in App Store Connect.
+
+> [!NOTE]
+> This guide is provided for informational purposes and does not constitute legal advice. Every publisher is responsible for evaluating their complete application binary, including third-party SDKs, mediation networks, and proprietary backend analytics. Always consult the official [Google iOS Data Disclosure guide](https://developers.google.com/admob/ios/privacy/data-disclosure) and Apple's [App Privacy Details on the App Store](https://developer.apple.com/app-store/app-privacy-details/).
+
+## Overview and SDK scope
+
+When publishing an iOS application on the App Store, Apple requires developers to disclose what data their app and third-party SDKs collect, how that data is used, and whether it is linked to the user's identity or used for tracking.
+
+The `admob-cmp` library provides Kotlin Multiplatform bindings for the Google Mobile Ads SDK. The wrapper code itself does not perform independent data collection or tracking; all ad-related data handling is performed by the underlying Google Mobile Ads SDK CocoaPod or Swift Package dependency.
+
+## Data categories and purposes on iOS
+
+According to Google's official iOS data disclosure documentation, the Google Mobile Ads SDK collects specific data categories depending on user consent, App Tracking Transparency (ATT) authorization, and SDK configuration:
+
+| Data category | Apple privacy label data type | Stated purposes |
+|---|---|---|
+| **Identifiers** | Device ID (IDFA / IDFV), User ID | Third-Party Advertising, Analytics, Fraud Prevention and Security |
+| **Usage Data** | Product Interaction (ad impressions, clicks, video views) | Third-Party Advertising, Analytics |
+| **Diagnostics** | Crash Data, Performance Data (load latency, error logs) | Analytics, Fraud Prevention and Security |
+| **Location** | Coarse Location (derived from IP address) | Third-Party Advertising, Analytics |
+
+Whether this data is "Linked to the user" or "Used for tracking" in App Store Connect depends on your complete application binary, your App Tracking Transparency (ATT) implementation, and your mediation stack. Google does not provide definitive answers for these fields; you must evaluate them based on your app's specific architecture.
+
+### Stated purpose definitions
+
+1. **Third-Party Advertising**: Serving ads, evaluating ad performance, and delivering personalised or contextual advertising.
+2. **Analytics**: Monitoring SDK stability, ad request fill rates, and load performance metrics.
+3. **Fraud Prevention and Security**: Detecting invalid click activity, protecting against abusive behaviour, and enforcing platform compliance.
+
+## App Tracking Transparency (ATT) and Privacy Labels
+
+It is essential to distinguish between **App Store Privacy Labels** (App Privacy Details in App Store Connect) and the **App Tracking Transparency (ATT) prompt**:
+
+- **App Store Privacy Labels** are static declarations in your App Store listing describing all potential data collection across all execution paths.
+- **ATT Prompt** is a runtime iOS dialog requesting user permission to track their activity across third-party apps and websites using identifiers such as the IDFA.
+
+Declaring data categories in App Store Connect is mandatory regardless of whether your app displays the ATT prompt. However, user authorization via ATT affects how data collection is categorised:
+
+- **When ATT is authorized**: The SDK can access the IDFA and link identifier data for cross-app tracking.
+- **When ATT is denied, restricted, or not requested**: The iOS operating system returns zeroed IDFA strings. The Google Mobile Ads SDK serves non-personalised or contextual ads while continuing to collect non-linked diagnostic and coarse location data for analytics and fraud prevention.
+
+## Privacy Manifests (`PrivacyInfo.xcprivacy`)
+
+Apple requires apps and third-party SDKs to supply a Privacy Manifest (`PrivacyInfo.xcprivacy`) declaring required reason APIs and data collection details.
+
+- **SDK Dependency**: The underlying `Google-Mobile-Ads-SDK` native iOS dependency packages its own `PrivacyInfo.xcprivacy` manifest containing its required reason API declarations.
+- **Wrapper Status**: The `admob-cmp` Kotlin Multiplatform wrapper repository does **not** package a separate standalone privacy manifest, as it delegates native iOS ad execution entirely to the official Google Mobile Ads SDK dependency.
+- **Publisher Responsibility**: App publishers must ensure their own app bundle includes a privacy manifest if their custom app code or other non-ad dependencies use restricted Apple APIs (such as file timestamp APIs or system boot time APIs).
+
+## Mediation and third-party SDK caveats
+
+If you enable ad mediation adapters (such as Meta Audience Network, AppLovin, or Unity Ads), each adapter brings its own native binary into your iOS app. You must evaluate each mediated SDK's data disclosure guidelines and privacy manifests individually, as mediation partners may collect additional data categories or declare additional tracking linkage.
+
+## Publisher verification checklist
+
+Before submitting your iOS application to App Store Connect, you must make the final decisions regarding your data disclosure. Use the following framework to guide your evaluation:
+
+- [ ] **Primary source alignment**: Review the latest [Google iOS Data Disclosure guide](https://developers.google.com/admob/ios/privacy/data-disclosure) and Apple's [App Privacy Details](https://developer.apple.com/app-store/app-privacy-details/).
+- [ ] **ATT implementation**: Confirm whether your app requests tracking permission using `AdTrackingController` before initialising Mobile Ads.
+- [ ] **Mediation audit**: Review data collection disclosures and `PrivacyInfo.xcprivacy` manifests for all included mediation network adapters.
+- [ ] **Backend logging and analytics**: Include disclosures for any proprietary analytics, telemetry, or ad revenue event forwarding implemented in app code.
+
+## Primary vendor references
+
+- [Google Mobile Ads SDK iOS Data Disclosure](https://developers.google.com/admob/ios/privacy/data-disclosure)
+- [Apple App Privacy Details on the App Store](https://developer.apple.com/app-store/app-privacy-details/)
+- [Apple Privacy Manifest Files](https://developer.apple.com/documentation/bundleresources/privacy_manifest_files)
+
+<CardGrid>
+  <LinkCard title="App Tracking Transparency" href="/privacy/app-tracking-transparency/" description="Configuring the iOS ATT prompt." />
+  <LinkCard title="Play Data Safety" href="/privacy/play-data-safety/" description="Google Play Data safety declarations." />
+  <LinkCard title="iOS setup" href="/start/ios-setup/" description="CocoaPods, Swift Package Manager, and Gradle plugin setup." />
+</CardGrid>

@@ -1,18 +1,11 @@
 ---
 title: "Mediation"
 description: "AdMob mediation on Kotlin Multiplatform — adding adapters per platform, setting network privacy flags with hooks, and verifying fill."
-faq:
-  - q: Does AdMob CMP bundle mediation adapters?
-    a: No, deliberately. Adapters are platform binaries that must match your GMA SDK version and your network contracts. Add them to your Android module and your Xcode project directly.
-  - q: How do I set a mediation network's privacy flags before initialization?
-    a: Use an AdInitializationHook and act on AdInitializationPhase.BeforeMobileAdsInitialize. Hooks run at well-defined phases on both platforms, exactly once per real native initialization.
-  - q: How do I confirm a mediation adapter is serving?
-    a: Read adManager.diagnostics.adapterStatuses() after the manager is Ready, and open Google's Ad Inspector with adManager.diagnostics.openAdInspector() on a test device.
 ---
 
 import { Aside, Tabs, TabItem, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-## Why does AdMob CMP ship zero mediation adapters?
+## Architecture of mediation adapter integration
 
 Adapters are platform binaries that must match the GMA SDK version
 and the publisher's network contracts. Bundling them inside a
@@ -34,7 +27,7 @@ arise, and bundling an adapter at the consumer side is the right
 shape. The [architecture reference](/reference/architecture/) has
 the full platform-by-platform model.
 
-## How do I add an adapter on each platform?
+## Adding platform mediation adapters
 
 ```kotlin
 // Android — app or shared Android module
@@ -66,10 +59,10 @@ before adding the dependency, and to keep the GMA version
 consistent across the project's two platforms even though the
 library does not enforce that.
 
-## How do I set a network's privacy flags before initialization?
+## Configuring pre-initialisation privacy flags
 
 State the problem first: many networks require privacy flags to be
-set *before* SDK initialization, and there is no cross-platform
+set *before* SDK initialisation, and there is no cross-platform
 place to do that unless the ad library provides one.
 `AdInitializationHook` is that place.
 
@@ -123,7 +116,7 @@ re-applied. Decide the settings before the first `initialize` ever
 runs.
 </Aside>
 
-## How do I verify an adapter is actually serving?
+## Verifying adapter initialisation and status
 
 ```kotlin
 // After adManager.status is AdManagerStatus.Ready
@@ -159,7 +152,7 @@ debug-only call path. The
 [test safety guide](/advanced/test-safety/) covers which devices
 count as test devices.
 
-## How do I see which network won a given impression?
+## Inspecting winning mediation networks
 
 ```kotlin
 LaunchedEffect(Unit) {
@@ -194,12 +187,3 @@ which is different from a network that is not being asked. The
 former is a configuration issue; the latter is a waterfall
 issue. Both look the same to a publisher who only watches
 `loadedAdNetworkResponseInfo`.
-
-## Where to next?
-
-<CardGrid>
-  <LinkCard title="Revenue and paid events" href="/advanced/revenue-events/" description="AdValue and the mediation chain." />
-  <LinkCard title="Play Data safety" href="/privacy/play-data-safety/" description="Adapters add data disclosures." />
-  <LinkCard title="Architecture" href="/reference/architecture/" description="Why iOS ships bindings only." />
-  <LinkCard title="iOS setup" href="/start/ios-setup/" description="Where adapter packages go in Xcode." />
-</CardGrid>

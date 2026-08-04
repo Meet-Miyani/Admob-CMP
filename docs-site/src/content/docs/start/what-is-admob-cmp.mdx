@@ -1,210 +1,60 @@
 ---
 title: "What is AdMob CMP?"
-description: "AdMob CMP is a KMP AdMob library for Compose Multiplatform — six ad formats, UMP consent and mediation behind one Kotlin API on Android and iOS."
-faq:
-  - q: What is AdMob CMP?
-    a: AdMob CMP is a Kotlin Multiplatform library that wraps the Google Mobile Ads SDKs for Android and iOS behind one Kotlin API, with suspend functions, StateFlow state and a single sealed AdEvent stream.
-  - q: Is AdMob CMP a consent management platform?
-    a: No. The name predates the ad-tech meaning of CMP. AdMob CMP integrates Google's User Messaging Platform for GDPR consent, but it is an ad SDK wrapper, not a consent management platform vendor.
-  - q: Which ad formats does AdMob CMP support?
-    a: Banner including collapsible, interstitial, rewarded, rewarded interstitial, app-open and native ads, on both Android and iOS.
+description: "An orientation to AdMob CMP — a Kotlin Multiplatform library bringing AdMob ad formats and UMP consent to Compose Multiplatform on Android and iOS."
 ---
 
-import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 import PlatformMatrix from '../../../components/diagrams/PlatformMatrix.astro';
 
-## What is AdMob CMP?
+## Library Overview
 
-AdMob CMP is a KMP AdMob library — a Kotlin Multiplatform wrapper over the
-Google Mobile Ads SDKs that ships a single Kotlin API for the formats AdMob
-publishers actually use, on both Android and iOS. The Android side binds the
-GMA Next-Gen SDK (1.3.0) and the iOS side binds GMA 13.x through Kotlin/Native
-cinterop, so the same `rememberAdManager()` call, the same `AdPlacement`, and
-the same `AdEvent` stream work on both platforms. The published coordinate is
-`dev.avinya.ads:admob-cmp` under the `dev.avinya.ads` group, at version
-1.1.0. The Android app runs on API 26 or above and the iOS app targets iOS
-15 or above.
+AdMob CMP is a Kotlin Multiplatform (KMP) library that provides a unified Kotlin API for Google Mobile Ads (GMA) and User Messaging Platform (UMP) consent across Android and iOS. Built primarily for Compose Multiplatform applications, it enables developers to manage ad lifecycles, load states, and user privacy compliance using declarative Kotlin constructs.
 
-The library keeps AdMob's vocabulary — `AdValue`, response info, adaptive
-banner sizes, UMP consent states, native asset names — but replaces the
-listener-style SDK surface with suspend functions, `StateFlow` state, and a
-single sealed `AdEvent` stream. You write the integration once and it runs
-identically on both platforms, with platform-specific behaviour isolated to
-thin Android and iOS adapters that the consumer never sees. Platform
-specifics stay where they belong: the Android app's `AndroidManifest.xml`
-declares the AdMob app id, the iOS app's `Info.plist` declares
-`GADApplicationIdentifier`, and everything in between is shared code.
+The published facade dependency coordinate is `dev.avinya.ads:admob-cmp:1.1.0`. The library wraps Google Mobile Ads SDKs on both platforms:
+- **Android**: Binds the GMA Next-Gen SDK (version 1.3.0) and UMP SDK (version 4.0.0) transitively via Maven.
+- **iOS**: Provides cinterop bindings for the GMA iOS SDK (version 13.x) and UMP iOS SDK (version 3.x), with the host application linking Google's framework binaries directly via Swift Package Manager.
 
-The split is deliberate. The library is published as two modules behind a
-single coordinate: `admob-cmp-core` holds the controllers, state machines,
-and platform adapters, while `admob-cmp-compose` holds the composable
-surface. Most consumers depend on the umbrella `dev.avinya.ads:admob-cmp`
-artifact and never notice the split. Apps that want the controller API
-without Compose Multiplatform can depend on `admob-cmp-core` directly.
+## Architectural Model
 
-## Which ad formats does it support?
+The project is structured into two main modules behind the umbrella coordinate:
+- `admob-cmp-core`: Contains core controllers (`BannerAdController`, `InterstitialAdController`, etc.), lifecycle state machines, ad caching logic, retry policies, and platform-specific adapters. Non-Compose KMP applications can depend directly on this module.
+- `admob-cmp-compose`: Provides Compose Multiplatform composable abstractions, including `rememberAdManager()`, `BannerAdView`, and `NativeAdView`.
 
-Every format in the current AdMob catalogue, behind a single controller-per-format API:
+Platform specificities remain strictly isolated. Manifest metadata and application identity reside in native configuration files (`AndroidManifest.xml` on Android and `Info.plist` on iOS), while all ad management, state flows, and consent handling take place in shared Kotlin code.
 
-| Format | Controller | Composable | Guide |
+## Supported Ad Formats
+
+The library supports six distinct ad format configurations across five core ad types:
+
+| Format | Controller / API | Composable View | Primary Placement Guide |
 |---|---|---|---|
-| Banner (incl. collapsible) | `adManager.banner(placement)` | `BannerAdView` | [Banner ads](/formats/banner/) |
+| Banner (Standard & Adaptive) | `adManager.banner(placement)` | `BannerAdView` | [Banner ads](/formats/banner/) |
 | Interstitial | `adManager.interstitial(placement)` | — | [Interstitial ads](/formats/interstitial/) |
 | Rewarded | `adManager.rewarded(placement)` | — | [Rewarded ads](/formats/rewarded/) |
-| Rewarded interstitial | `adManager.rewardedInterstitial(placement)` | — | [Rewarded ads](/formats/rewarded/) |
-| App-open | `adManager.appOpen(placement)` + `AppOpenAdCoordinator` | — | [App-open ads](/formats/app-open/) |
-| Native | `adManager.nativeAd(placement)` (a pool) | `NativeAdView` | [Native ads](/formats/native/) |
+| Rewarded Interstitial | `adManager.rewardedInterstitial(placement)` | — | [Rewarded ads](/formats/rewarded/) |
+| App-Open | `adManager.appOpen(placement)` | — | [App-open ads](/formats/app-open/) |
+| Native | `adManager.nativeAd(placement)` | `NativeAdView` | [Native ads](/formats/native/) |
 
-The controllers are placement-keyed and cached for the manager's lifetime,
-so an app with three banner placements owns three `BannerAdController`
-instances — not a fresh one per recomposition. `NativeAdView` is the one
-exception in shape: it is a pool, because native ads are single-use.
+Controllers are placement-keyed singletons retained across screen recompositions, ensuring load state continuity and preventing redundant ad requests.
 
-## What does it give you that the raw SDKs do not?
+## Core Capabilities
 
-Four things the library owns so the app does not have to:
+AdMob CMP addresses common ad-integration challenges in shared Kotlin code:
 
-1. A placement-keyed controller cache so the same `AdPlacement` always
-   resolves to the same instance with the same load state.
-2. A TTL'd FIFO ad cache with capped exponential retry, configurable per
-   placement through `AdCachePolicy`, `AdExpirationPolicy` and
-   `AdRetryPolicy`.
-3. A consent gate that makes a pre-consent ad request impossible by
-   construction — every load checks `canRequestAds` and fails fast with
-   `AdErrorCode.CONSENT_REQUIRED` when the user has not opted in.
-4. One event stream instead of five callback interfaces, with `AdEvent`
-   covering `Loaded`, `LoadFailed`, `Impression`, `Clicked`, `Paid`,
-   `RewardEarned` and the iOS-only video family.
+1. **Placement-Keyed Controller Management**: Maintains static, placement-specific controllers across UI recompositions.
+2. **Automated Ad Caching & Retry**: Implements TTL-based eviction, backoff retry policies, and customizable caching parameters (`AdCachePolicy`, `AdExpirationPolicy`, `AdRetryPolicy`).
+3. **Consent-Gated Requests**: Automatically checks `canRequestAds` before making network requests, preventing policy violations from premature loading.
+4. **Unified Reactive Event Stream**: Exposes a single `AdEvent` `StateFlow` covering `Loaded`, `LoadFailed`, `Impression`, `Clicked`, `Paid`, and `RewardEarned`.
 
-The whole integration looks like this:
-
-```kotlin
-@Composable
-fun App() {
-    val adManager = rememberAdManager()
-
-    LaunchedEffect(Unit) {
-        adManager.gatherConsentAndInitialize(
-            AdConfig(
-                androidAppId = TestAdIds.ANDROID_APP_ID,
-                iosAppId = TestAdIds.IOS_APP_ID,
-            )
-        )
-    }
-
-    val placement = remember {
-        AdPlacement(
-            id = "main_interstitial",
-            format = AdFormat.Interstitial,
-            androidAdUnitId = TestAdIds.ANDROID_INTERSTITIAL,
-            iosAdUnitId = TestAdIds.IOS_INTERSTITIAL,
-        )
-    }
-    val interstitial = remember(adManager) { adManager.interstitial(placement) }
-    val scope = rememberCoroutineScope()
-
-    Button(
-        onClick = {
-            scope.launch {
-                interstitial.load()
-                interstitial.show()
-            }
-        }
-    ) { Text("Show ad") }
-}
-```
-
-Two caveats worth knowing on day one. `show()` suspends for the ad's whole
-on-screen lifetime, so it must run in a UI-scoped coroutine — never in
-`GlobalScope`. And a second `show()` on the same controller while one is
-still on screen returns `AdShowResult.NotReady` rather than queueing; await
-the first result before calling again. Both rules are documented in detail
-on the [interstitial guide](/formats/interstitial/).
-
-The cache and retry layer is the second thing people underestimate. A
-naive integration against the raw SDKs opens a TCP connection, calls GMA's
-load, waits on a listener, parses the response, and only then exposes
-state. Every app that ships a full-screen ad eventually writes that
-caching, eviction, and retry layer themselves — usually wrong, and
-usually twice (once per platform). The library writes it once in shared
-code, with the policy surfaces the consumer needs (`AdCachePolicy`,
-`AdExpirationPolicy`, `AdRetryPolicy`, `AdTimeoutPolicy`) and nothing
-else. The [caching, retry and timeouts guide](/advanced/caching-retry-timeouts/)
-goes through every knob.
-
-## How does it compare with other Kotlin Multiplatform AdMob libraries?
-
-A neutral look at capability, not at quality:
-
-| Capability | AdMob CMP | Typical Kotlin Multiplatform AdMob wrapper |
-|---|---|---|
-| Banner, interstitial, rewarded | Yes | Yes |
-| Rewarded interstitial | Yes | Varies |
-| App-open ads | Yes | Usually not offered |
-| Native ads | Yes, with a layout DSL and an ad pool | Usually not offered |
-| UMP consent inside the init flow | Yes, with `ConsentMode` and the privacy options form | Usually a standalone consent call |
-| iOS ATT ordering handled explicitly | Yes | Varies |
-| Paid/revenue events and mediation response info | Yes | Varies |
-| Kotlin/Native test linking on iOS | Solved by a published Gradle plugin | Usually unaddressed |
-| iOS distribution model | Bindings-only cinterop; the app links GMA via SPM | Varies |
-
-The closest alternative in this space is
-[`LexiLabs-App/basic-ads`](https://github.com/LexiLabs-App/basic-ads). It
-covers banner, interstitial and rewarded formats. If those three formats are
-all a project needs and its API shape suits the codebase better, it is a
-reasonable choice. AdMob CMP exists for projects that also need native ads,
-app-open ads, consent wired into initialization, or Kotlin/Native tests that
-link on iOS.
-
-<Aside type="note">
-This comparison describes verifiable capability differences. It deliberately
-does not rate code quality, maintenance, or community size — those change
-faster than this page can be updated and would invite a different kind of
-post.
-</Aside>
-
-## Which platforms and versions does it run on?
+## Supported Platforms and Boundaries
 
 <PlatformMatrix />
 
-Android is API 26 or above, with the GMA Next-Gen SDK and UMP arriving as
-transitive Maven dependencies. iOS is 15.0 or above, with the GMA and UMP
-frameworks linked by the app through Swift Package Manager. The full version
-table — Kotlin, Compose Multiplatform, Android `minSdk`, iOS deployment
-target, and the GMA / UMP versions each release was built against — is on
-[Compatibility](/reference/compatibility/).
+- **Android**: Target API 26 (Android 8.0) or higher.
+- **iOS**: Target iOS 15.0 or higher.
 
-## What does AdMob CMP deliberately not do?
+### Platform Scope & Intentional Boundaries
 
-A short list, because the omissions are features:
-
-- It ships zero mediation adapters by design. Adapters are platform binaries
-  that must match the GMA SDK version and the publisher's network contracts;
-  bundling them would pin GMA versions for every consumer. Add them to your
-  Android module and Xcode project directly. See [Mediation](/advanced/mediation/).
-- It never embeds Google's binaries on iOS, only cinterop bindings. The app
-  links the real GMA and UMP frameworks itself. See
-  [Architecture](/reference/architecture/) for the rationale.
-- It is consumable from KMP and Gradle projects only, so a pure-Swift iOS
-  app cannot adopt it without a Kotlin Multiplatform shim.
-- It does not support ad networks other than AdMob directly. Mediation
-  covers that.
-
-## Is AdMob CMP a consent management platform?
-
-No. In ad-tech, CMP normally means Consent Management Platform — the vendor
-that brokers GDPR / TCF consent. This library's name predates that
-association in the project's own history and is retained for continuity with
-the published Maven coordinate `dev.avinya.ads:admob-cmp`. It integrates
-Google's User Messaging Platform to gather GDPR / TCF consent, but it is
-not itself a CMP vendor. The consent flow is documented on
-[UMP consent](/privacy/consent/).
-
-## Where to next?
-
-<CardGrid>
-  <LinkCard title="Quickstart" href="/start/quickstart/" description="Render a test ad in five minutes." />
-  <LinkCard title="Installation" href="/start/installation/" description="Gradle, version catalog, and the Gradle plugin." />
-  <LinkCard title="Native ads" href="/formats/native/" description="The layout DSL and ad pooling." />
-  <LinkCard title="Compatibility" href="/reference/compatibility/" description="Kotlin, Compose, minSdk and iOS versions." />
-</CardGrid>
+- **No Bundled Mediation Adapters**: Mediation network adapters (such as Meta or Unity Ads) must be added to native project dependencies directly to avoid locking GMA SDK versions.
+- **Bindings-Only iOS Distribution**: Objective-C cinterop bindings are shipped without embedding binary dependencies. Host applications link `GoogleMobileAds` via Swift Package Manager to avoid Objective-C duplicate symbol conflicts when mediation adapters are used.
+- **KMP Scope**: Designed specifically for mobile targets (Android and iOS). Desktop and Web targets are not supported ad-serving platforms.
+- **Naming Context**: The acronym CMP refers to Compose Multiplatform within this project. While the library integrates Google's UMP SDK for GDPR and TCF compliance, it is an SDK integration wrapper rather than a Consent Management Platform vendor.
