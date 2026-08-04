@@ -139,8 +139,7 @@
 
 .landing-meta dt {
   color: var(--admob-slate);
-  font-weight: 400;
-  opacity: 0.75;
+  font-weight: 500;
 }
 
 .landing-meta dd {
