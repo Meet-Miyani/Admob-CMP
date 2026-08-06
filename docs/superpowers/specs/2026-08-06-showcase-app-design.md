@@ -518,11 +518,14 @@ Error handling sections above.
 | [phase-1a-app-shell](../plans/2026-08-06-showcase-phase-1a-app-shell.md) | 1 | Written |
 | [phase-1b-persistence](../plans/2026-08-06-showcase-phase-1b-persistence.md) | 1 | Written |
 | [phase-1c-nav-shell](../plans/2026-08-06-showcase-phase-1c-nav-shell.md) | 1 | Written |
-| phase-2-consent | 2 | Not written |
-| phase-3-feed | 3 | Not written |
-| phase-4-article | 4 | Not written |
-| phase-5-store | 5 | Not written |
-| phase-6-inspector | 6 | Not written |
+| [phase-2-consent-init](../plans/2026-08-06-showcase-phase-2-consent-init.md) | 2 | Written |
+| [phase-3-feed](../plans/2026-08-06-showcase-phase-3-feed.md) | 3 | Written |
+| [phase-4-article](../plans/2026-08-06-showcase-phase-4-article.md) | 4 | Written |
+| [phase-5-store-library](../plans/2026-08-06-showcase-phase-5-store-library.md) | 5 | Written |
+| [phase-6-appopen-inspector](../plans/2026-08-06-showcase-phase-6-appopen-inspector.md) | 6 | Written |
+
+Phase 1 is **implemented** on `feat/showcase-app`. Phases 2–6 are planned but
+not started.
 
 One deliberate deviation from the phase table above: release-readiness wiring
 moved from Phase 6 into the Phase 1c plan. Tests that exist but are not gated
