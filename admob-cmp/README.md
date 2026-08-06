@@ -15,7 +15,7 @@ stream. See [Architecture](https://ads.avinya.dev/reference/architecture/) for t
 
 ```kotlin
 // commonMain
-implementation("dev.avinya.ads:admob-cmp:1.1.0")
+implementation("dev.avinya.ads:admob-cmp:1.1.1")
 ```
 
 If your project runs Kotlin/Native tests (`:yourModule:iosSimulatorArm64Test`), also apply
@@ -23,7 +23,7 @@ the Gradle plugin — without it the test link fails on `Undefined symbols … _
 
 ```kotlin
 plugins {
-    id("dev.avinya.ads.admob-cmp") version "1.1.0"
+    id("dev.avinya.ads.admob-cmp") version "1.1.1"
 }
 ```
 
@@ -42,6 +42,7 @@ compatible compiler.
 
 | admob-cmp | Kotlin | Compose Multiplatform | Android minSdk | iOS deployment target |
 |---|---|---|---|---|
+| 1.1.1 | 2.3.20 | 1.11.1 | 26 | 15.0 |
 | 1.1.0 | 2.3.20 | 1.11.1 | 26 | 15.0 |
 | 1.0.2 | 2.3.20 | 1.11.1 | 26 | 15.0 |
 | 1.0.0 | 2.3.20 | 1.11.1 | 26 | 15.0 |

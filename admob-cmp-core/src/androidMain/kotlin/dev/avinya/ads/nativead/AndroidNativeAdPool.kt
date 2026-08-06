@@ -1,5 +1,7 @@
 package dev.avinya.ads.nativead
 
+import android.os.Handler
+import android.os.Looper
 import dev.avinya.ads.InternalAdMobCmpApi
 import dev.avinya.ads.AdAttemptResult
 import dev.avinya.ads.AdError
@@ -46,7 +48,7 @@ internal class AndroidNativeAdPool internal constructor(
     override val placement: AdPlacement,
     globalEvents: MutableSharedFlow<AdEvent>,
     private val adRequestBlockedError: () -> AdError?
-) : NativeAdPool, NativePoolPlatform<NativeAd> {
+) : NativeAdPool, NativePoolPlatform<AndroidLoadedNativeAd> {
 
     private val stateLock = Any()
     private val core = NativePoolCore(placement, this, globalEvents)
@@ -68,7 +70,8 @@ internal class AndroidNativeAdPool internal constructor(
     override fun clear() = core.clear()
 
     // Retained for AndroidNativeAdView, which needs the SDK handle to build the view tree.
-    fun peek(token: NativeAdToken): NativeAd? = core.peek(token)
+    // Unwraps the handle exactly as IosNativeAdPool.peek does.
+    fun peek(token: NativeAdToken): NativeAd? = core.peek(token)?.ad
 
     fun take(): NativeAd? = acquire()?.let(::peek)
 
@@ -76,27 +79,29 @@ internal class AndroidNativeAdPool internal constructor(
 
     override fun <T> withPoolLock(block: () -> T): T = synchronized(stateLock) { block() }
 
-    override fun destroy(ad: NativeAd) = ad.destroy()
-
-    override fun responseInfo(ad: NativeAd): AdResponseInfo? = ad.getResponseInfo().toCommon()
-
-    override fun mediaInfo(ad: NativeAd): NativeMediaInfo? {
-        val mediaContent = ad.mediaContent ?: return null
-        return NativeMediaInfo(
-            aspectRatio = (mediaContent.aspectRatio as? Float)?.takeIf { it > 0f },
-            hasVideoContent = mediaContent.hasVideoContent,
-            durationSeconds = mediaContent.duration.takeIf { it > 0f }?.toDouble()
-        )
+    override fun destroy(ad: AndroidLoadedNativeAd) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            ad.ad.destroy()
+        } else {
+            Handler(Looper.getMainLooper()).post { ad.ad.destroy() }
+        }
     }
+
+    // Both accessors are pure field reads of values snapshotted on Main at load time, so they
+    // are safe from whatever dispatcher the caller uses. mediaInfo() in particular is public,
+    // non-suspend API a consumer can call from any thread.
+    override fun responseInfo(ad: AndroidLoadedNativeAd): AdResponseInfo? = ad.responseInfo
+
+    override fun mediaInfo(ad: AndroidLoadedNativeAd): NativeMediaInfo? = ad.mediaInfo
 
     override suspend fun loadBatch(
         count: Int,
         requestOptions: AdRequestOptions,
         nativeOptions: NativeAdOptions,
         requiredGeneration: Long
-    ): AdAttemptResult<List<NativeAd>> = withContext(Dispatchers.Main.immediate) {
+    ): AdAttemptResult<List<AndroidLoadedNativeAd>> = withContext(Dispatchers.Main.immediate) {
         suspendCancellableCoroutine { continuation ->
-            val pending = mutableListOf<NativeAd>()
+            val pending = mutableListOf<AndroidLoadedNativeAd>()
             // Guarded by synchronized(pending): once cancellation has run its cleanup, this
             // flips so a late onNativeAdLoaded destroys its ad instead of adding it to an
             // already-drained list.
@@ -109,7 +114,7 @@ internal class AndroidNativeAdPool internal constructor(
             continuation.invokeOnCancellation {
                 synchronized(pending) {
                     cancelled = true
-                    pending.forEach { it.destroy() }
+                    pending.forEach { it.ad.destroy() }
                     pending.clear()
                 }
             }
@@ -123,12 +128,21 @@ internal class AndroidNativeAdPool internal constructor(
                     // Atomically check cancellation and add: if cancellation already drained
                     // pending, destroy this ad instead of leaking it into a list nothing
                     // will clean up.
+                    // Snapshot response/media info HERE, on the Main-confined loader callback.
+                    // NativePoolCore reads them back from an arbitrary dispatcher (mediaInfo() is
+                    // even public, non-suspend API), which put GMA accesses off Main — CLAUDE.md
+                    // invariant #5. Both are fixed once the ad is loaded.
+                    val loaded = AndroidLoadedNativeAd(
+                        ad = nativeAd,
+                        responseInfo = nativeAd.getResponseInfo().toCommon(),
+                        mediaInfo = nativeAd.readMediaInfo()
+                    )
                     val accepted = synchronized(pending) {
                         if (cancelled || !continuation.isActive) {
                             false
                         } else {
                             AdLogger.d("Android native ad loaded callback. placement=${placement.id} pendingBefore=${pending.size}")
-                            pending += nativeAd
+                            pending += loaded
                             true
                         }
                     }
@@ -146,7 +160,7 @@ internal class AndroidNativeAdPool internal constructor(
                 }
 
                 override fun onAdLoadingCompleted() {
-                    val loaded: List<NativeAd>
+                    val loaded: List<AndroidLoadedNativeAd>
                     val error: AdError?
                     val accepted: Boolean
                     // Claim the batch under the same lock that snapshots it. Checking
@@ -162,7 +176,7 @@ internal class AndroidNativeAdPool internal constructor(
                     }
                     AdLogger.i("Android native loading completed. placement=${placement.id} loaded=${loaded.size}")
                     if (!accepted) {
-                        loaded.forEach { it.destroy() }
+                        loaded.forEach { it.ad.destroy() }
                         return
                     }
                     // Resume once, here — the batch-complete signal. Any ad that loaded
@@ -172,7 +186,7 @@ internal class AndroidNativeAdPool internal constructor(
                         // never receives the batch, so destroy it here rather than leaking
                         // it into a dropped value.
                         continuation.resume(AdAttemptResult.Success(loaded)) { _, _, _ ->
-                            loaded.forEach { it.destroy() }
+                            loaded.forEach { it.ad.destroy() }
                         }
                     } else {
                         // Whole batch yielded nothing: report the captured per-ad error, or a
@@ -196,11 +210,11 @@ internal class AndroidNativeAdPool internal constructor(
     private fun installCallbacks(nativeAd: NativeAd) {
         nativeAd.adEventCallback = object : NativeAdEventCallback {
             override fun onAdImpression() =
-                core.emitInstanceScopedEvent({ it === nativeAd }) { id -> AdEvent.Impression(placement.id, id) }
+                core.emitInstanceScopedEvent({ it.ad === nativeAd }) { id -> AdEvent.Impression(placement.id, id) }
             override fun onAdClicked() =
-                core.emitInstanceScopedEvent({ it === nativeAd }) { id -> AdEvent.Clicked(placement.id, id) }
+                core.emitInstanceScopedEvent({ it.ad === nativeAd }) { id -> AdEvent.Clicked(placement.id, id) }
             override fun onAdPaid(value: com.google.android.libraries.ads.mobile.sdk.common.AdValue) {
-                core.emitInstanceScopedEvent({ it === nativeAd }) { id ->
+                core.emitInstanceScopedEvent({ it.ad === nativeAd }) { id ->
                     AdEvent.Paid(
                         placement.id,
                         PaidEvent(placement.id, value.toCommon(), nativeAd.getResponseInfo().toCommon()),
@@ -210,6 +224,28 @@ internal class AndroidNativeAdPool internal constructor(
             }
         }
     }
+}
+
+/**
+ * Android's native-ad handle: the SDK ad plus the metadata snapshotted on Main at load time.
+ *
+ * Mirrors iOS's [dev.avinya.ads.nativead.LoadedNativeAd]. The raw `NativeAd` used to be the
+ * pool's handle type directly, which left no place to cache metadata and forced the core to
+ * call back into GMA from arbitrary dispatchers.
+ */
+internal data class AndroidLoadedNativeAd(
+    val ad: NativeAd,
+    val responseInfo: AdResponseInfo?,
+    val mediaInfo: NativeMediaInfo?,
+)
+
+private fun NativeAd.readMediaInfo(): NativeMediaInfo? {
+    val mediaContent = mediaContent ?: return null
+    return NativeMediaInfo(
+        aspectRatio = (mediaContent.aspectRatio as? Float)?.takeIf { it > 0f },
+        hasVideoContent = mediaContent.hasVideoContent,
+        durationSeconds = mediaContent.duration.takeIf { it > 0f }?.toDouble()
+    )
 }
 
 @InternalAdMobCmpApi

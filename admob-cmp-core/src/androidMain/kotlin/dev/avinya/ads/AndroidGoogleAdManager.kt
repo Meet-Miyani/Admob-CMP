@@ -369,9 +369,11 @@ internal class AndroidGoogleAdManager(
                 val initializationConfig = InitializationConfig.Builder(config.androidAppId)
                     .setRequestConfiguration(requestedIdentity.globalRequestConfiguration.toAndroidRequestConfiguration())
                     .build()
-                suspendCancellableCoroutine { continuation ->
-                    MobileAds.initialize(appContext, initializationConfig) {
-                        if (continuation.isActive) continuation.resume(Unit)
+                withContext(Dispatchers.IO) {
+                    suspendCancellableCoroutine { continuation ->
+                        MobileAds.initialize(appContext, initializationConfig) {
+                            if (continuation.isActive) continuation.resume(Unit)
+                        }
                     }
                 }
                 config.globalRequestConfiguration.publisherFirstPartyIdEnabled?.let {

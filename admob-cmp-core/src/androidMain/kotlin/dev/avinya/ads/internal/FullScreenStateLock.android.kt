@@ -1,5 +1,8 @@
 package dev.avinya.ads.internal
 
+import dev.avinya.ads.InternalAdMobCmpApi
+
+@InternalAdMobCmpApi
 public actual class FullScreenStateLock public actual constructor() {
     private val monitor = Any()
 

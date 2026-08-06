@@ -120,8 +120,8 @@ export interface LandingMeta {
 }
 
 export const landingMeta: LandingMeta = {
-  mavenCoordinate: 'dev.avinya.ads:admob-cmp:1.1.0',
-  gradlePlugin: 'dev.avinya.ads.admob-cmp:1.1.0',
+  mavenCoordinate: 'dev.avinya.ads:admob-cmp:1.1.1',
+  gradlePlugin: 'dev.avinya.ads.admob-cmp:1.1.1',
   kotlinVersion: '2.3.20',
   composeMultiplatformVersion: '1.11.1',
   androidMinSdk: 26,

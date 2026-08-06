@@ -20,6 +20,10 @@ import kotlinx.coroutines.withContext
 import kotlinx.cinterop.CValue
 import platform.Foundation.NSError
 import platform.Foundation.NSRecursiveLock
+import platform.UIKit.UIApplication
+import platform.UIKit.UISceneActivationStateForegroundActive
+import platform.UIKit.UIWindow
+import platform.UIKit.UIWindowScene
 import platform.darwin.NSObject
 import kotlin.native.ref.WeakReference
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -92,8 +96,9 @@ internal class IosBannerAdController internal constructor(
 
     override fun destroy(banner: IosLoadedBanner) = teardownBanner(banner.view)
 
-    override fun responseInfo(banner: IosLoadedBanner): AdResponseInfo? =
-        banner.view.responseInfo?.toCommon()
+    // Pure field read of a value snapshotted on Main at load time, so this is safe to call
+    // from whatever dispatcher BannerCore's caller resumed on.
+    override fun responseInfo(banner: IosLoadedBanner): AdResponseInfo? = banner.responseInfo
 
     override suspend fun loadBanner(
         size: CValue<GADAdSize>,
@@ -106,12 +111,28 @@ internal class IosBannerAdController internal constructor(
             val result = suspendCancellableCoroutine<AdAttemptResult<IosLoadedBanner>> { continuation ->
                 val banner = GADBannerView(size)
                 banner.adUnitID = placement.iosAdUnitId
-                banner.rootViewController = topViewController()
+                val windowScene = UIApplication.sharedApplication.connectedScenes
+                    .filterIsInstance<UIWindowScene>()
+                    .firstOrNull { it.activationState == UISceneActivationStateForegroundActive }
+                    ?: UIApplication.sharedApplication.connectedScenes.filterIsInstance<UIWindowScene>().firstOrNull()
+                val rootVC = (windowScene?.keyWindow
+                    ?: windowScene?.windows?.filterIsInstance<UIWindow>()?.firstOrNull())
+                    ?.rootViewController
+                banner.rootViewController = rootVC ?: topViewController()
                 lateinit var bannerDelegate: BannerDelegate
                 bannerDelegate = BannerDelegate(
                     onLoaded = {
                         if (continuation.isActive) {
-                            continuation.resume(AdAttemptResult.Success(IosLoadedBanner(banner, bannerDelegate)))
+                            // Capture response info HERE, on Main. GADBannerView is a UIView, and
+                            // BannerCore resumes on whatever dispatcher its caller used — reading
+                            // `.responseInfo` there was a UIKit property access off the main
+                            // thread (CLAUDE.md invariant #5). It is fixed once loaded, so
+                            // snapshotting it loses nothing.
+                            continuation.resume(
+                                AdAttemptResult.Success(
+                                    IosLoadedBanner(banner, bannerDelegate, banner.responseInfo?.toCommon())
+                                )
+                            )
                         }
                     },
                     onFailedToLoad = { error ->
@@ -192,7 +213,12 @@ internal class IosBannerAdController internal constructor(
 }
 
 /** Banner handle: the view plus the strong delegate reference it needs to outlive it. */
-internal data class IosLoadedBanner(val view: GADBannerView, val delegate: BannerDelegate)
+internal data class IosLoadedBanner(
+    val view: GADBannerView,
+    val delegate: BannerDelegate,
+    /** Snapshotted on Main at load time — see the capture site in `loadBanner`. */
+    val responseInfo: AdResponseInfo?,
+)
 
 internal class BannerDelegate(
     private val onLoaded: () -> Unit,

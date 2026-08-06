@@ -73,7 +73,6 @@ internal class AndroidNativeAdLayoutRenderer(
                 oldBottom: Int,
             ) {
                 if (view.width <= 0 || view.height <= 0) return
-                view.removeOnLayoutChangeListener(this)
 
                 val rootBounds = view.screenBounds()
                 val issues = listOfNotNull(
@@ -81,7 +80,7 @@ internal class AndroidNativeAdLayoutRenderer(
                     nativeAdView.bodyView?.let { "body" to it },
                     nativeAdView.callToActionView?.let { "callToAction" to it },
                     nativeAdView.iconView?.let { "icon" to it },
-                    nativeAdView.mediaView?.let { "media" to it },
+                    renderedMediaView?.let { "media" to it },
                     nativeAdView.advertiserView?.let { "advertiser" to it },
                     nativeAdView.priceView?.let { "price" to it },
                     nativeAdView.storeView?.let { "store" to it },
@@ -98,6 +97,7 @@ internal class AndroidNativeAdLayoutRenderer(
                     return
                 }
 
+                view.removeOnLayoutChangeListener(this)
                 nativeAdView.registerNativeAd(nativeAd, renderedMediaView)
                 AdLogger.d(
                     "Android native renderer registered after containment. " +

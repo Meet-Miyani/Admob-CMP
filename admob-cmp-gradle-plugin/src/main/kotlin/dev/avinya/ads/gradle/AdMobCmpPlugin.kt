@@ -29,22 +29,34 @@ public abstract class AdMobCmpPlugin : Plugin<Project> {
             val downloadGma = target.tasks.register("downloadGmaIos", DownloadIosFramework::class.java) {
                 description = "Download the Google Mobile Ads iOS XCFramework (test linking only)"
                 group = "ios-setup"
-                baseUrl.set(GMA_DOWNLOAD_BASE)
-                version.set(AdMobCmpNativeDeps.gmaIosVersion)
-                expectedSha256.set(AdMobCmpNativeDeps.gmaIosSha256)
-                markerFile.set(frameworksDir.map { d ->
-                    d.file("GoogleMobileAds.xcframework/.gma_downloaded")
-                })
+                baseUrl.set(
+                    target.providers.gradleProperty("admobCmp.ios.baseUrl").orElse(GMA_DOWNLOAD_BASE)
+                )
+                version.set(
+                    target.providers.gradleProperty("admobCmp.gma.ios.version").orElse(AdMobCmpNativeDeps.gmaIosVersion)
+                )
+                expectedSha256.set(
+                    target.providers.gradleProperty("admobCmp.gma.ios.sha256").orElse(AdMobCmpNativeDeps.gmaIosSha256)
+                )
+                // frameworkDir is the tracked output; the marker is derived from it so the two
+                // can never drift apart.
+                frameworkDir.set(frameworksDir.map { d -> d.dir("GoogleMobileAds.xcframework") })
+                markerFile.set(frameworkDir.file(".gma_downloaded"))
             }
             val downloadUmp = target.tasks.register("downloadUmpIos", DownloadIosFramework::class.java) {
                 description = "Download the User Messaging Platform iOS XCFramework (test linking only)"
                 group = "ios-setup"
-                baseUrl.set(GMA_DOWNLOAD_BASE)
-                version.set(AdMobCmpNativeDeps.gmaUmpIosVersion)
-                expectedSha256.set(AdMobCmpNativeDeps.umpIosSha256)
-                markerFile.set(frameworksDir.map { d ->
-                    d.file("UserMessagingPlatform.xcframework/.ump_downloaded")
-                })
+                baseUrl.set(
+                    target.providers.gradleProperty("admobCmp.ios.baseUrl").orElse(GMA_DOWNLOAD_BASE)
+                )
+                version.set(
+                    target.providers.gradleProperty("admobCmp.ump.ios.version").orElse(AdMobCmpNativeDeps.gmaUmpIosVersion)
+                )
+                expectedSha256.set(
+                    target.providers.gradleProperty("admobCmp.ump.ios.sha256").orElse(AdMobCmpNativeDeps.umpIosSha256)
+                )
+                frameworkDir.set(frameworksDir.map { d -> d.dir("UserMessagingPlatform.xcframework") })
+                markerFile.set(frameworkDir.file(".ump_downloaded"))
             }
 
             val kotlin = target.extensions.getByType(KotlinMultiplatformExtension::class.java)

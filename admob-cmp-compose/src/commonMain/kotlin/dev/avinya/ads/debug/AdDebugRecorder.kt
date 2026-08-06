@@ -1,3 +1,5 @@
+@file:OptIn(dev.avinya.ads.InternalAdMobCmpApi::class)
+
 package dev.avinya.ads.debug
 
 import dev.avinya.ads.AdEvent

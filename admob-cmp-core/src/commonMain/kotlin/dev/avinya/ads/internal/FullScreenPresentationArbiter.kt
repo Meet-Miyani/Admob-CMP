@@ -1,3 +1,5 @@
+@file:OptIn(dev.avinya.ads.InternalAdMobCmpApi::class)
+
 package dev.avinya.ads.internal
 
 import dev.avinya.ads.AdFormat

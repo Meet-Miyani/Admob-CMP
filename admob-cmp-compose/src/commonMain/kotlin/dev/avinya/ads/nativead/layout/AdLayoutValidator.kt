@@ -55,44 +55,68 @@ public object AdLayoutValidator {
         val errors = mutableListOf<AdLayoutValidationIssue>()
         val assets = mutableSetOf<String>()
 
-        fun visit(node: AdNode, path: String) {
+        fun isVisible(node: AdNode, parentVisible: Boolean): Boolean {
+            if (!parentVisible) return false
+            val m = node.modifier
+            if (m.display != AdDisplay.Visible) return false
+            if (m.alpha <= 0f) return false
+            if (m.width is AdLayoutSize.Fixed && m.width.dp <= 0f) return false
+            if (m.height is AdLayoutSize.Fixed && m.height.dp <= 0f) return false
+            return true
+        }
+
+        fun visit(node: AdNode, path: String, parentVisible: Boolean = true) {
+            val visible = isVisible(node, parentVisible)
             when (node) {
                 is AdContainerNode.Row -> {
                     if (node.children.isEmpty()) warnings += warning("empty_container", "Row has no children.", path)
-                    node.children.forEachIndexed { index, child -> visit(child, "$path/row[$index]") }
+                    node.children.forEachIndexed { index, child -> visit(child, "$path/row[$index]", visible) }
                 }
                 is AdContainerNode.Column -> {
                     if (node.children.isEmpty()) warnings += warning("empty_container", "Column has no children.", path)
-                    node.children.forEachIndexed { index, child -> visit(child, "$path/column[$index]") }
+                    node.children.forEachIndexed { index, child -> visit(child, "$path/column[$index]", visible) }
                 }
                 is AdContainerNode.Box -> {
                     if (node.children.isEmpty()) warnings += warning("empty_container", "Box has no children.", path)
-                    node.children.forEachIndexed { index, child -> visit(child, "$path/box[$index]") }
+                    node.children.forEachIndexed { index, child -> visit(child, "$path/box[$index]", visible) }
                 }
                 is AdSpacer -> Unit
                 is AdStaticText -> {
                     if (node.text.isBlank()) warnings += warning("blank_static_text", "Static text is blank.", path)
                 }
-                is AdAssetNode.Headline -> assets += "headline"
-                is AdAssetNode.Body -> assets += "body"
-                is AdAssetNode.CallToAction -> assets += "call_to_action"
-                is AdAssetNode.Icon -> assets += "icon"
-                is AdAssetNode.Media -> assets += "media"
-                is AdAssetNode.Advertiser -> assets += "advertiser"
-                is AdAssetNode.Price -> assets += "price"
-                is AdAssetNode.Store -> assets += "store"
-                is AdAssetNode.StarRating -> assets += "star_rating"
-                is AdAssetNode.AdChoices -> assets += "ad_choices"
-                is AdAssetNode.AdBadge -> assets += "ad_badge"
+                is AdAssetNode -> {
+                    if (visible) {
+                        val key = when (node) {
+                            is AdAssetNode.Headline -> "headline"
+                            is AdAssetNode.Body -> "body"
+                            is AdAssetNode.CallToAction -> "call_to_action"
+                            is AdAssetNode.Icon -> "icon"
+                            is AdAssetNode.Media -> "media"
+                            is AdAssetNode.Advertiser -> "advertiser"
+                            is AdAssetNode.Price -> "price"
+                            is AdAssetNode.Store -> "store"
+                            is AdAssetNode.StarRating -> "star_rating"
+                            is AdAssetNode.AdChoices -> "ad_choices"
+                            is AdAssetNode.AdBadge -> "ad_badge"
+                        }
+                        assets += key
+                    } else {
+                        warnings += warning("hidden_asset", "Asset ${node::class.simpleName} is hidden (gone, alpha=0, or 0 size).", path)
+                    }
+                }
             }
         }
 
         visit(root, "root")
 
-        fun containsAdBadge(node: AdNode): Boolean = when (node) {
-            is AdAssetNode.AdBadge -> true
-            is AdContainerNode -> node.children.any(::containsAdBadge)
-            else -> false
+        fun containsAdBadge(node: AdNode, parentVisible: Boolean = true): Boolean {
+            val visible = isVisible(node, parentVisible)
+            if (!visible) return false
+            return when (node) {
+                is AdAssetNode.AdBadge -> true
+                is AdContainerNode -> node.children.any { containsAdBadge(it, visible) }
+                else -> false
+            }
         }
         val topRegion = when (root) {
             is AdContainerNode.Column -> root.children.firstOrNull()

@@ -211,8 +211,9 @@ internal class IosRewardedSlot(
             if (presentation.tryHandOffToCallbacks()) {
                 delegates.retain(loaded, delegate)
                 loaded.fullScreenContentDelegate = delegate
+                val weakLoaded = WeakReference(loaded)
                 loaded.presentFromRootViewController(rootVC) {
-                    val adReward = loaded.adReward
+                    val adReward = weakLoaded.value?.adReward
                     if (adReward != null) {
                         // amount is an NSDecimalNumber and may be fractional (P1-14 established
                         // the exact-decimal pattern for paid values; reuse it here so a mediated
@@ -324,8 +325,9 @@ internal class IosRewardedInterstitialSlot(
             if (presentation.tryHandOffToCallbacks()) {
                 delegates.retain(loaded, delegate)
                 loaded.fullScreenContentDelegate = delegate
+                val weakLoaded = WeakReference(loaded)
                 loaded.presentFromRootViewController(rootVC) {
-                    val adReward = loaded.adReward
+                    val adReward = weakLoaded.value?.adReward
                     if (adReward != null) {
                         // amount is an NSDecimalNumber and may be fractional (P1-14 established
                         // the exact-decimal pattern for paid values; reuse it here so a mediated

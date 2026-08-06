@@ -95,12 +95,16 @@ class AdConfigTest {
     }
 
     @Test
-    fun `testMode with only consent debug test device ids does not warn`() {
+    fun `testMode with only consent debug test device ids still warns`() {
+        // consentTestDeviceIds configures UMP consent debugging and NEVER reaches GMA's
+        // RequestConfiguration, so it is no evidence the device will be served test ads.
+        // This previously asserted the opposite and locked in a warning that failed open.
         val warning = config().copy(
             debugOptions = AdDebugOptions(testMode = true, consentTestDeviceIds = listOf("HASHED_ID"))
         ).testModeWarningOrNull()
 
-        assertNull(warning)
+        assertNotNull(warning, "UMP consent debug ids must not satisfy the GMA test-device check")
+        assertTrue(warning.contains("testDeviceIds"))
     }
 
     @Test
