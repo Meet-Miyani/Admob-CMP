@@ -87,10 +87,15 @@ private fun ArticleBody(
 ) {
     val paragraphs = remember(article.body) { splitParagraphs(article.body) }
     val adIndex = remember(paragraphs.size) { inlineAdSlotIndex(paragraphs.size) }
-    // Use a sentinel past the end of any LazyColumn row so the paragraph↔row
-    // shift below becomes a no-op for articles that don't carry an ad.
-    val effectiveAdIndex = adIndex ?: Int.MAX_VALUE
     val showInlineAd = adsEnabled && sdkReady
+    // The ad row is only in the list when both the article carries a slot
+    // AND the gate is on. When the gate is off, the row is dropped entirely
+    // (per the plan: an ad failure is never a user-facing error — no
+    // zero-height placeholder, no displaced paragraph, no shift in flow).
+    val showAdRow = adIndex != null && showInlineAd
+    // Use a sentinel past the end of any LazyColumn row so the paragraph↔row
+    // shift below becomes a no-op when no ad row is in the list.
+    val effectiveAdIndex = adIndex?.takeIf { showInlineAd } ?: Int.MAX_VALUE
 
     // Fraction as a derived state of the LazyListState. We approximate the
     // visible-row offset by index alone — coarse but stable across re-layouts,
@@ -144,37 +149,30 @@ private fun ArticleBody(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            val itemCount = paragraphs.size + (adIndex?.let { 1 } ?: 0)
+            val itemCount = paragraphs.size + if (showAdRow) 1 else 0
             items(
                 count = itemCount,
                 key = { index ->
-                    when {
-                        adIndex == null -> "p-$index"
-                        index < adIndex -> "p-$index"
-                        index == adIndex -> "ad-${article.id}"
+                    if (!showAdRow) "p-$index"
+                    else when {
+                        index < effectiveAdIndex -> "p-$index"
+                        index == effectiveAdIndex -> "ad-${article.id}"
                         else -> "p-${index - 1}"
                     }
                 },
             ) { index ->
                 when {
-                    adIndex != null && index == adIndex -> {
-                        if (showInlineAd) {
-                            NativeAdView(
-                                placement = ShowcasePlacements.articleNative,
-                                itemKey = "article_native_${article.id}",
-                                layout = inlineNativeAdLayout,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 8.dp),
-                            )
-                        } else {
-                            Text(
-                                text = paragraphs[index - 1],
-                                style = MaterialTheme.typography.bodyLarge,
-                            )
-                        }
+                    showAdRow && index == adIndex -> {
+                        NativeAdView(
+                            placement = ShowcasePlacements.articleNative,
+                            itemKey = "article_native_${article.id}",
+                            layout = inlineNativeAdLayout,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                        )
                     }
-                    adIndex != null && index > adIndex -> Text(
+                    showAdRow && index > adIndex -> Text(
                         text = paragraphs[index - 1],
                         style = MaterialTheme.typography.bodyLarge,
                     )

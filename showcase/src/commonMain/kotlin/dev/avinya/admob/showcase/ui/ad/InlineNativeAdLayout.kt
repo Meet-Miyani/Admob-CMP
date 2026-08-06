@@ -33,12 +33,15 @@ val inlineNativeAdLayout: AdLayout = adLayout {
 // Surface validation findings at module load so a bad layout fails to render
 // visibly, not silently. Warnings are non-fatal but logged for the same
 // reason FeedNativeAdLayout mentions: missing the ad badge is policy-grade.
-val inlineNativeAdLayoutReport = AdLayoutValidator.validate(inlineNativeAdLayout.root)
-    .also { report ->
-        if (report.warnings.isNotEmpty()) {
-            println(
-                "inlineNativeAdLayout validation warnings: " +
-                    report.warnings.joinToString { "${it.code}@${it.nodePath}: ${it.message}" }
-            )
-        }
+private object InlineNativeAdLayoutValidation {
+    init {
+        AdLayoutValidator.validate(inlineNativeAdLayout.root)
+            .takeIf { it.warnings.isNotEmpty() }
+            ?.let { report ->
+                println(
+                    "inlineNativeAdLayout validation warnings: " +
+                        report.warnings.joinToString { "${it.code}@${it.nodePath}: ${it.message}" }
+                )
+            }
     }
+}
