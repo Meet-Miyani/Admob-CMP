@@ -13,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -20,6 +21,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import dev.avinya.ads.LocalAdManager
+import dev.avinya.ads.ui.BannerAdView
 import dev.avinya.ads.ui.NativeAdView
 import dev.avinya.admob.showcase.di.LocalAppGraph
 import dev.avinya.admob.showcase.domain.ad.ShowcasePlacements
@@ -43,30 +45,43 @@ fun FeedScreen(onArticleClick: (String) -> Unit) {
         }
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        items(
-            count = items.itemCount,
-            key = items.itemKey { it.key },
-        ) { index ->
-            when (val item = items[index]) {
-                is FeedItem.Article -> ArticleCard(
-                    item = item,
-                    onClick = { viewModel.onIntent(FeedIntent.OpenArticle(item.id)) },
-                )
-                is FeedItem.NativeAdSlot -> NativeAdView(
-                    placement = ShowcasePlacements.feedNative,
-                    itemKey = item.slotKey,
-                    layout = feedNativeAdLayout,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                // Placeholders are disabled, so null only occurs transiently
-                // while a page loads. Render nothing — never a spinner per row.
-                null -> Unit
+    Column(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(
+                count = items.itemCount,
+                key = items.itemKey { it.key },
+            ) { index ->
+                when (val item = items[index]) {
+                    is FeedItem.Article -> ArticleCard(
+                        item = item,
+                        onClick = { viewModel.onIntent(FeedIntent.OpenArticle(item.id)) },
+                    )
+                    is FeedItem.NativeAdSlot -> NativeAdView(
+                        placement = ShowcasePlacements.feedNative,
+                        itemKey = item.slotKey,
+                        layout = feedNativeAdLayout,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    // Placeholders are disabled, so null only occurs transiently
+                    // while a page loads. Render nothing — never a spinner per row.
+                    null -> Unit
+                }
             }
+        }
+
+        // Rendered only when it can actually fill. BannerAdView measures its
+        // own container and supplies the width — do not build BannerGeometry
+        // by hand here; that is only for headless controller callers.
+        val state by viewModel.state.collectAsState()
+        if (state.adsEnabled && state.sdkReady) {
+            BannerAdView(
+                placement = ShowcasePlacements.feedBanner,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
