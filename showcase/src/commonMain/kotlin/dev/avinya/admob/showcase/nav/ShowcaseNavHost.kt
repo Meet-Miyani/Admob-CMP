@@ -16,6 +16,7 @@ import androidx.navigation3.ui.NavDisplay
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 
 import dev.avinya.admob.showcase.feature.onboarding.OnboardingScreen
+import dev.avinya.admob.showcase.feature.feed.FeedScreen
 import dev.avinya.admob.showcase.feature.settings.SettingsScreen
 
 /**
@@ -61,7 +62,13 @@ fun ShowcaseNavHost(backStack: SnapshotStateList<ShowcaseNavKey>) {
                         },
                     )
                 }
-                entry<ShowcaseNavKey.Feed> { PlaceholderScreen("Feed") }
+                entry<ShowcaseNavKey.Feed> {
+                    FeedScreen(
+                        onArticleClick = { articleId ->
+                            backStack.add(ShowcaseNavKey.ArticleDetail(articleId))
+                        },
+                    )
+                }
                 entry<ShowcaseNavKey.Library> { PlaceholderScreen("Library") }
                 entry<ShowcaseNavKey.Store> { PlaceholderScreen("Store") }
                 entry<ShowcaseNavKey.Settings> { SettingsScreen() }
