@@ -249,6 +249,33 @@ is the contributor's responsibility:
    Maven Central coordinates are immutable, and it is the last point at which
    a bad release can be stopped.
 
+## Showcase app
+
+`showcase/` is a production-grade Compose Multiplatform reference app that
+exercises every ad format the SDK supports in realistic placements — a
+reading app with a paged feed, article detail, a coin economy and a
+per-screen ad Inspector.
+
+It is a **consumer** of `admob-cmp`, never a reason to change it. Design:
+[docs/superpowers/specs/2026-08-06-showcase-app-design.md](docs/superpowers/specs/2026-08-06-showcase-app-design.md).
+
+Run it:
+
+```bash
+./gradlew :androidApp:installDebug          # Android
+open iosApp/iosApp.xcodeproj                # iOS — build and run in Xcode
+```
+
+All placements use Google's test ad units with `strictTestMode` on. The app
+targets Android and iOS only; `desktopApp` and `webApp` keep rendering the
+unsupported-platform screen.
+
+Tests:
+
+```bash
+./gradlew :showcase:testAndroidHostTest :showcase:iosSimulatorArm64Test
+```
+
 ## License
 
 [Apache License 2.0](LICENSE).

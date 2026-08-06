@@ -133,6 +133,7 @@ section "3. Android + ABI + publication metadata"
   :admob-cmp-compose:testAndroidHostTest \
   :admob-cmp:verifyKotlinMultiplatformPomDependencyScopes \
   :admob-cmp-compose:verifyKotlinMultiplatformPomDependencyScopes \
+  :showcase:testAndroidHostTest \
   :androidApp:assembleDebug \
   --no-configuration-cache
 
@@ -143,6 +144,7 @@ section "5. iOS + klib ABI"
 ./gradlew \
   :admob-cmp-core:iosSimulatorArm64Test \
   :admob-cmp-compose:iosSimulatorArm64Test \
+  :showcase:iosSimulatorArm64Test \
   :admob-cmp-core:checkKotlinAbi \
   :admob-cmp-compose:checkKotlinAbi \
   --no-configuration-cache
