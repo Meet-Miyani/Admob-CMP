@@ -68,6 +68,13 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.test)
             }
         }
+        val androidHostTest by getting {
+            dependencies {
+                implementation("androidx.test:core:1.6.1")
+                implementation("androidx.test.ext:junit:1.2.1")
+                implementation("org.robolectric:robolectric:4.14.1")
+            }
+        }
         val androidMain by getting {
             dependencies {
                 implementation(libs.kotlinx.coroutines.android)

@@ -4,25 +4,46 @@ import androidx.room.ConstructedBy
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.RoomDatabaseConstructor
-import dev.avinya.admob.showcase.data.db.dao.SpikeDao
-import dev.avinya.admob.showcase.data.db.entity.SpikeEntity
+import dev.avinya.admob.showcase.data.db.dao.ArticleDao
+import dev.avinya.admob.showcase.data.db.dao.TelemetryDao
+import dev.avinya.admob.showcase.data.db.dao.WalletDao
+import dev.avinya.admob.showcase.data.db.entity.AdEventEntity
+import dev.avinya.admob.showcase.data.db.entity.ArticleEntity
+import dev.avinya.admob.showcase.data.db.entity.BookmarkEntity
+import dev.avinya.admob.showcase.data.db.entity.PaidEventEntity
+import dev.avinya.admob.showcase.data.db.entity.PolicyDecisionEntity
+import dev.avinya.admob.showcase.data.db.entity.ReadingProgressEntity
+import dev.avinya.admob.showcase.data.db.entity.RewardGrantEntity
+import dev.avinya.admob.showcase.data.db.entity.UnlockEntity
+import dev.avinya.admob.showcase.data.db.entity.WalletEntity
 
 @Database(
-    entities = [SpikeEntity::class],
+    entities = [
+        ArticleEntity::class,
+        BookmarkEntity::class,
+        ReadingProgressEntity::class,
+        UnlockEntity::class,
+        WalletEntity::class,
+        RewardGrantEntity::class,
+        AdEventEntity::class,
+        PolicyDecisionEntity::class,
+        PaidEventEntity::class,
+    ],
     version = 1,
     exportSchema = true,
 )
 @ConstructedBy(ShowcaseDatabaseConstructor::class)
-internal abstract class ShowcaseDatabase : RoomDatabase() {
-    abstract fun spikeDao(): SpikeDao
+abstract class ShowcaseDatabase : RoomDatabase() {
+    abstract fun articleDao(): ArticleDao
+    abstract fun walletDao(): WalletDao
+    abstract fun telemetryDao(): TelemetryDao
 }
 
 /**
  * KMP databases cannot be instantiated reflectively, so Room's KSP processor
- * generates the `actual` for this `expect` object per target. There is
- * deliberately no hand-written actual — writing one is an error.
+ * generates the `actual` per target. Do not hand-write one.
  */
 @Suppress("KotlinNoActualForExpect")
-internal expect object ShowcaseDatabaseConstructor : RoomDatabaseConstructor<ShowcaseDatabase> {
+expect object ShowcaseDatabaseConstructor : RoomDatabaseConstructor<ShowcaseDatabase> {
     override fun initialize(): ShowcaseDatabase
 }
