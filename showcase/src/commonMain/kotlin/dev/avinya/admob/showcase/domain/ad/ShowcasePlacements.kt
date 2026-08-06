@@ -7,6 +7,8 @@ import dev.avinya.ads.AdSizePolicy
 import dev.avinya.ads.AdUnitIds
 import dev.avinya.ads.BannerRefreshPolicy
 import dev.avinya.ads.CollapsiblePlacement
+import dev.avinya.ads.FullScreenAdOptions
+import dev.avinya.ads.ServerSideVerificationOptions
 import dev.avinya.ads.TestAdIds
 import kotlin.time.Duration.Companion.seconds
 
@@ -76,6 +78,28 @@ object ShowcasePlacements {
         strictTestMode = true,
     )
 
-    // Phases 5-6 add storeRewarded, storeRewardedInterstitial and appOpen
-    // here, so the whole catalog stays in one readable file.
+    val storeRewarded: AdPlacement = AdPlacement(
+        id = "store_rewarded",
+        format = AdFormat.Rewarded,
+        adUnitIds = AdUnitIds(android = TestAdIds.ANDROID_REWARDED, ios = TestAdIds.IOS_REWARDED),
+        fullScreenOptions = FullScreenAdOptions(
+            // A real coin economy would verify server-side. Standing up the
+            // endpoint is out of scope; setting the options shows where it goes.
+            serverSideVerification = ServerSideVerificationOptions(
+                userId = "showcase-demo-user",
+                customData = "store_rewarded",
+            ),
+        ),
+        strictTestMode = true,
+    )
+
+    val storeRewardedInterstitial: AdPlacement = AdPlacement(
+        id = "store_rewarded_interstitial",
+        format = AdFormat.RewardedInterstitial,
+        adUnitIds = AdUnitIds(
+            android = TestAdIds.ANDROID_REWARDED_INTERSTITIAL,
+            ios = TestAdIds.IOS_REWARDED_INTERSTITIAL,
+        ),
+        strictTestMode = true,
+    )
 }
