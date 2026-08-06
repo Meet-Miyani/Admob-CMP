@@ -58,4 +58,32 @@ interface ArticleDao {
 
     @Query("SELECT EXISTS(SELECT 1 FROM unlocks WHERE articleId = :articleId)")
     fun isUnlocked(articleId: String): Flow<Boolean>
+
+    @Query("SELECT * FROM articles WHERE isPremium = 1 ORDER BY feedOrdinal ASC")
+    fun premiumArticles(): Flow<List<ArticleEntity>>
+
+    @Query(
+        "SELECT a.* FROM articles a " +
+            "INNER JOIN bookmarks b ON b.articleId = a.id " +
+            "ORDER BY b.createdAt DESC",
+    )
+    fun bookmarkedArticles(): Flow<List<ArticleEntity>>
+
+    @Query(
+        "SELECT a.* FROM articles a " +
+            "INNER JOIN reading_progress p ON p.articleId = a.id " +
+            "WHERE p.scrollFraction > 0.0 AND p.scrollFraction < 1.0 " +
+            "ORDER BY p.updatedAt DESC",
+    )
+    fun inProgressArticles(): Flow<List<ArticleEntity>>
+
+    @Query(
+        "SELECT a.* FROM articles a " +
+            "INNER JOIN unlocks u ON u.articleId = a.id " +
+            "ORDER BY u.unlockedAt DESC",
+    )
+    fun unlockedArticles(): Flow<List<ArticleEntity>>
+
+    @Query("SELECT articleId FROM unlocks")
+    fun unlockedIds(): Flow<List<String>>
 }
