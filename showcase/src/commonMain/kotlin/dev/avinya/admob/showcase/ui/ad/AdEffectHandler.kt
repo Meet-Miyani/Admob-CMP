@@ -3,10 +3,10 @@ package dev.avinya.admob.showcase.ui.ad
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import dev.avinya.ads.AdShowResult
 import dev.avinya.ads.LocalAdManager
 import dev.avinya.admob.showcase.domain.ad.ShowcasePlacements
 import dev.avinya.admob.showcase.domain.ad.SuppressionReason
+import dev.avinya.admob.showcase.domain.ad.advancesCooldown
 import dev.avinya.admob.showcase.feature.article.ArticleEffect
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
@@ -59,10 +59,11 @@ fun AdEffectHandler(
                     mutex.withLock {
                         try {
                             interstitial.load()
-                            when (val result = interstitial.show()) {
-                                is AdShowResult.Shown -> onShown()
-                                is AdShowResult.NotReady -> onSuppressed(SuppressionReason.NotReady)
-                                is AdShowResult.Failed -> onSuppressed(SuppressionReason.NotReady)
+                            val result = interstitial.show()
+                            if (advancesCooldown(result)) {
+                                onShown()
+                            } else {
+                                onSuppressed(SuppressionReason.NotReady)
                             }
                         } catch (t: Throwable) {
                             // A platform that throws instead of returning Failed would
