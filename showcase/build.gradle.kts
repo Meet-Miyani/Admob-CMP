@@ -10,6 +10,8 @@ plugins {
     alias(libs.plugins.androidKmpLibrary)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.room)
 }
 
 val consumePublishedAdmobCmp =
@@ -50,6 +52,8 @@ kotlin {
                 implementation(libs.androidx.lifecycle.viewmodelCompose)
                 implementation(libs.androidx.lifecycle.runtimeCompose)
                 implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.androidx.room.runtime)
+                implementation(libs.androidx.sqlite.bundled)
 
                 if (consumePublishedAdmobCmp) {
                     implementation("dev.avinya.ads:admob-cmp:${providers.gradleProperty("VERSION_NAME").get()}")
@@ -71,3 +75,16 @@ kotlin {
         }
     }
 }
+
+room {
+    schemaDirectory("$projectDir/schemas")
+}
+
+// Room's KMP compiler runs per target, so the processor is registered per
+// KSP configuration rather than once globally.
+dependencies {
+    add("kspAndroid", libs.androidx.room.compiler)
+    add("kspIosArm64", libs.androidx.room.compiler)
+    add("kspIosSimulatorArm64", libs.androidx.room.compiler)
+}
+

@@ -22,6 +22,9 @@ androidx-nav3Ui = "1.1.1"
 androidx-paging = "3.5.0"
 androidx-room = "2.8.4"
 androidx-sqlite = "2.7.0"
+ksp = "2.3.11"
+
+
 
 
 # --- admob-cmp-core (Google Mobile Ads / UMP) ---
@@ -72,3 +75,6 @@ composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "k
 kotlinJvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 mavenPublish = { id = "com.vanniktech.maven.publish", version = "0.37.0" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+room = { id = "androidx.room", version.ref = "androidx-room" }
+
