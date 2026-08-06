@@ -65,6 +65,17 @@ object ShowcasePlacements {
         strictTestMode = true,
     )
 
-    // Phases 4-6 add articleInterstitial, storeRewarded, storeRewardedInterstitial
-    // and appOpen here, so the whole catalog stays in one readable file.
+    val articleInterstitial = AdPlacement(
+        id = "article_interstitial",
+        format = AdFormat.Interstitial,
+        adUnitIds = AdUnitIds(
+            android = TestAdIds.ANDROID_INTERSTITIAL,
+            ios = TestAdIds.IOS_INTERSTITIAL,
+        ),
+        cachePolicy = AdCachePolicy(maxSize = 2, reloadAfterShow = true),
+        strictTestMode = true,
+    )
+
+    // Phases 5-6 add storeRewarded, storeRewardedInterstitial and appOpen
+    // here, so the whole catalog stays in one readable file.
 }

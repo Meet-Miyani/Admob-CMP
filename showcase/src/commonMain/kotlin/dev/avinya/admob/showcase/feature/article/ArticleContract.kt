@@ -1,6 +1,7 @@
 package dev.avinya.admob.showcase.feature.article
 
 import dev.avinya.admob.showcase.data.db.entity.ArticleEntity
+import dev.avinya.admob.showcase.domain.ad.SuppressionReason
 
 /**
  * Immutable UI state for the article detail screen.
@@ -37,4 +38,8 @@ sealed interface ArticleIntent {
 sealed interface ArticleEffect {
     /** Ask the host to pop this entry. */
     data object NavigateBack : ArticleEffect
+    /** Ask the host to show the article-interstitial ad. */
+    data object ShowInterstitial : ArticleEffect
+    /** The ad was suppressed for [reason] — the host may surface it in the Inspector. */
+    data class AdSuppressed(val reason: SuppressionReason) : ArticleEffect
 }

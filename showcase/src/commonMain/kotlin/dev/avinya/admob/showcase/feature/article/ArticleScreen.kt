@@ -30,8 +30,10 @@ import dev.avinya.ads.ui.NativeAdView
 import dev.avinya.admob.showcase.data.db.entity.ArticleEntity
 import dev.avinya.admob.showcase.di.LocalAppGraph
 import dev.avinya.admob.showcase.domain.ad.ShowcasePlacements
+import dev.avinya.admob.showcase.domain.ad.SuppressionReason
 import dev.avinya.admob.showcase.domain.article.inlineAdSlotIndex
 import dev.avinya.admob.showcase.domain.article.splitParagraphs
+import dev.avinya.admob.showcase.ui.ad.AdEffectHandler
 import dev.avinya.admob.showcase.ui.ad.inlineNativeAdLayout
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
@@ -43,18 +45,27 @@ fun ArticleScreen(articleId: String, onBack: () -> Unit) {
     val graph = LocalAppGraph.current
     val adManager = LocalAdManager.current
     val viewModel: ArticleViewModel = viewModel {
-        ArticleViewModel(graph.articles, graph.settings, adManager, articleId)
+        ArticleViewModel(
+            articles = graph.articles,
+            settings = graph.settings,
+            adState = graph.adState,
+            adManager = adManager,
+            clock = graph.clock,
+            articleId = articleId,
+        )
     }
     val state by viewModel.state.collectAsState()
     val listState = rememberLazyListState()
 
-    LaunchedEffect(viewModel) {
-        viewModel.effects.collect { effect ->
-            when (effect) {
-                ArticleEffect.NavigateBack -> onBack()
-            }
-        }
-    }
+    AdEffectHandler(
+        effects = viewModel.effects,
+        onSuppressed = { reason: SuppressionReason ->
+            // Phase 6's Inspector will read this; for now a print is the
+            // minimum that proves the wiring reaches the UI.
+            println("Article ad suppressed: $reason")
+        },
+        onNavigateBack = onBack,
+    )
 
     when {
         state.article != null -> ArticleBody(

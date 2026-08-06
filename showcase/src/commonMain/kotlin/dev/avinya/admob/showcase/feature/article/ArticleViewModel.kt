@@ -4,10 +4,16 @@ import androidx.lifecycle.viewModelScope
 import dev.avinya.ads.AdManager
 import dev.avinya.ads.AdManagerStatus
 import dev.avinya.admob.showcase.core.mvi.MviViewModel
+import dev.avinya.admob.showcase.core.time.Clock
 import dev.avinya.admob.showcase.data.prefs.SettingsRepository
+import dev.avinya.admob.showcase.data.repo.AdStateRepository
 import dev.avinya.admob.showcase.data.repo.ArticleRepository
+import dev.avinya.admob.showcase.domain.ad.AdDecision
+import dev.avinya.admob.showcase.domain.ad.AdPolicy
+import dev.avinya.admob.showcase.domain.ad.AdPolicySnapshot
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -28,8 +34,11 @@ import kotlinx.coroutines.launch
 class ArticleViewModel(
     private val articles: ArticleRepository,
     private val settings: SettingsRepository,
+    private val adState: AdStateRepository,
     private val adManager: AdManager,
+    private val clock: Clock,
     private val articleId: String,
+    private val adPolicy: AdPolicy = AdPolicy(),
 ) : MviViewModel<ArticleState, ArticleIntent, ArticleEffect>(ArticleState()) {
 
     init {
@@ -84,10 +93,46 @@ class ArticleViewModel(
                 // does not race with the bookmark flow's next emission.
                 articles.setBookmarked(articleId, !state.value.bookmarked)
             }
-            ArticleIntent.Close -> emitEffect(ArticleEffect.NavigateBack)
+            ArticleIntent.Close -> viewModelScope.launch {
+                handleClose()
+            }
             is ArticleIntent.ProgressUpdated -> viewModelScope.launch {
                 articles.setProgress(articleId, intent.fraction)
             }
         }
+    }
+
+    /**
+     * The single thing Task 4 is here to do: ask the policy whether an
+     * interstitial may show, dispatch the result, and **always** emit
+     * [ArticleEffect.NavigateBack] so a suppressed or not-ready ad never
+     * blocks the user from leaving the article.
+     *
+     * `articlesRead` increments *before* the decision, so the 3rd article
+     * close (and the 6th, 9th, …) sees `articlesRead = 3` and gets `Show`.
+     * `lastInterstitialAt` is recorded only when the decision is `Show`,
+     * because resetting the cooldown because an ad didn't show would be
+     * an obvious bug.
+     */
+    private suspend fun handleClose() {
+        adState.incrementArticlesRead()
+        val snapshot = AdPolicySnapshot(
+            articlesRead = adState.articlesRead.first(),
+            millisSinceLastInterstitial = adState.lastInterstitialAt.first()
+                ?.let { clock.nowMillis() - it } ?: Long.MAX_VALUE,
+            millisSinceColdStart = clock.nowMillis() - adState.coldStartAt,
+            canRequestAds = adManager.consent.canRequestAds.value,
+            // TODO(phase 5): wire to the rewarded-unlock flow
+            wasRewardedUnlock = false,
+            adsEnabled = state.value.adsEnabled,
+        )
+        when (val decision = adPolicy.decideInterstitial(snapshot)) {
+            AdDecision.Show -> {
+                adState.recordInterstitialShown()
+                emitEffect(ArticleEffect.ShowInterstitial)
+            }
+            is AdDecision.Suppress -> emitEffect(ArticleEffect.AdSuppressed(decision.reason))
+        }
+        emitEffect(ArticleEffect.NavigateBack)
     }
 }

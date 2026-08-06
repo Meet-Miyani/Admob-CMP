@@ -12,6 +12,7 @@ import dev.avinya.admob.showcase.core.time.Clock
 import dev.avinya.admob.showcase.core.time.SystemClock
 import dev.avinya.admob.showcase.data.db.ShowcaseDatabase
 import dev.avinya.admob.showcase.data.prefs.SettingsRepository
+import dev.avinya.admob.showcase.data.repo.AdStateRepository
 import dev.avinya.admob.showcase.data.repo.ArticleRepository
 import dev.avinya.admob.showcase.data.repo.WalletRepository
 import kotlinx.coroutines.CoroutineScope
@@ -53,6 +54,13 @@ class AppGraph(storage: PlatformStorage) {
     val articles: ArticleRepository = ArticleRepository(database.articleDao(), clock)
 
     val wallet: WalletRepository = WalletRepository(database.walletDao(), clock)
+
+    // Captured once at graph construction. Cold-start grace means cold start,
+    // not cold launch — the value resets every process, which is the right
+    // semantic for the interstitial's first 30s.
+    private val coldStartAt: Long = clock.nowMillis()
+
+    val adState: AdStateRepository = AdStateRepository(preferences, clock, coldStartAt)
 }
 
 /**
