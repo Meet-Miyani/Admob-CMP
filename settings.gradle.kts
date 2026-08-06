@@ -69,3 +69,5 @@ include(":webApp")
 include(":admob-cmp")
 include(":admob-cmp-core")
 include(":admob-cmp-compose")
+include(":showcase")
+
