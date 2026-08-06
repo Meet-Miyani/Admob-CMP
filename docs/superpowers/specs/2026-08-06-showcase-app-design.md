@@ -122,9 +122,21 @@ today: `project(":admob-cmp-compose")` normally, or the published
 `dev.avinya.ads:admob-cmp:$VERSION_NAME` coordinate when
 `admobCmpConsumePublished=true`.
 
-`shared`'s iOS framework exports `:showcase` so the existing
-`MainViewController` and `ContentView.swift` keep working untouched. No
-Xcode project edits.
+`shared` depends on `:showcase` with plain `implementation(...)` — **not**
+`api(...)` plus a framework `export(...)`. No Swift code references a
+`:showcase` type (`ContentView.swift` only calls
+`MainViewControllerKt.MainViewController()`), and `shared`'s framework is
+`isStatic = true`, so showcase code links in regardless; `export` would only
+change the generated Obj-C header surface. The existing `MainViewController`
+and `ContentView.swift` keep working untouched, with no Xcode project edits.
+
+**`:showcase` must apply the `dev.avinya.ads.admob-cmp` Gradle plugin.**
+Without it, `:showcase:iosSimulatorArm64Test` fails at link with
+`Undefined symbols ... _OBJC_CLASS_$_GADBannerView`. Supplying the GMA and
+UMP XCFrameworks to Kotlin/Native **test executables** is that plugin's
+entire purpose — an iOS *app* resolves them from Xcode's SPM packages, but a
+test executable has no Xcode. Applying the plugin is not an SDK change; it is
+the documented way for a consumer to depend on admob-cmp.
 
 `shared` keeps its `expect fun PlatformAdDemo()` seam. Only the adCapable
 actual changes.
@@ -442,7 +454,7 @@ to zero height. Navigation always proceeds.
 
 ## Testing
 
-In `showcase/src/commonTest/`, run via `:showcase:testDebugUnitTest`
+In `showcase/src/commonTest/`, run via `:showcase:testAndroidHostTest`
 (Android host) and `:showcase:iosSimulatorArm64Test`.
 
 | Test | Covers |
@@ -491,6 +503,34 @@ back to the owner for a decision before any app code is written.
 | 4 · Article | detail screen, reading progress, inline native with a second layout, collapsible banner, `AdPolicy` and interstitial on close. Adds `AdPolicyTest` |
 | 5 · Store and Library | wallet, rewarded with callback-based credit and idempotency, rewarded-interstitial, unlock transaction with `isBlocked`, Library screen. Adds `CoinEconomyTest` |
 | 6 · App-open, Inspector, polish | `AppOpenAdCoordinator`, Inspector's three tabs, telemetry pipeline, KDoc pass, README section, release-readiness wiring |
+
+### Plan index
+
+Implementation plans are written **just-in-time**, each against a codebase
+that already exists rather than against a prediction of one. This spec is the
+durable record; a plan that has not been written yet has lost nothing,
+because everything it needs is in the Screens, Data layer, State flow and
+Error handling sections above.
+
+| Plan | Spec phase | Status |
+|---|---|---|
+| [phase-0-toolchain-spike](../plans/2026-08-06-showcase-phase-0-toolchain-spike.md) | 0 | Written |
+| [phase-1a-app-shell](../plans/2026-08-06-showcase-phase-1a-app-shell.md) | 1 | Written |
+| [phase-1b-persistence](../plans/2026-08-06-showcase-phase-1b-persistence.md) | 1 | Written |
+| [phase-1c-nav-shell](../plans/2026-08-06-showcase-phase-1c-nav-shell.md) | 1 | Written |
+| phase-2-consent | 2 | Not written |
+| phase-3-feed | 3 | Not written |
+| phase-4-article | 4 | Not written |
+| phase-5-store | 5 | Not written |
+| phase-6-inspector | 6 | Not written |
+
+One deliberate deviation from the phase table above: release-readiness wiring
+moved from Phase 6 into the Phase 1c plan. Tests that exist but are not gated
+rot, and it is a two-line change either way.
+
+Note that the Phase 1b plan creates the `ad_events`, `policy_decisions` and
+`paid_events` tables even though nothing writes to them until Phase 6. The
+data foundation for the later phases therefore lands early and on purpose.
 
 ---
 
