@@ -65,6 +65,7 @@ fun ArticleScreen(articleId: String, onBack: () -> Unit) {
             println("Article ad suppressed: $reason")
         },
         onNavigateBack = onBack,
+        onShown = { viewModel.onInterstitialShown() },
     )
 
     when {

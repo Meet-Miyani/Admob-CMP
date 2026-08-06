@@ -110,9 +110,9 @@ class ArticleViewModel(
      *
      * `articlesRead` increments *before* the decision, so the 3rd article
      * close (and the 6th, 9th, …) sees `articlesRead = 3` and gets `Show`.
-     * `lastInterstitialAt` is recorded only when the decision is `Show`,
-     * because resetting the cooldown because an ad didn't show would be
-     * an obvious bug.
+     * The cooldown write lives in [onInterstitialShown] and is invoked from
+     * `AdEffectHandler` only on `AdShowResult.Shown` — recording the timestamp
+     * here would burn 60 seconds of cooldown for an ad that never rendered.
      */
     private suspend fun handleClose() {
         adState.incrementArticlesRead()
@@ -127,12 +127,20 @@ class ArticleViewModel(
             adsEnabled = state.value.adsEnabled,
         )
         when (val decision = adPolicy.decideInterstitial(snapshot)) {
-            AdDecision.Show -> {
-                adState.recordInterstitialShown()
-                emitEffect(ArticleEffect.ShowInterstitial)
-            }
+            AdDecision.Show -> emitEffect(ArticleEffect.ShowInterstitial)
             is AdDecision.Suppress -> emitEffect(ArticleEffect.AdSuppressed(decision.reason))
         }
         emitEffect(ArticleEffect.NavigateBack)
+    }
+
+    /**
+     * Records a successful interstitial presentation in [adState].
+     *
+     * Called from `AdEffectHandler`'s `AdShowResult.Shown` branch — not from
+     * the decision site — so a `NotReady` or `Failed` ad does not reset the
+     * cooldown.
+     */
+    fun onInterstitialShown() {
+        viewModelScope.launch { adState.recordInterstitialShown(clock.nowMillis()) }
     }
 }
