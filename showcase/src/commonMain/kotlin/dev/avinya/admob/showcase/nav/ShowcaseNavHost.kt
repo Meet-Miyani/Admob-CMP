@@ -15,6 +15,8 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 
+import dev.avinya.admob.showcase.feature.settings.SettingsScreen
+
 /**
  * The app's navigation shell.
  *
@@ -51,7 +53,7 @@ fun ShowcaseNavHost(backStack: SnapshotStateList<ShowcaseNavKey>) {
                 entry<ShowcaseNavKey.Feed> { PlaceholderScreen("Feed") }
                 entry<ShowcaseNavKey.Library> { PlaceholderScreen("Library") }
                 entry<ShowcaseNavKey.Store> { PlaceholderScreen("Store") }
-                entry<ShowcaseNavKey.Settings> { PlaceholderScreen("Settings") }
+                entry<ShowcaseNavKey.Settings> { SettingsScreen() }
                 entry<ShowcaseNavKey.ArticleDetail> { key -> PlaceholderScreen("Article ${key.articleId}") }
             },
         )
