@@ -3,6 +3,7 @@ package dev.avinya.admob.showcase.feature.article
 import androidx.lifecycle.viewModelScope
 import dev.avinya.admob.showcase.core.mvi.MviViewModel
 import dev.avinya.admob.showcase.data.repo.ArticleRepository
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 
 /**
@@ -19,15 +20,23 @@ class ArticleViewModel(
 ) : MviViewModel<ArticleState, ArticleIntent, ArticleEffect>(ArticleState()) {
 
     init {
-        loadArticle()
+        load()
         observeBookmark()
-        loadInitialProgress()
     }
 
-    private fun loadArticle() {
+    private fun load() {
         viewModelScope.launch {
-            val entity = articles.article(articleId)
-            updateState { copy(article = entity, loading = false) }
+            val entityDeferred = async { articles.article(articleId) }
+            val progressDeferred = async { articles.progress(articleId) }
+            val entity = entityDeferred.await()
+            val fraction = progressDeferred.await()
+            updateState {
+                copy(
+                    article = entity,
+                    initialProgress = fraction,
+                    loading = false,
+                )
+            }
         }
     }
 
@@ -36,13 +45,6 @@ class ArticleViewModel(
             articles.isBookmarked(articleId).collect { bookmarked ->
                 updateState { copy(bookmarked = bookmarked) }
             }
-        }
-    }
-
-    private fun loadInitialProgress() {
-        viewModelScope.launch {
-            val fraction = articles.progress(articleId)
-            updateState { copy(initialProgress = fraction) }
         }
     }
 
