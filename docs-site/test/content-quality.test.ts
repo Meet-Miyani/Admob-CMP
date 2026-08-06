@@ -16,8 +16,7 @@ const adStateKt = join(repoRoot, 'admob-cmp-core/src/commonMain/kotlin/dev/aviny
 const adManagerKt = join(repoRoot, 'admob-cmp-core/src/commonMain/kotlin/dev/avinya/ads/AdManager.kt');
 const adTrackingKt = join(repoRoot, 'admob-cmp-core/src/commonMain/kotlin/dev/avinya/ads/AdTrackingAuthorization.kt');
 const adCompositionKt = join(repoRoot, 'admob-cmp-compose/src/commonMain/kotlin/dev/avinya/ads/AdComposition.kt');
-const demoStartupKt = join(repoRoot, 'shared/src/adCapableMain/kotlin/dev/avinya/admob/cmp/demo/DemoAdStartup.kt');
-const demoPlatformKt = join(repoRoot, 'shared/src/adCapableMain/kotlin/dev/avinya/admob/cmp/demo/PlatformAdDemo.adCapable.kt');
+const showcaseAdConfigKt = join(repoRoot, 'showcase/src/commonMain/kotlin/dev/avinya/admob/showcase/ShowcaseAdConfig.kt');
 
 export interface ContentViolation {
   file: string;
@@ -259,14 +258,12 @@ describe('Source-of-truth factual contracts', () => {
     expect(adComposition).toContain('public expect fun rememberAdManager(): AdManager');
   });
 
-  it('demo sample startup uses AdInitializationHook and ConsentMode.GatherBeforeInitialize', () => {
-    const demoStartup = readFileSync(demoStartupKt, 'utf8');
-    const demoPlatform = readFileSync(demoPlatformKt, 'utf8');
+  it('showcase sample startup uses AdInitializationHook and TrackingAuthorizationHook', () => {
+    const showcaseConfig = readFileSync(showcaseAdConfigKt, 'utf8');
 
-    expect(demoStartup).toContain('class TrackingAuthorizationHook');
-    expect(demoStartup).toContain('AdInitializationPhase.BeforeMobileAdsInitialize');
-    expect(demoPlatform).toContain('ConsentMode.GatherBeforeInitialize');
-    expect(demoPlatform).toContain('requestAuthorization()');
+    expect(showcaseConfig).toContain('class TrackingAuthorizationHook');
+    expect(showcaseConfig).toContain('AdInitializationPhase.BeforeMobileAdsInitialize');
+    expect(showcaseConfig).toContain('requestAuthorization()');
   });
 });
 
