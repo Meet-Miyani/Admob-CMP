@@ -74,20 +74,28 @@ Coin balance, an "Earn 50 coins" card, an offer-wall entry point, and the list o
 
 - [ ] **Step 1: Add the placement**
 
+Signatures below are verified against `admob-cmp-core` source — use them exactly.
+
+`AdPlacement` has **no** `serverSideVerificationOptions` parameter. SSV lives inside `FullScreenAdOptions`, reached through the placement's `fullScreenOptions`:
+
 ```kotlin
     val storeRewarded = AdPlacement(
         id = "store_rewarded",
         format = AdFormat.Rewarded,
         adUnitIds = AdUnitIds(android = TestAdIds.ANDROID_REWARDED, ios = TestAdIds.IOS_REWARDED),
-        serverSideVerificationOptions = ServerSideVerificationOptions(
-            userId = "showcase-demo-user",
-            customData = "showcase",
+        fullScreenOptions = FullScreenAdOptions(
+            serverSideVerification = ServerSideVerificationOptions(
+                userId = "showcase-demo-user",
+                customData = "showcase",
+            ),
         ),
         strictTestMode = true,
     )
 ```
 
-> Verify `ServerSideVerificationOptions`' parameter names against the ABI dump before writing. SSV is included because a real coin economy would verify server-side; the showcase sets the options and says in a comment that verification itself is out of scope.
+Verified shapes: `AdUnitIds(android: String, ios: String)`, `FullScreenAdOptions(immersiveMode: Boolean = false, serverSideVerification: ServerSideVerificationOptions? = null)`, `ServerSideVerificationOptions(userId: String? = null, customData: String? = null)`.
+
+SSV options are set because a real coin economy would verify server-side; standing up the verification endpoint itself is out of scope, and a comment should say so at the call site.
 
 - [ ] **Step 2: Write the failing idempotency-key test**
 

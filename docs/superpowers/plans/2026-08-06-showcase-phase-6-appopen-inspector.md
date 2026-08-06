@@ -79,7 +79,22 @@ fun AppOpenHost(suppressor: AppOpenSuppressor, content: @Composable () -> Unit) 
 }
 ```
 
-Verify `AppOpenConfig`'s parameter names and `isBlocked`'s exact shape against the ABI dump before writing.
+Signatures **verified** against `admob-cmp-core` source:
+
+```
+AppOpenAdCoordinator(manager: AdManager, controller: AppOpenAdController,
+                     config: AppOpenConfig = …)
+    var isBlocked: Boolean            // mutable property, not a function
+    fun start(scope: CoroutineScope)
+
+AppOpenConfig(showOnColdStart: Boolean = false,
+              minBackgroundDuration: Duration = 4.seconds,
+              cooldownBetweenShows: Duration = Duration.ZERO,
+              preloadOnStart: Boolean = true,
+              coldStartTimeout: Duration = 5.seconds)
+```
+
+`showOnColdStart` defaults to `false`; leave it so. A cold-start app-open ad is the most intrusive placement in the catalog and would fire over onboarding on a first run.
 
 - [ ] **Step 3: Suppress during onboarding too**
 

@@ -286,9 +286,18 @@ object ShowcasePlacements {
 }
 ```
 
-> Verify each constructor parameter name against the ABI dump before writing —
-> `grep -A25 'final class dev.avinya.ads/AdPlacement' admob-cmp-core/api/admob-cmp-core.klib.api`.
-> Adapt to what exists; **do not change the SDK** to match this sketch.
+Constructor names above are **verified** against `admob-cmp-core` source:
+
+```
+AdPlacement(id, format, adUnitIds, requestOptions, cachePolicy, retryPolicy,
+            timeoutPolicy, bannerSizePolicy, bannerRefreshPolicy, nativeOptions,
+            fullScreenOptions, enabled, strictTestMode)
+AdUnitIds(android: String, ios: String)
+AdCachePolicy(maxSize: Int = 1, expirationPolicy: AdExpirationPolicy = …,
+              reloadAfterShow: Boolean = false)
+```
+
+Note there is no `serverSideVerificationOptions` parameter — SSV lives inside `fullScreenOptions` (see the Phase 5 plan).
 
 - [ ] **Step 2: Build the native ad layout**
 
