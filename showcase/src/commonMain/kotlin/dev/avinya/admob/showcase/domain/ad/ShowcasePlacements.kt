@@ -6,6 +6,7 @@ import dev.avinya.ads.AdPlacement
 import dev.avinya.ads.AdSizePolicy
 import dev.avinya.ads.AdUnitIds
 import dev.avinya.ads.BannerRefreshPolicy
+import dev.avinya.ads.CollapsiblePlacement
 import dev.avinya.ads.TestAdIds
 import kotlin.time.Duration.Companion.seconds
 
@@ -50,7 +51,20 @@ object ShowcasePlacements {
         strictTestMode = true,
     )
 
-    // Phases 4-6 add articleBanner, articleInterstitial,
-    // storeRewarded, storeRewardedInterstitial and appOpen here, so the whole
-    // catalog stays in one readable file.
+    val articleBanner: AdPlacement = AdPlacement(
+        id = "article_banner",
+        format = AdFormat.Banner,
+        adUnitIds = AdUnitIds(
+            android = TestAdIds.ANDROID_COLLAPSIBLE_BANNER,
+            ios = TestAdIds.IOS_COLLAPSIBLE_BANNER,
+        ),
+        bannerSizePolicy = AdSizePolicy.LargeAnchoredAdaptive(
+            collapsible = CollapsiblePlacement.Bottom,
+        ),
+        bannerRefreshPolicy = BannerRefreshPolicy.AdServerManaged,
+        strictTestMode = true,
+    )
+
+    // Phases 4-6 add articleInterstitial, storeRewarded, storeRewardedInterstitial
+    // and appOpen here, so the whole catalog stays in one readable file.
 }

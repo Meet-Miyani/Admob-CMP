@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.avinya.ads.LocalAdManager
+import dev.avinya.ads.ui.BannerAdView
 import dev.avinya.ads.ui.NativeAdView
 import dev.avinya.admob.showcase.data.db.entity.ArticleEntity
 import dev.avinya.admob.showcase.di.LocalAppGraph
@@ -182,6 +183,13 @@ private fun ArticleBody(
                     )
                 }
             }
+        }
+
+        if (adsEnabled && sdkReady) {
+            BannerAdView(
+                placement = ShowcasePlacements.articleBanner,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
