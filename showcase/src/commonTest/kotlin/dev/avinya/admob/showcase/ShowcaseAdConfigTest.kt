@@ -3,6 +3,7 @@ package dev.avinya.admob.showcase
 import dev.avinya.ads.AdError
 import dev.avinya.ads.AdErrorCode
 import dev.avinya.ads.AdManagerStatus
+import dev.avinya.ads.ConsentDebugGeography
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -12,6 +13,26 @@ class ShowcaseAdConfigTest {
     fun usesGoogleSampleAppIdsSoNoProductionInventoryIsEverRequested() {
         assertEquals("ca-app-pub-3940256099942544~3347511713", SHOWCASE_ANDROID_APP_ID)
         assertEquals("ca-app-pub-3940256099942544~1458002511", SHOWCASE_IOS_APP_ID)
+    }
+
+    @Test
+    fun debugGeographyDefaultsToDisabledSoRealGeographyIsUsed() {
+        val config = showcaseAdConfig(
+            trackingHook = TrackingAuthorizationHook { },
+            debugGeography = ConsentDebugGeography.Disabled,
+        )
+
+        assertEquals(ConsentDebugGeography.Disabled, config.debugGeography)
+    }
+
+    @Test
+    fun debugGeographyIsCarriedIntoTheConfig() {
+        val config = showcaseAdConfig(
+            trackingHook = TrackingAuthorizationHook { },
+            debugGeography = ConsentDebugGeography.Eea,
+        )
+
+        assertEquals(ConsentDebugGeography.Eea, config.debugGeography)
     }
 
     @Test

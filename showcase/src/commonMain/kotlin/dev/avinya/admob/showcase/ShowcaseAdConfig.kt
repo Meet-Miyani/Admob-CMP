@@ -4,6 +4,7 @@ import dev.avinya.ads.AdConfig
 import dev.avinya.ads.AdInitializationHook
 import dev.avinya.ads.AdInitializationPhase
 import dev.avinya.ads.AdManagerStatus
+import dev.avinya.ads.ConsentDebugGeography
 
 /** Google's public sample app id for Android. Never a production unit. */
 const val SHOWCASE_ANDROID_APP_ID: String = "ca-app-pub-3940256099942544~3347511713"
@@ -18,10 +19,14 @@ const val SHOWCASE_IOS_APP_ID: String = "ca-app-pub-3940256099942544~1458002511"
  * GMA serve test ads. Test ads come from using [dev.avinya.ads.TestAdIds] units,
  * which every showcase placement does.
  */
-fun showcaseAdConfig(trackingHook: AdInitializationHook): AdConfig = AdConfig(
+fun showcaseAdConfig(
+    trackingHook: AdInitializationHook,
+    debugGeography: ConsentDebugGeography = ConsentDebugGeography.Disabled,
+): AdConfig = AdConfig(
     androidAppId = SHOWCASE_ANDROID_APP_ID,
     iosAppId = SHOWCASE_IOS_APP_ID,
     testMode = true,
+    debugGeography = debugGeography,
     initializationHooks = listOf(trackingHook),
 )
 

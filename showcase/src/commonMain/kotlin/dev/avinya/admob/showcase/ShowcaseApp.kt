@@ -8,6 +8,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import dev.avinya.admob.showcase.di.LocalAppGraph
+import dev.avinya.admob.showcase.di.ProvideAdManager
 import dev.avinya.admob.showcase.di.rememberAppGraph
 import dev.avinya.admob.showcase.nav.ShowcaseNavHost
 import dev.avinya.admob.showcase.nav.ShowcaseNavKey
@@ -28,9 +29,11 @@ fun ShowcaseApp() {
     LaunchedEffect(graph) { graph.articles.seedIfEmpty() }
 
     CompositionLocalProvider(LocalAppGraph provides graph) {
-        ShowcaseTheme(themeMode = themeMode) {
-            val backStack = remember { mutableStateListOf<ShowcaseNavKey>(ShowcaseNavKey.Feed) }
-            ShowcaseNavHost(backStack = backStack)
+        ProvideAdManager {
+            ShowcaseTheme(themeMode = themeMode) {
+                val backStack = remember { mutableStateListOf<ShowcaseNavKey>(ShowcaseNavKey.Feed) }
+                ShowcaseNavHost(backStack = backStack)
+            }
         }
     }
 }
