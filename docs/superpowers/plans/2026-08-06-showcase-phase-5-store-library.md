@@ -806,18 +806,72 @@ Add `LocalAppOpenSuppressor` as a `CompositionLocal` provided in `ShowcaseApp`, 
 
 - [ ] **Step 5: Wire into navigation**
 
-Replace `PlaceholderScreen("Store")` with `StoreScreen()`.
+Phase 4 shipped its whole article feature unreachable because this step was left implicit. Do it explicitly.
+
+In `ShowcaseNavHost.kt`, replace the Store entry:
+
+```kotlin
+                entry<ShowcaseNavKey.Store> { StoreScreen() }
+```
+
+and add `import dev.avinya.admob.showcase.feature.store.StoreScreen`.
+
+In `ShowcaseApp.kt`, provide the suppressor above the nav host so both the Store and Phase 6's coordinator see the same instance:
+
+```kotlin
+    val suppressor = remember { AppOpenSuppressor() }
+
+    CompositionLocalProvider(
+        LocalAppGraph provides graph,
+        LocalAppOpenSuppressor provides suppressor,
+    ) {
+        // … ProvideAdManager { ShowcaseTheme { … } } unchanged …
+    }
+```
+
+`remember { }` with **no keys** — the suppressor must outlive every recomposition, and keying it would reset suppression depth mid-transaction.
 
 - [ ] **Step 6: Verify on device**
+
+```bash
+./gradlew :androidApp:installDebug
+```
 
 Four behaviours, all required:
 
 1. Watch a rewarded ad to completion → balance increases, snackbar confirms.
 2. **Dismiss one early → no credit**, and the message says no reward was earned.
 3. Offer wall shows an intro that can be declined; declining costs nothing.
-4. Unlock a premium article → coins spent, article shows as unlocked, and it survives an app restart.
+4. Unlock a premium article → coins spent, shown as unlocked, and it survives:
+
+```bash
+adb shell am force-stop dev.avinya.admob.cmp && ./gradlew :androidApp:installDebug
+```
 
 - [ ] **Step 7: Commit**
+
+```bash
+git add showcase/src
+git commit -m "$(cat <<'EOF'
+feat(showcase): add the Store with rewarded ads and coin unlocks
+
+Credit comes from the reward callback, never from show() returning
+Shown — a user who dismisses early still yields Shown, and crediting on
+it pays for an ad that was not watched. A replayed callback hits the
+idempotency key and returns AlreadyGranted.
+
+A fractional AdReward credits nothing rather than being rounded:
+AdReward exposes amountMicros with wholeAmountOrNull(), and rounding
+would silently over- or under-pay.
+
+Unlock transactions run inside AppOpenSuppressor.suppressing so an
+app-open ad cannot appear mid-purchase; the finally restores depth even
+if the transaction throws.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+EOF
+)"
+```
 
 ---
 
@@ -883,7 +937,30 @@ cd docs-site && npm test && cd ..
 
 - [ ] **Step 3: Run on iOS**
 
-Build and run `iosApp` in Xcode. Rewarded ads use a different presentation path from Android; confirm crediting and early-dismissal both behave identically.
+```bash
+xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp \
+  -configuration Debug -destination "generic/platform=iOS Simulator" \
+  CODE_SIGNING_ALLOWED=NO build
+```
+
+Then run it from Xcode against a simulator. Rewarded ads use a different presentation path on iOS, so confirm both crediting **and** early dismissal behave identically to Android — neither is implied by the Android run.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add showcase/src
+git commit -m "$(cat <<'EOF'
+feat(showcase): add the ad-free Library screen
+
+Bookmarks, in-progress and unlocked articles, grouped. Carries no ads at
+all, and says so in the UI: a showcase that puts an ad on every screen
+teaches the wrong lesson, and stating the reasoning is more useful than
+silently omitting them.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+EOF
+)"
+```
 
 ---
 
