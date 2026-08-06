@@ -27,7 +27,7 @@ fun ThemeMode.isDark(systemInDark: Boolean): Boolean = when (this) {
 }
 
 @Composable
-fun ShowcaseTheme(
+internal fun ShowcaseTheme(
     themeMode: ThemeMode = ThemeMode.Default,
     content: @Composable () -> Unit,
 ) {
