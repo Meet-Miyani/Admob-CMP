@@ -81,17 +81,12 @@ kotlin {
         val adCapableMain by creating {
             dependsOn(commonMain)
             dependencies {
+                implementation(project(":showcase"))
                 if (consumePublishedAdmobCmp) {
                     implementation("dev.avinya.ads:admob-cmp:${providers.gradleProperty("VERSION_NAME").get()}")
                 } else {
                     implementation(project(":admob-cmp-compose"))
                 }
-            }
-        }
-        val adCapableTest by creating {
-            dependsOn(commonTest)
-            dependencies {
-                implementation(libs.kotlinx.coroutines.test)
             }
         }
 
@@ -103,18 +98,14 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.android)
             }
         }
-        val androidHostTest by getting {
-            dependsOn(adCapableTest)
-        }
+        val androidHostTest by getting
         val iosMain by getting {
             dependsOn(adCapableMain)
             dependencies {
                 implementation(libs.kotlinx.coroutines.core)
             }
         }
-        val iosTest by getting {
-            dependsOn(adCapableTest)
-        }
+        val iosTest by getting
     }
 }
 
