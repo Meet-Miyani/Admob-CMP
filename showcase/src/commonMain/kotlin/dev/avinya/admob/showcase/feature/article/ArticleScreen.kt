@@ -24,9 +24,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.avinya.ads.LocalAdManager
+import dev.avinya.ads.ui.NativeAdView
 import dev.avinya.admob.showcase.data.db.entity.ArticleEntity
 import dev.avinya.admob.showcase.di.LocalAppGraph
+import dev.avinya.admob.showcase.domain.ad.ShowcasePlacements
+import dev.avinya.admob.showcase.domain.article.inlineAdSlotIndex
 import dev.avinya.admob.showcase.domain.article.splitParagraphs
+import dev.avinya.admob.showcase.ui.ad.inlineNativeAdLayout
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 
@@ -35,8 +40,9 @@ private const val PROGRESS_DEBOUNCE_MS: Long = 500
 @Composable
 fun ArticleScreen(articleId: String, onBack: () -> Unit) {
     val graph = LocalAppGraph.current
+    val adManager = LocalAdManager.current
     val viewModel: ArticleViewModel = viewModel {
-        ArticleViewModel(graph.articles, articleId)
+        ArticleViewModel(graph.articles, graph.settings, adManager, articleId)
     }
     val state by viewModel.state.collectAsState()
     val listState = rememberLazyListState()
@@ -54,6 +60,8 @@ fun ArticleScreen(articleId: String, onBack: () -> Unit) {
             article = state.article!!,
             bookmarked = state.bookmarked,
             initialProgress = state.initialProgress,
+            adsEnabled = state.adsEnabled,
+            sdkReady = state.sdkReady,
             listState = listState,
             onBack = { viewModel.onIntent(ArticleIntent.Close) },
             onToggleBookmark = { viewModel.onIntent(ArticleIntent.ToggleBookmark) },
@@ -70,12 +78,16 @@ private fun ArticleBody(
     article: ArticleEntity,
     bookmarked: Boolean,
     initialProgress: Float,
+    adsEnabled: Boolean,
+    sdkReady: Boolean,
     listState: androidx.compose.foundation.lazy.LazyListState,
     onBack: () -> Unit,
     onToggleBookmark: () -> Unit,
     onProgress: (Float) -> Unit,
 ) {
     val paragraphs = remember(article.body) { splitParagraphs(article.body) }
+    val adIndex = remember(paragraphs.size) { inlineAdSlotIndex(paragraphs.size) }
+    val showInlineAd = adsEnabled && sdkReady
 
     // Fraction as a derived state of the LazyListState. We approximate the
     // visible-row offset by index alone — coarse but stable across re-layouts,
@@ -122,11 +134,45 @@ private fun ArticleBody(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            items(paragraphs.size) { index ->
-                Text(
-                    text = paragraphs[index],
-                    style = MaterialTheme.typography.bodyLarge,
-                )
+            val itemCount = paragraphs.size + (adIndex?.let { 1 } ?: 0)
+            items(
+                count = itemCount,
+                key = { index ->
+                    when {
+                        adIndex == null -> "p-$index"
+                        index < adIndex -> "p-$index"
+                        index == adIndex -> "ad-${article.id}"
+                        else -> "p-${index - 1}"
+                    }
+                },
+            ) { index ->
+                when {
+                    adIndex != null && index == adIndex -> {
+                        if (showInlineAd) {
+                            NativeAdView(
+                                placement = ShowcasePlacements.articleNative,
+                                itemKey = "article_native_${article.id}",
+                                layout = inlineNativeAdLayout,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                            )
+                        } else {
+                            Text(
+                                text = paragraphs[index - 1],
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                        }
+                    }
+                    adIndex != null && index > adIndex -> Text(
+                        text = paragraphs[index - 1],
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    else -> Text(
+                        text = paragraphs[index],
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
             }
         }
     }

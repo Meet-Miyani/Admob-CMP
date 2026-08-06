@@ -42,7 +42,15 @@ object ShowcasePlacements {
         strictTestMode = true,
     )
 
-    // Phases 4-6 add articleNative, articleBanner, articleInterstitial,
+    val articleNative: AdPlacement = AdPlacement(
+        id = "article_native",
+        format = AdFormat.Native,
+        adUnitIds = AdUnitIds(android = TestAdIds.ANDROID_NATIVE, ios = TestAdIds.IOS_NATIVE),
+        cachePolicy = AdCachePolicy(maxSize = 2),
+        strictTestMode = true,
+    )
+
+    // Phases 4-6 add articleBanner, articleInterstitial,
     // storeRewarded, storeRewardedInterstitial and appOpen here, so the whole
     // catalog stays in one readable file.
 }

@@ -1,9 +1,15 @@
 package dev.avinya.admob.showcase.feature.article
 
 import androidx.lifecycle.viewModelScope
+import dev.avinya.ads.AdManager
+import dev.avinya.ads.AdManagerStatus
 import dev.avinya.admob.showcase.core.mvi.MviViewModel
+import dev.avinya.admob.showcase.data.prefs.SettingsRepository
 import dev.avinya.admob.showcase.data.repo.ArticleRepository
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
 /**
@@ -13,15 +19,23 @@ import kotlinx.coroutines.launch
  * Task 1 keeps `Close` trivial — it just emits [ArticleEffect.NavigateBack].
  * Task 4 will consult the AdPolicy in `onIntent(ArticleIntent.Close)` and may
  * swap that for a `ShowInterstitial` / `AdSuppressed` effect.
+ *
+ * Task 2 adds the inline native ad. The ad's placement, the SDK status, and
+ * the user's master switch are all observed here so the screen can collapse
+ * the slot to the surrounding paragraph when ads are off, without the
+ * reading position shifting.
  */
 class ArticleViewModel(
     private val articles: ArticleRepository,
+    private val settings: SettingsRepository,
+    private val adManager: AdManager,
     private val articleId: String,
 ) : MviViewModel<ArticleState, ArticleIntent, ArticleEffect>(ArticleState()) {
 
     init {
         load()
         observeBookmark()
+        observeAdGates()
     }
 
     private fun load() {
@@ -46,6 +60,21 @@ class ArticleViewModel(
                 updateState { copy(bookmarked = bookmarked) }
             }
         }
+    }
+
+    private fun observeAdGates() {
+        combine(settings.adsMasterSwitch, adManager.status) { adsEnabled, status ->
+            adsEnabled to status
+        }
+            .onEach { (adsEnabled, status) ->
+                updateState {
+                    copy(
+                        adsEnabled = adsEnabled,
+                        sdkReady = status == AdManagerStatus.Ready,
+                    )
+                }
+            }
+            .launchIn(viewModelScope)
     }
 
     override fun onIntent(intent: ArticleIntent) {
