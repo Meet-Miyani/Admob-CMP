@@ -19,16 +19,34 @@ explicit prior consent.** This is a showcase; the library is the subject,
 not the material.
 
 Building a real app against an SDK is how API gaps get found, so gaps are
-expected. When one appears:
+expected — finding them is a *goal* of this work, not a side effect. What is
+forbidden is resolving them here. The SDK is the product; the showcase is one
+of its consumers, and a consumer reaching into the producer to fix its own
+problem destroys the signal that the gap existed at all.
 
-1. Record it — what was needed, which screen needed it, what the workaround
-   was.
-2. Work around it inside `:showcase` if a reasonable workaround exists.
-3. Bring it to the owner. Do not patch the library mid-branch.
+When a gap appears:
 
-Any SDK change the owner subsequently approves lands as its own additive
-commit, with the regenerated `api/*.klib.api` dump in that same commit, per
-[AGENTS.md](../../../AGENTS.md).
+1. **Record it** in `docs/showcase-sdk-gaps.md` (append-only; created on the
+   first gap, not preemptively).
+2. **Work around it** inside `:showcase` if a reasonable workaround exists.
+3. **Escalate it** to the owner. Do not patch the library mid-branch.
+
+Each entry uses this format, so the log is directly actionable later without
+re-deriving context:
+
+```
+## <short title>
+- Phase / screen:   where it surfaced
+- Needed:           the API or behaviour the showcase wanted
+- Available today:  the closest thing admob-cmp actually exposes
+- Workaround:       what :showcase does instead, and what it costs
+- Severity:         blocks a showcase feature | forces awkward code | cosmetic
+- Additive?:        whether a fix would be ABI-additive or breaking
+```
+
+Any SDK change the owner subsequently approves happens **after this branch**,
+as its own additive commit, with the regenerated `api/*.klib.api` dump in that
+same commit, per [AGENTS.md](../../../AGENTS.md).
 
 The frozen ABI is untouched by this work: `:showcase` is not a published
 module.
@@ -493,6 +511,8 @@ Files this branch is expected to touch:
 - `scripts/release-readiness.sh` — add `:showcase` tests to the existing
   Android-host and iOS test sections
 - `README.md` — a short "Showcase app" section
+- `docs/showcase-sdk-gaps.md` — new, and only if a gap is actually found (see
+  Invariant 0)
 
 Files this branch must **not** touch:
 
