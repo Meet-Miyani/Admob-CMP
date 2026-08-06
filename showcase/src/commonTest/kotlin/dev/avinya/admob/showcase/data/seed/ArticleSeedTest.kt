@@ -42,4 +42,18 @@ class ArticleSeedTest {
     fun freeArticlesCostNothing() {
         assertTrue(ArticleSeed.articles().filterNot { it.isPremium }.all { it.unlockCostCoins == 0 })
     }
+
+    @Test
+    fun everyArticleCarriesItsFeedOrdinal() {
+        val ordinals = ArticleSeed.articles().map { it.feedOrdinal }
+
+        assertEquals(ordinals.indices.toList(), ordinals)
+    }
+
+    @Test
+    fun ordinalOrderMatchesPublishedAtDescendingSoTheFeedAgrees() {
+        val byPublished = ArticleSeed.articles().sortedByDescending { it.publishedAt }
+
+        assertEquals(byPublished.map { it.feedOrdinal }, byPublished.indices.toList())
+    }
 }

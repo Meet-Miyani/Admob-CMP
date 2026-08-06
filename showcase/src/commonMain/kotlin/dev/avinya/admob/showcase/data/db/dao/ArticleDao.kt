@@ -1,5 +1,6 @@
 package dev.avinya.admob.showcase.data.db.dao
 
+import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -28,6 +29,14 @@ interface ArticleDao {
 
     @Query("SELECT * FROM articles ORDER BY publishedAt DESC LIMIT :limit OFFSET :offset")
     suspend fun page(limit: Int, offset: Int): List<ArticleEntity>
+
+    /**
+     * Feed order. `feedOrdinal` ascending is equivalent to `publishedAt`
+     * descending — asserted by `ArticleSeedTest` — and sorting on the integer
+     * keeps the ad-slot rule and the query agreeing on one ordering.
+     */
+    @Query("SELECT * FROM articles ORDER BY feedOrdinal ASC")
+    fun pagingSource(): PagingSource<Int, ArticleEntity>
 
     @Upsert
     suspend fun upsertProgress(progress: ReadingProgressEntity)

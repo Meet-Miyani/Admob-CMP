@@ -73,6 +73,7 @@ object ArticleSeed {
                         readTimeMin = 4 + index % 9,
                         isPremium = premium,
                         unlockCostCoins = if (premium) 50 else 0,
+                        feedOrdinal = index,
                     )
                 )
                 index++

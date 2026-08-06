@@ -17,6 +17,15 @@ data class ArticleEntity(
     val readTimeMin: Int,
     val isPremium: Boolean,
     val unlockCostCoins: Int,
+    /**
+     * Position in the feed's canonical ordering, assigned by the seed.
+     *
+     * Exists because Paging's `insertSeparators` provides adjacent items but
+     * no index, and a stateful counter would be wrong — separators are
+     * recomputed lazily. Ad placement therefore reads stable data on the
+     * article rather than a list position.
+     */
+    val feedOrdinal: Int,
 )
 
 @Entity(

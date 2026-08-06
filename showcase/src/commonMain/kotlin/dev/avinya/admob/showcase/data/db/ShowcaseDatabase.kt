@@ -29,7 +29,7 @@ import dev.avinya.admob.showcase.data.db.entity.WalletEntity
         PolicyDecisionEntity::class,
         PaidEventEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 @ConstructedBy(ShowcaseDatabaseConstructor::class)

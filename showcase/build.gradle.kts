@@ -58,6 +58,9 @@ kotlin {
                 implementation(libs.androidx.navigation3.runtime)
                 implementation(libs.androidx.navigation3.ui)
                 implementation(libs.androidx.lifecycle.viewmodelNavigation3)
+                implementation(libs.androidx.paging.common)
+                implementation(libs.androidx.paging.compose)
+                implementation(libs.androidx.room.paging)
 
                 if (consumePublishedAdmobCmp) {
                     implementation("dev.avinya.ads:admob-cmp:${providers.gradleProperty("VERSION_NAME").get()}")

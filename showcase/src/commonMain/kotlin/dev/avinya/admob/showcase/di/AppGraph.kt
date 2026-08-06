@@ -35,6 +35,14 @@ class AppGraph(storage: PlatformStorage) {
     val database: ShowcaseDatabase = storage.databaseBuilder()
         .setDriver(BundledSQLiteDriver())
         .setQueryCoroutineContext(Dispatchers.IO)
+        // Destructive is correct *here* and only here: every row in the
+        // database at this point is regenerable seed content, so a real
+        // Migration would be ceremony with no user-visible benefit.
+        //
+        // This stops being acceptable from Phase 5 onward, when the wallet
+        // holds coins the user earned by watching ads. Any schema change after
+        // that needs a real Migration.
+        .fallbackToDestructiveMigration(dropAllTables = true)
         .build()
 
     private val preferences: DataStore<Preferences> =
