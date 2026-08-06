@@ -1,17 +1,16 @@
 package dev.avinya.admob.showcase
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.remember
 import dev.avinya.admob.showcase.di.LocalAppGraph
 import dev.avinya.admob.showcase.di.rememberAppGraph
+import dev.avinya.admob.showcase.nav.ShowcaseNavHost
+import dev.avinya.admob.showcase.nav.ShowcaseNavKey
 import dev.avinya.admob.showcase.ui.theme.ShowcaseTheme
 import dev.avinya.admob.showcase.ui.theme.ThemeMode
 
@@ -30,9 +29,8 @@ fun ShowcaseApp() {
 
     CompositionLocalProvider(LocalAppGraph provides graph) {
         ShowcaseTheme(themeMode = themeMode) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Showcase app — foundation")
-            }
+            val backStack = remember { mutableStateListOf<ShowcaseNavKey>(ShowcaseNavKey.Feed) }
+            ShowcaseNavHost(backStack = backStack)
         }
     }
 }
