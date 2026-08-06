@@ -438,15 +438,192 @@ class OnboardingViewModel(
 
 - [ ] **Step 6: Write the screen**
 
-Create `showcase/src/commonMain/.../feature/onboarding/OnboardingScreen.kt`. Render one row per `OnboardingStep.orderedSteps()` with its state, the `TrackingStepDisplay` (including an explicit "not applicable on this platform" row), and on `OnboardingStep.Failed` a Retry button plus a **Continue without ads** button. Collect `effects` and call `onFinished()` on `OnboardingEffect.Finished`.
+Create `showcase/src/commonMain/.../feature/onboarding/OnboardingScreen.kt`:
 
-Construct the ViewModel from `LocalAdManager.current` and `LocalAppGraph.current.settings`, reading `debugGeography` from `settings.consentDebugGeography`.
+```kotlin
+package dev.avinya.admob.showcase.feature.onboarding
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.avinya.ads.ConsentDebugGeography
+import dev.avinya.ads.LocalAdManager
+import dev.avinya.admob.showcase.StartupState
+import dev.avinya.admob.showcase.di.LocalAppGraph
+
+/**
+ * First-launch screen. Shows the initialisation sequence as it happens.
+ *
+ * Deliberately narrates each step rather than showing an opaque spinner: a
+ * consumer reading this app should be able to see that consent comes before
+ * tracking, and tracking before the first ad request.
+ */
+@Composable
+fun OnboardingScreen(onFinished: () -> Unit) {
+    val adManager = LocalAdManager.current
+    val graph = LocalAppGraph.current
+    val storedGeography by graph.settings.consentDebugGeography.collectAsState(initial = null)
+
+    val debugGeography = remember(storedGeography) {
+        ConsentDebugGeography.entries.firstOrNull { it.name == storedGeography }
+            ?: ConsentDebugGeography.Disabled
+    }
+
+    val viewModel: OnboardingViewModel = viewModel(key = debugGeography.name) {
+        OnboardingViewModel(adManager, graph.settings, debugGeography)
+    }
+    val state by viewModel.state.collectAsState()
+
+    LaunchedEffect(viewModel) {
+        viewModel.onIntent(OnboardingIntent.Begin)
+    }
+    LaunchedEffect(viewModel) {
+        viewModel.effects.collect { effect ->
+            when (effect) {
+                OnboardingEffect.Finished -> onFinished()
+            }
+        }
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text("Setting up ads", style = MaterialTheme.typography.headlineLarge)
+        Text(
+            "Consent is gathered first, then tracking permission, then the SDK " +
+                "initialises. Requesting ads before tracking resolves would " +
+                "permanently forfeit the advertising identifier.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        OnboardingStep.orderedSteps().forEach { step ->
+            StepRow(
+                label = step.label(),
+                detail = step.detail(state),
+                status = step.statusFor(state),
+            )
+        }
+
+        val startup = state.startup
+        if (state.step == OnboardingStep.Failed && startup is StartupState.Failed) {
+            Text(
+                startup.message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (startup.retryable) {
+                    Button(onClick = { viewModel.onIntent(OnboardingIntent.Retry) }) { Text("Retry") }
+                }
+                // Always offered: a consent refusal or a permanent failure must
+                // never trap the user here. The app works fully without ads.
+                OutlinedButton(onClick = { viewModel.onIntent(OnboardingIntent.ContinueWithoutAds) }) {
+                    Text("Continue without ads")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StepRow(label: String, detail: String, status: StepStatus) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        when (status) {
+            StepStatus.Active -> CircularProgressIndicator(modifier = Modifier.width(18.dp))
+            StepStatus.Complete -> Text("✓", style = MaterialTheme.typography.titleMedium)
+            StepStatus.Skipped -> Text("–", style = MaterialTheme.typography.titleMedium)
+            StepStatus.Pending -> Text("·", style = MaterialTheme.typography.titleMedium)
+        }
+        Column {
+            Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+            Text(
+                detail,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+    Spacer(Modifier.width(0.dp))
+}
+
+private enum class StepStatus { Pending, Active, Complete, Skipped }
+
+private fun OnboardingStep.label(): String = when (this) {
+    OnboardingStep.Consent -> "Consent"
+    OnboardingStep.Tracking -> "Tracking permission"
+    OnboardingStep.Initializing -> "Initialising the SDK"
+    OnboardingStep.Done -> "Ready"
+    OnboardingStep.Failed -> "Failed"
+}
+
+private fun OnboardingStep.detail(state: OnboardingState): String = when (this) {
+    OnboardingStep.Consent -> "UMP gathers consent where it is required"
+    OnboardingStep.Tracking -> when (state.tracking) {
+        // Shown, not hidden: a consumer needs to learn ATT is iOS-only.
+        TrackingStepDisplay.NotApplicable -> "Not applicable on this platform"
+        TrackingStepDisplay.Pending -> "Waiting for the system prompt"
+        TrackingStepDisplay.Granted -> "Granted — personalised ads available"
+        TrackingStepDisplay.Refused -> "Refused — non-personalised ads only"
+    }
+    OnboardingStep.Initializing -> "Starting Google Mobile Ads"
+    OnboardingStep.Done -> "Done"
+    OnboardingStep.Failed -> "Failed"
+}
+
+private fun OnboardingStep.statusFor(state: OnboardingState): StepStatus {
+    if (this == OnboardingStep.Tracking &&
+        state.tracking == TrackingStepDisplay.NotApplicable
+    ) {
+        return StepStatus.Skipped
+    }
+    val order = OnboardingStep.orderedSteps()
+    val currentIndex = order.indexOf(state.step)
+    val thisIndex = order.indexOf(this)
+    return when {
+        state.step == OnboardingStep.Done -> StepStatus.Complete
+        currentIndex < 0 -> StepStatus.Pending
+        thisIndex < currentIndex -> StepStatus.Complete
+        thisIndex == currentIndex -> StepStatus.Active
+        else -> StepStatus.Pending
+    }
+}
+```
 
 - [ ] **Step 7: Verify and commit**
 
 ```bash
 ./gradlew :showcase:testAndroidHostTest :showcase:iosSimulatorArm64Test :showcase:compileKotlinIosArm64 --no-configuration-cache
 ```
+
+Expected: `BUILD SUCCESSFUL`, `OnboardingStepTest` passing on both platforms.
 
 ```bash
 git add showcase/src && git commit -m "$(cat <<'EOF'
@@ -538,22 +715,333 @@ fun shouldShowPrivacyOptionsButton(status: PrivacyOptionsRequirementStatus): Boo
 
 ```
 
-- [ ] **Step 3: Build the Settings screen**
+- [ ] **Step 3: Write the contract**
 
-Sections, each reading live state:
+Create `showcase/src/commonMain/.../feature/settings/SettingsContract.kt`:
 
-| Section | Contents |
-|---|---|
-| SDK | `adManager.status`, `diagnostics.sdkVersion()`, `diagnostics.adapterStatuses()` |
-| Consent | `consent.status`, `consent.canRequestAds`, privacy-options button (gated as above) → `consent.showPrivacyOptions()` |
-| Consent debugging | `ConsentDebugGeography` picker (persisted), `consent.resetConsentForDebug()` + note that it takes effect on next launch |
-| Tracking | `tracking.status()`, request button, "not applicable on Android" copy |
-| Diagnostics | `openAdInspector()`, `openDebugMenu(adUnitId)` — both return `Boolean`; surface failure rather than swallowing it |
-| App | theme picker, inspector toggle, ads master switch |
+```kotlin
+package dev.avinya.admob.showcase.feature.settings
 
-The ads master switch and theme write through `SettingsRepository`.
+import dev.avinya.ads.AdTrackingAuthorization
+import dev.avinya.ads.ConsentDebugGeography
+import dev.avinya.ads.ConsentStatus
+import dev.avinya.ads.PrivacyOptionsRequirementStatus
+import dev.avinya.admob.showcase.ui.theme.ThemeMode
 
-- [ ] **Step 4: Verify and commit**
+data class SettingsState(
+    val sdkStatus: String = "Unknown",
+    val sdkVersion: String? = null,
+    val adapters: List<String> = emptyList(),
+    val consentStatus: ConsentStatus = ConsentStatus.Unknown,
+    val canRequestAds: Boolean = false,
+    val privacyOptions: PrivacyOptionsRequirementStatus = PrivacyOptionsRequirementStatus.Unknown,
+    val tracking: AdTrackingAuthorization = AdTrackingAuthorization.NotDetermined,
+    val debugGeography: ConsentDebugGeography = ConsentDebugGeography.Disabled,
+    val themeMode: ThemeMode = ThemeMode.Default,
+    val inspectorEnabled: Boolean = true,
+    val adsEnabled: Boolean = true,
+    val busy: Boolean = false,
+)
+
+sealed interface SettingsIntent {
+    data object ShowPrivacyOptions : SettingsIntent
+    data object RequestTracking : SettingsIntent
+    data object ResetConsent : SettingsIntent
+    data object OpenAdInspector : SettingsIntent
+    data class SetDebugGeography(val geography: ConsentDebugGeography) : SettingsIntent
+    data class SetThemeMode(val mode: ThemeMode) : SettingsIntent
+    data class SetInspectorEnabled(val enabled: Boolean) : SettingsIntent
+    data class SetAdsEnabled(val enabled: Boolean) : SettingsIntent
+}
+
+sealed interface SettingsEffect {
+    /** Shown as a transient message. [success] false means the SDK refused the request. */
+    data class Notice(val message: String, val success: Boolean) : SettingsEffect
+}
+```
+
+- [ ] **Step 4: Write the ViewModel**
+
+Create `showcase/src/commonMain/.../feature/settings/SettingsViewModel.kt`:
+
+```kotlin
+package dev.avinya.admob.showcase.feature.settings
+
+import androidx.lifecycle.viewModelScope
+import dev.avinya.ads.AdManager
+import dev.avinya.ads.ConsentDebugGeography
+import dev.avinya.admob.showcase.core.mvi.MviViewModel
+import dev.avinya.admob.showcase.data.prefs.SettingsRepository
+import dev.avinya.admob.showcase.ui.theme.ThemeMode
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.launch
+
+class SettingsViewModel(
+    private val adManager: AdManager,
+    private val settings: SettingsRepository,
+) : MviViewModel<SettingsState, SettingsIntent, SettingsEffect>(SettingsState()) {
+
+    init {
+        observeSdk()
+        observePreferences()
+        updateState {
+            copy(
+                sdkVersion = adManager.diagnostics.sdkVersion(),
+                adapters = adManager.diagnostics.adapterStatuses().map { it.toString() },
+                tracking = adManager.tracking.status(),
+            )
+        }
+    }
+
+    private fun observeSdk() {
+        viewModelScope.launch {
+            combine(
+                adManager.status,
+                adManager.consent.status,
+                adManager.consent.canRequestAds,
+                adManager.consent.privacyOptionsRequirementStatus,
+            ) { status, consent, canRequest, privacy ->
+                Quad(status, consent, canRequest, privacy)
+            }.collect { (status, consent, canRequest, privacy) ->
+                updateState {
+                    copy(
+                        sdkStatus = status.toString(),
+                        consentStatus = consent,
+                        canRequestAds = canRequest,
+                        privacyOptions = privacy,
+                    )
+                }
+            }
+        }
+    }
+
+    private fun observePreferences() {
+        viewModelScope.launch {
+            combine(
+                settings.themeMode,
+                settings.inspectorEnabled,
+                settings.adsMasterSwitch,
+                settings.consentDebugGeography,
+            ) { theme, inspector, ads, geography ->
+                Quad(theme, inspector, ads, geography)
+            }.collect { (theme, inspector, ads, geography) ->
+                updateState {
+                    copy(
+                        themeMode = theme,
+                        inspectorEnabled = inspector,
+                        adsEnabled = ads,
+                        debugGeography = ConsentDebugGeography.entries
+                            .firstOrNull { it.name == geography } ?: ConsentDebugGeography.Disabled,
+                    )
+                }
+            }
+        }
+    }
+
+    override fun onIntent(intent: SettingsIntent) {
+        when (intent) {
+            SettingsIntent.ShowPrivacyOptions -> run("Privacy options") {
+                adManager.consent.showPrivacyOptions()
+            }
+            SettingsIntent.ResetConsent -> run("Consent reset — restart to see the form again") {
+                adManager.consent.resetConsentForDebug()
+            }
+            SettingsIntent.OpenAdInspector -> run("Ad Inspector") {
+                adManager.diagnostics.openAdInspector()
+            }
+            SettingsIntent.RequestTracking -> viewModelScope.launch {
+                val result = adManager.tracking.requestAuthorization()
+                updateState { copy(tracking = result) }
+            }
+            is SettingsIntent.SetDebugGeography -> viewModelScope.launch {
+                settings.setConsentDebugGeography(intent.geography.name)
+                emitEffect(SettingsEffect.Notice("Applies on next launch", success = true))
+            }
+            is SettingsIntent.SetThemeMode -> viewModelScope.launch { settings.setThemeMode(intent.mode) }
+            is SettingsIntent.SetInspectorEnabled ->
+                viewModelScope.launch { settings.setInspectorEnabled(intent.enabled) }
+            is SettingsIntent.SetAdsEnabled ->
+                viewModelScope.launch { settings.setAdsMasterSwitch(intent.enabled) }
+        }
+    }
+
+    /**
+     * Runs an SDK call that reports success as a `Boolean`.
+     *
+     * The result is surfaced rather than swallowed: `showPrivacyOptions()` and
+     * `openAdInspector()` return `false` in legitimate situations, and a button
+     * that silently does nothing is the worst possible teaching example.
+     */
+    private fun run(label: String, block: suspend () -> Boolean) {
+        if (state.value.busy) return
+        updateState { copy(busy = true) }
+        viewModelScope.launch {
+            val ok = block()
+            updateState { copy(busy = false) }
+            emitEffect(
+                SettingsEffect.Notice(
+                    message = if (ok) label else "$label unavailable right now",
+                    success = ok,
+                ),
+            )
+        }
+    }
+}
+
+private data class Quad<A, B, C, D>(val a: A, val b: B, val c: C, val d: D)
+```
+
+- [ ] **Step 5: Write the screen**
+
+Create `showcase/src/commonMain/.../feature/settings/SettingsScreen.kt`. Structure it as six sections in a `LazyColumn`, each a `SettingsSection(title) { … }` composable of your own:
+
+```kotlin
+@Composable
+fun SettingsScreen() {
+    val adManager = LocalAdManager.current
+    val graph = LocalAppGraph.current
+    val viewModel: SettingsViewModel = viewModel { SettingsViewModel(adManager, graph.settings) }
+    val state by viewModel.state.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(viewModel) {
+        viewModel.effects.collect { effect ->
+            when (effect) {
+                is SettingsEffect.Notice -> snackbarHostState.showSnackbar(effect.message)
+            }
+        }
+    }
+
+    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+        ) {
+            item {
+                SettingsSection("SDK") {
+                    LabelledValue("Status", state.sdkStatus)
+                    LabelledValue("Version", state.sdkVersion ?: "unavailable")
+                    LabelledValue("Adapters", state.adapters.size.toString())
+                }
+            }
+            item {
+                SettingsSection("Consent") {
+                    LabelledValue("Status", state.consentStatus.toString())
+                    LabelledValue("Can request ads", state.canRequestAds.toString())
+                    LabelledValue("Privacy options", state.privacyOptions.name)
+
+                    // Gated ONLY on the requirement status — never on
+                    // ConsentStatus.Obtained. See shouldShowPrivacyOptionsButton.
+                    if (shouldShowPrivacyOptionsButton(state.privacyOptions)) {
+                        Button(
+                            enabled = !state.busy,
+                            onClick = { viewModel.onIntent(SettingsIntent.ShowPrivacyOptions) },
+                        ) { Text("Manage consent") }
+                    }
+                }
+            }
+            item {
+                SettingsSection("Consent debugging") {
+                    Text(
+                        "Debug geography forces UMP to behave as if the device were " +
+                            "in the selected region. Applies on next launch.",
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                    ConsentDebugGeography.entries.forEach { geography ->
+                        RadioRow(
+                            label = geography.name,
+                            selected = state.debugGeography == geography,
+                            onClick = { viewModel.onIntent(SettingsIntent.SetDebugGeography(geography)) },
+                        )
+                    }
+                    OutlinedButton(
+                        enabled = !state.busy,
+                        onClick = { viewModel.onIntent(SettingsIntent.ResetConsent) },
+                    ) { Text("Reset consent") }
+                }
+            }
+            item {
+                SettingsSection("Tracking") {
+                    LabelledValue("Authorisation", state.tracking.name)
+                    if (state.tracking == AdTrackingAuthorization.NotApplicable) {
+                        Text(
+                            "App Tracking Transparency is an iOS concept. Android " +
+                                "always reports NotApplicable.",
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    } else {
+                        Button(onClick = { viewModel.onIntent(SettingsIntent.RequestTracking) }) {
+                            Text("Request tracking permission")
+                        }
+                    }
+                }
+            }
+            item {
+                SettingsSection("Diagnostics") {
+                    Button(
+                        enabled = !state.busy,
+                        onClick = { viewModel.onIntent(SettingsIntent.OpenAdInspector) },
+                    ) { Text("Open Ad Inspector") }
+                }
+            }
+            item {
+                SettingsSection("App") {
+                    ThemeMode.entries.forEach { mode ->
+                        RadioRow(
+                            label = mode.name,
+                            selected = state.themeMode == mode,
+                            onClick = { viewModel.onIntent(SettingsIntent.SetThemeMode(mode)) },
+                        )
+                    }
+                    SwitchRow(
+                        label = "Show inspector",
+                        checked = state.inspectorEnabled,
+                        onCheckedChange = { viewModel.onIntent(SettingsIntent.SetInspectorEnabled(it)) },
+                    )
+                    SwitchRow(
+                        label = "Show ads",
+                        checked = state.adsEnabled,
+                        onCheckedChange = { viewModel.onIntent(SettingsIntent.SetAdsEnabled(it)) },
+                    )
+                    Text(
+                        "Turning ads off suppresses every placement locally without " +
+                            "changing any SDK or consent state. The app stays fully usable.",
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+            }
+        }
+    }
+}
+```
+
+Write the four small helpers — `SettingsSection(title, content)`, `LabelledValue(label, value)`, `RadioRow(label, selected, onClick)` and `SwitchRow(label, checked, onCheckedChange)` — in the same file; each is a `Row` or `Column` of Material3 primitives with no logic.
+
+Replace `PlaceholderScreen("Settings")` in `ShowcaseNavHost` with `SettingsScreen()`.
+
+- [ ] **Step 6: Verify and commit**
+
+```bash
+./gradlew :showcase:testAndroidHostTest :showcase:iosSimulatorArm64Test :showcase:compileKotlinIosArm64 --no-configuration-cache
+```
+
+```bash
+git add showcase/src && git commit -m "$(cat <<'EOF'
+feat(showcase): add Settings with live consent, tracking and diagnostics
+
+The privacy-options button is gated only on
+PrivacyOptionsRequirementStatus.Required, never on
+ConsentStatus.Obtained — gating on the latter puts a dead button in front
+of users in regions where UMP requires no such control.
+
+Boolean-returning SDK calls surface their result rather than swallowing
+it; a button that silently does nothing is the worst teaching example.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+EOF
+)"
+```
 
 ---
 
@@ -565,15 +1053,101 @@ The ads master switch and theme write through `SettingsRepository`.
 - Modify: `showcase/src/commonMain/.../nav/ShowcaseNavHost.kt`
 - Modify: `docs-site/test/content-quality.test.ts`
 
-- [ ] **Step 1: Add the Onboarding destination**
+- [ ] **Step 1: Extend the nav-key test first**
 
-Add `data object Onboarding : ShowcaseNavKey` (label `"Welcome"`), and **do not** add it to `TOP_LEVEL_KEYS` — it is not a tab. Extend `ShowcaseNavKeyTest` to assert it is excluded, mirroring the existing `ArticleDetail` case.
+Add to `ShowcaseNavKeyTest`:
 
-- [ ] **Step 2: Choose the start destination from persisted state**
+```kotlin
+    @Test
+    fun onboardingIsNotATopLevelDestination() {
+        assertTrue(TOP_LEVEL_KEYS.none { it == ShowcaseNavKey.Onboarding })
+    }
 
-In `ShowcaseApp.kt`, read `settings.onboardingComplete` and start the backstack at `Onboarding` when false, `Feed` when true. Hide the bottom bar while the current key is `Onboarding`.
+    @Test
+    fun onboardingHidesTheBottomBar() {
+        assertFalse(showsBottomBar(ShowcaseNavKey.Onboarding))
+        assertTrue(showsBottomBar(ShowcaseNavKey.Feed))
+        assertTrue(showsBottomBar(ShowcaseNavKey.ArticleDetail("a1")))
+    }
+```
 
-- [ ] **Step 3: Restore the docs-site factual contract**
+Run it and confirm it fails with `Unresolved reference: Onboarding`.
+
+- [ ] **Step 2: Add the destination and the bottom-bar rule**
+
+In `ShowcaseNavKey.kt`, add the destination — **not** to `TOP_LEVEL_KEYS`:
+
+```kotlin
+    data object Onboarding : ShowcaseNavKey {
+        override val label: String = "Welcome"
+    }
+```
+
+and below `TOP_LEVEL_KEYS`:
+
+```kotlin
+/**
+ * Whether the bottom bar shows for [key].
+ *
+ * Onboarding is modal: the tabs must not be reachable until the SDK has
+ * either initialised or been declined. Kept as a pure function so the rule
+ * is testable without Compose.
+ */
+fun showsBottomBar(key: ShowcaseNavKey): Boolean = key != ShowcaseNavKey.Onboarding
+```
+
+Run the test again and confirm it passes.
+
+- [ ] **Step 3: Choose the start destination from persisted state**
+
+In `ShowcaseApp.kt`, replace the fixed backstack with one seeded from `onboardingComplete`. `collectAsState` needs an initial value, and `null` is used to mean "not yet loaded" so the app does not flash the Feed before the preference arrives:
+
+```kotlin
+    val onboardingComplete by graph.settings.onboardingComplete
+        .map<Boolean, Boolean?> { it }
+        .collectAsState(initial = null)
+
+    CompositionLocalProvider(LocalAppGraph provides graph) {
+        ProvideAdManager {
+            ShowcaseTheme(themeMode = themeMode) {
+                // Hold the first screen until the preference resolves, otherwise
+                // a returning user briefly sees onboarding on every cold start.
+                when (onboardingComplete) {
+                    null -> Box(Modifier.fillMaxSize())
+                    else -> {
+                        val backStack = remember(onboardingComplete) {
+                            mutableStateListOf<ShowcaseNavKey>(
+                                if (onboardingComplete == true) {
+                                    ShowcaseNavKey.Feed
+                                } else {
+                                    ShowcaseNavKey.Onboarding
+                                },
+                            )
+                        }
+                        ShowcaseNavHost(backStack = backStack)
+                    }
+                }
+            }
+        }
+    }
+```
+
+In `ShowcaseNavHost`, wrap the `NavigationBar` in `if (showsBottomBar(current)) { … }` and add the entry:
+
+```kotlin
+                entry<ShowcaseNavKey.Onboarding> {
+                    OnboardingScreen(
+                        onFinished = {
+                            backStack.clear()
+                            backStack.add(ShowcaseNavKey.Feed)
+                        },
+                    )
+                }
+```
+
+Clearing before adding matters: leaving `Onboarding` on the stack would let a back press return to a completed consent flow.
+
+- [ ] **Step 4: Restore the docs-site factual contract**
 
 Phase 1a's file moves dropped an assertion: the contract used to check that a sample demonstrates `ConsentMode.GatherBeforeInitialize`, and nothing replaced it. The showcase now has a real consent flow, so re-point it.
 
@@ -596,7 +1170,7 @@ and extend the showcase startup test:
 
 > The showcase uses `InitializeOnlyIfAlreadyAllowed` after an explicit `gatherConsent`, which is the two-step form of what `GatherBeforeInitialize` does in one call. If the docs assert `GatherBeforeInitialize` specifically, either add a second sample using it or adjust the docs — **flag this to the owner rather than silently changing docs prose.**
 
-- [ ] **Step 4: Full verification**
+- [ ] **Step 5: Full verification**
 
 ```bash
 ./gradlew :showcase:testAndroidHostTest :showcase:iosSimulatorArm64Test --no-configuration-cache
@@ -604,11 +1178,11 @@ and extend the showcase startup test:
 cd docs-site && npm test && cd ..
 ```
 
-- [ ] **Step 5: Run on both platforms**
+- [ ] **Step 6: Run on both platforms**
 
 Fresh install on Android: onboarding appears, consent form shows (test mode), initialization reaches `Ready`, tabs become reachable. On iOS simulator additionally confirm the **ATT prompt appears** and that `Info.plist` carries `NSUserTrackingUsageDescription` — without it the prompt cannot show and the IDFA is withheld silently.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ---
 
