@@ -45,7 +45,7 @@ fun ShowcaseNavHost(backStack: SnapshotStateList<ShowcaseNavKey>) {
         NavDisplay(
             backStack = backStack,
             modifier = Modifier.fillMaxSize().padding(padding),
-            onBack = { backStack.removeLastOrNull() },
+            onBack = { if (backStack.size > 1) backStack.removeLast() },
             entryDecorators = listOf(rememberViewModelStoreNavEntryDecorator()),
             entryProvider = entryProvider {
                 entry<ShowcaseNavKey.Feed> { PlaceholderScreen("Feed") }
