@@ -87,6 +87,9 @@ private fun ArticleBody(
 ) {
     val paragraphs = remember(article.body) { splitParagraphs(article.body) }
     val adIndex = remember(paragraphs.size) { inlineAdSlotIndex(paragraphs.size) }
+    // Use a sentinel past the end of any LazyColumn row so the paragraph↔row
+    // shift below becomes a no-op for articles that don't carry an ad.
+    val effectiveAdIndex = adIndex ?: Int.MAX_VALUE
     val showInlineAd = adsEnabled && sdkReady
 
     // Fraction as a derived state of the LazyListState. We approximate the
@@ -96,7 +99,11 @@ private fun ArticleBody(
         derivedStateOf {
             val total = paragraphs.size
             if (total <= 1) 0f
-            else (listState.firstVisibleItemIndex.toFloat() / (total - 1)).coerceIn(0f, 1f)
+            else {
+                val row = listState.firstVisibleItemIndex
+                val paragraph = row - (if (row > effectiveAdIndex) 1 else 0)
+                (paragraph.toFloat() / (total - 1)).coerceIn(0f, 1f)
+            }
         }
     }
 
@@ -107,7 +114,10 @@ private fun ArticleBody(
             val target = (initialProgress * (paragraphs.size - 1))
                 .toInt()
                 .coerceIn(0, paragraphs.lastIndex)
-            listState.scrollToItem(target)
+            // The ad row shifts every LazyColumn index at and after it by one,
+            // so the paragraph-based target needs the matching offset.
+            val listTarget = target + (if (target >= effectiveAdIndex) 1 else 0)
+            listState.scrollToItem(listTarget)
         }
     }
 
