@@ -72,13 +72,10 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.test)
             }
         }
-        val androidHostTest by getting {
-            dependencies {
-                implementation("androidx.test:core:1.6.1")
-                implementation("androidx.test.ext:junit:1.2.1")
-                implementation("org.robolectric:robolectric:4.14.1")
-            }
-        }
+        // No androidHostTest dependencies: every test in this module is a pure
+        // JVM/Native test over values. Verifying Room would need Robolectric and
+        // androidx.test here, which is an unreasonable cost for a module whose
+        // job is to demonstrate the ad SDK — see RoomCodegenCanaryTest (iosTest).
         val androidMain by getting {
             dependencies {
                 implementation(libs.kotlinx.coroutines.android)

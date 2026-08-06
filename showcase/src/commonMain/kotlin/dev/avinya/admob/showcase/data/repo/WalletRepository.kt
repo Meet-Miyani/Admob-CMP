@@ -4,26 +4,26 @@ import dev.avinya.admob.showcase.core.time.Clock
 import dev.avinya.admob.showcase.data.db.dao.WalletDao
 import dev.avinya.admob.showcase.data.db.entity.RewardGrantEntity
 import dev.avinya.admob.showcase.data.db.entity.WalletEntity
+import dev.avinya.admob.showcase.domain.wallet.CreditResult
+import dev.avinya.admob.showcase.domain.wallet.DebitResult
+import dev.avinya.admob.showcase.domain.wallet.WalletState
+import dev.avinya.admob.showcase.domain.wallet.credit
+import dev.avinya.admob.showcase.domain.wallet.debit
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-sealed interface CreditResult {
-    data class Credited(val newBalance: Int) : CreditResult
-
-    /** The idempotency key was already recorded. Nothing changed — this is success, not an error. */
-    data object AlreadyGranted : CreditResult
-}
-
-sealed interface DebitResult {
-    data class Debited(val newBalance: Int) : DebitResult
-    data class InsufficientFunds(val balance: Int, val required: Int) : DebitResult
-}
-
 /**
- * The coin wallet.
+ * Persistence adapter for the coin wallet.
  *
- * [credit] is idempotent by design. A rewarded ad's reward callback can be
- * replayed, and crediting twice for one watched ad is the bug this guards.
+ * Holds no rules of its own. Every decision lives in
+ * [dev.avinya.admob.showcase.domain.wallet] as a pure function; this class
+ * only loads state, applies the rule, and writes the outcome back. That split
+ * is what lets the economy be tested by comparing values rather than by
+ * standing up a database.
+ *
+ * Idempotency is enforced at both levels on purpose: `recordGrant` inserts
+ * with `IGNORE` so a concurrent replay loses the race atomically at the
+ * database, and the domain rule then turns that into the right result value.
  */
 class WalletRepository(
     private val walletDao: WalletDao,
@@ -36,22 +36,41 @@ class WalletRepository(
 
     suspend fun credit(amount: Int, idempotencyKey: String): CreditResult {
         val now = clock.nowMillis()
-        val inserted = walletDao.recordGrant(
-            RewardGrantEntity(idempotencyKey = idempotencyKey, amount = amount, grantedAt = now),
-        )
-        if (inserted == -1L) return CreditResult.AlreadyGranted
 
-        val newBalance = currentBalance() + amount
-        walletDao.upsert(WalletEntity(id = 0, coinBalance = newBalance, updatedAt = now))
-        return CreditResult.Credited(newBalance)
+        // INSERT OR IGNORE returns -1 when the key already existed. Deciding
+        // from the write result rather than from a prior read keeps the guard
+        // atomic against a concurrent replay of the same reward callback.
+        val alreadyGranted = walletDao.recordGrant(
+            RewardGrantEntity(idempotencyKey = idempotencyKey, amount = amount, grantedAt = now),
+        ) == -1L
+
+        val state = WalletState(
+            balance = currentBalance(),
+            grantedKeys = if (alreadyGranted) setOf(idempotencyKey) else emptySet(),
+        )
+
+        return when (val result = state.credit(amount, idempotencyKey)) {
+            is CreditResult.AlreadyGranted -> result
+            is CreditResult.Credited -> {
+                walletDao.upsert(
+                    WalletEntity(id = 0, coinBalance = result.newBalance, updatedAt = now),
+                )
+                result
+            }
+        }
     }
 
     suspend fun debit(amount: Int): DebitResult {
-        val balance = currentBalance()
-        if (balance < amount) return DebitResult.InsufficientFunds(balance = balance, required = amount)
+        val state = WalletState(balance = currentBalance())
 
-        val newBalance = balance - amount
-        walletDao.upsert(WalletEntity(id = 0, coinBalance = newBalance, updatedAt = clock.nowMillis()))
-        return DebitResult.Debited(newBalance)
+        return when (val result = state.debit(amount)) {
+            is DebitResult.InsufficientFunds -> result
+            is DebitResult.Debited -> {
+                walletDao.upsert(
+                    WalletEntity(id = 0, coinBalance = result.newBalance, updatedAt = clock.nowMillis()),
+                )
+                result
+            }
+        }
     }
 }
