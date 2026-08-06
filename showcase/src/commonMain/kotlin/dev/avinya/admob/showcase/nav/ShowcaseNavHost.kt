@@ -15,6 +15,7 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 
+import dev.avinya.admob.showcase.feature.onboarding.OnboardingScreen
 import dev.avinya.admob.showcase.feature.settings.SettingsScreen
 
 /**
@@ -30,16 +31,18 @@ fun ShowcaseNavHost(backStack: SnapshotStateList<ShowcaseNavKey>) {
 
     Scaffold(
         bottomBar = {
-            NavigationBar {
-                TOP_LEVEL_KEYS.forEach { key ->
-                    NavigationBarItem(
-                        selected = current == key,
-                        onClick = { switchTopLevel(backStack, key) },
-                        // Text initials, not material-icons: that artifact is not on the
-                        // approved dependency list. The Phase 6 plan's polish pass revisits this.
-                        icon = { Text(key.label.first().toString()) },
-                        label = { Text(key.label) },
-                    )
+            if (showsBottomBar(current)) {
+                NavigationBar {
+                    TOP_LEVEL_KEYS.forEach { key ->
+                        NavigationBarItem(
+                            selected = current == key,
+                            onClick = { switchTopLevel(backStack, key) },
+                            // Text initials, not material-icons: that artifact is not on the
+                            // approved dependency list. The Phase 6 plan's polish pass revisits this.
+                            icon = { Text(key.label.first().toString()) },
+                            label = { Text(key.label) },
+                        )
+                    }
                 }
             }
         },
@@ -50,6 +53,14 @@ fun ShowcaseNavHost(backStack: SnapshotStateList<ShowcaseNavKey>) {
             onBack = { if (backStack.size > 1) backStack.removeLast() },
             entryDecorators = listOf(rememberViewModelStoreNavEntryDecorator()),
             entryProvider = entryProvider {
+                entry<ShowcaseNavKey.Onboarding> {
+                    OnboardingScreen(
+                        onFinished = {
+                            backStack.clear()
+                            backStack.add(ShowcaseNavKey.Feed)
+                        },
+                    )
+                }
                 entry<ShowcaseNavKey.Feed> { PlaceholderScreen("Feed") }
                 entry<ShowcaseNavKey.Library> { PlaceholderScreen("Library") }
                 entry<ShowcaseNavKey.Store> { PlaceholderScreen("Store") }

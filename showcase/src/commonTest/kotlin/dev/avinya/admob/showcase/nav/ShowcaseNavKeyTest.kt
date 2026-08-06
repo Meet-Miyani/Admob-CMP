@@ -2,6 +2,7 @@ package dev.avinya.admob.showcase.nav
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ShowcaseNavKeyTest {
@@ -33,5 +34,17 @@ class ShowcaseNavKeyTest {
     @Test
     fun everyTopLevelKeyHasALabel() {
         assertTrue(TOP_LEVEL_KEYS.all { it.label.isNotBlank() })
+    }
+
+    @Test
+    fun onboardingIsNotATopLevelDestination() {
+        assertTrue(TOP_LEVEL_KEYS.none { it == ShowcaseNavKey.Onboarding })
+    }
+
+    @Test
+    fun onboardingHidesTheBottomBar() {
+        assertFalse(showsBottomBar(ShowcaseNavKey.Onboarding))
+        assertTrue(showsBottomBar(ShowcaseNavKey.Feed))
+        assertTrue(showsBottomBar(ShowcaseNavKey.ArticleDetail("a1")))
     }
 }

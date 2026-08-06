@@ -17,6 +17,7 @@ const adManagerKt = join(repoRoot, 'admob-cmp-core/src/commonMain/kotlin/dev/avi
 const adTrackingKt = join(repoRoot, 'admob-cmp-core/src/commonMain/kotlin/dev/avinya/ads/AdTrackingAuthorization.kt');
 const adCompositionKt = join(repoRoot, 'admob-cmp-compose/src/commonMain/kotlin/dev/avinya/ads/AdComposition.kt');
 const showcaseAdConfigKt = join(repoRoot, 'showcase/src/commonMain/kotlin/dev/avinya/admob/showcase/ShowcaseAdConfig.kt');
+const onboardingViewModelKt = join(repoRoot, 'showcase/src/commonMain/kotlin/dev/avinya/admob/showcase/feature/onboarding/OnboardingViewModel.kt');
 
 export interface ContentViolation {
   file: string;
@@ -264,6 +265,13 @@ describe('Source-of-truth factual contracts', () => {
     expect(showcaseConfig).toContain('class TrackingAuthorizationHook');
     expect(showcaseConfig).toContain('AdInitializationPhase.BeforeMobileAdsInitialize');
     expect(showcaseConfig).toContain('requestAuthorization()');
+  });
+
+  it('showcase onboarding gathers consent before initialising', () => {
+    const onboarding = readFileSync(onboardingViewModelKt, 'utf8');
+
+    expect(onboarding).toContain('consent.gatherConsent(config)');
+    expect(onboarding).toContain('ConsentMode.InitializeOnlyIfAlreadyAllowed');
   });
 });
 

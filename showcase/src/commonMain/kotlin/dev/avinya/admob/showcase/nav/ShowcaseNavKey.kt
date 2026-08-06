@@ -32,6 +32,10 @@ sealed interface ShowcaseNavKey : NavKey {
     data class ArticleDetail(val articleId: String) : ShowcaseNavKey {
         override val label: String = "Article"
     }
+
+    data object Onboarding : ShowcaseNavKey {
+        override val label: String = "Welcome"
+    }
 }
 
 /** The bottom bar's destinations, in order. */
@@ -41,3 +45,12 @@ val TOP_LEVEL_KEYS: List<ShowcaseNavKey> = listOf(
     ShowcaseNavKey.Store,
     ShowcaseNavKey.Settings,
 )
+
+/**
+ * Whether the bottom bar shows for [key].
+ *
+ * Onboarding is modal: the tabs must not be reachable until the SDK has
+ * either initialised or been declined. Kept as a pure function so the rule
+ * is testable without Compose.
+ */
+fun showsBottomBar(key: ShowcaseNavKey): Boolean = key != ShowcaseNavKey.Onboarding
