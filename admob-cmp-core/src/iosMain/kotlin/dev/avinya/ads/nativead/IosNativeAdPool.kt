@@ -10,6 +10,7 @@ import dev.avinya.ads.InternalAdMobCmpApi
 import GoogleMobileAds.GADAdChoicesPosition
 import GoogleMobileAds.GADAdLoader
 import GoogleMobileAds.GADAdLoaderAdTypeNative
+import GoogleMobileAds.GADMediaContent
 import GoogleMobileAds.GADMultipleAdsAdLoaderOptions
 import GoogleMobileAds.GADNativeAd
 import GoogleMobileAds.GADNativeAdDelegateProtocol
@@ -105,19 +106,12 @@ internal class IosNativeAdPool(
     // deterministic ad.destroy() the Android pool performs on the same paths.
     override fun destroy(ad: LoadedNativeAd) = teardownNativeAdOnMain(ad.ad)
 
-    override fun responseInfo(ad: LoadedNativeAd): AdResponseInfo? = ad.ad.responseInfo?.toCommon()
+    // Both accessors are pure field reads of values snapshotted on Main at load time, so they
+    // are safe from whatever dispatcher the caller uses. The core resolves the handle under the
+    // pool lock and calls these outside it.
+    override fun responseInfo(ad: LoadedNativeAd): AdResponseInfo? = ad.responseInfo
 
-    // The core resolves the handle under the pool lock and calls this outside it. The
-    // previous shape returned non-locally from inside the inline locked{} lambda — correct
-    // only because locked is inline, and silently broken if that ever changed.
-    override fun mediaInfo(ad: LoadedNativeAd): NativeMediaInfo? {
-        val mediaContent = ad.ad.mediaContent ?: return null
-        return NativeMediaInfo(
-            aspectRatio = mediaContent.aspectRatio.takeIf { it > 0.0 }?.toFloat(),
-            hasVideoContent = mediaContent.hasVideoContent,
-            durationSeconds = if (mediaContent.duration > 0f) mediaContent.duration.toDouble() else null
-        )
-    }
+    override fun mediaInfo(ad: LoadedNativeAd): NativeMediaInfo? = ad.mediaInfo
 
     override suspend fun loadBatch(
         count: Int,
@@ -209,7 +203,20 @@ internal class IosNativeAdPool(
     private data class NativeLoadBatch(val loader: GADAdLoader, val delegate: NativeAdLoaderDelegate)
 }
 
-internal class LoadedNativeAd(val ad: GADNativeAd, val delegates: List<NSObject>)
+internal class LoadedNativeAd(
+    val ad: GADNativeAd,
+    val delegates: List<NSObject>,
+    /** Snapshotted on Main at load time — see the capture site in the loader delegate. */
+    val responseInfo: AdResponseInfo?,
+    /** Snapshotted on Main at load time — see the capture site in the loader delegate. */
+    val mediaInfo: NativeMediaInfo?,
+)
+
+private fun GADMediaContent.toNativeMediaInfo(): NativeMediaInfo = NativeMediaInfo(
+    aspectRatio = aspectRatio.takeIf { it > 0.0 }?.toFloat(),
+    hasVideoContent = hasVideoContent,
+    durationSeconds = if (duration > 0f) duration.toDouble() else null
+)
 
 internal class NativeAdLoaderDelegate(
     private val placementId: String,
@@ -295,7 +302,7 @@ internal class NativeAdLoaderDelegate(
             val ad = weakAd.value
             val adValue = value?.toCommon()
             if (ad != null && adValue != null) {
-                emitInstanceScoped({ it.ad === didReceiveNativeAd }) { id ->
+                emitInstanceScoped({ it.ad === ad }) { id ->
                     AdEvent.Paid(placementId, PaidEvent(placementId, adValue, ad.responseInfo?.toCommon()), id)
                 }
             }
@@ -309,7 +316,16 @@ internal class NativeAdLoaderDelegate(
             mc.videoController.delegate = videoDelegate
             delegates.add(videoDelegate)
         }
-        val loaded = LoadedNativeAd(didReceiveNativeAd, delegates)
+        // Snapshot response/media info HERE, on the Main-confined delegate callback.
+        // NativePoolCore reads them back from an arbitrary dispatcher (mediaInfo() is even
+        // public, non-suspend API), which put GMA accesses off Main — CLAUDE.md invariant #5.
+        // Both are fixed once the ad is loaded.
+        val loaded = LoadedNativeAd(
+            ad = didReceiveNativeAd,
+            delegates = delegates,
+            responseInfo = didReceiveNativeAd.responseInfo?.toCommon(),
+            mediaInfo = mc?.toNativeMediaInfo()
+        )
         // Atomically check cancellation and add: if already cancelled/inactive, tear down
         // this ad instead of leaking it into a list nothing will drain.
         val accepted = locked {

@@ -35,8 +35,12 @@ public interface AdManager {
      *
      * **Best-effort delivery, not a durable log.** There is no replay and the buffer is
      * finite, so an event emitted with no collector attached — or during a burst that
-     * outruns a slow collector — is dropped. Drops are logged (tag `AdMobCMP`) but not
-     * retried.
+     * outruns a slow collector — is dropped. Nothing is retried.
+     *
+     * Only the second kind of drop is logged (tag `AdMobCMP`). An event emitted while no
+     * collector is attached is discarded **silently**: with no replay there is nothing to
+     * buffer it into, so the emission reports success and the SDK cannot observe the loss.
+     * Start collecting before the first ad operation if you need the early events.
      *
      * Fine for driving UI. **Do not use as the system of record for billing, revenue, or
      * impression accounting**; reconcile against AdMob reporting instead.

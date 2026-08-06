@@ -28,6 +28,19 @@ internal class FakeNativePlatform(
     /** Set to run arbitrary code (e.g. core.clear()) between the loader being invoked and it returning. */
     var beforeReturn: (suspend () -> Unit)? = null
 
+    /**
+     * Fires once, immediately after the NEXT pool-lock body completes.
+     *
+     * This is the seam for testing check-then-write races deterministically: it models a
+     * competing caller acquiring the pool lock at the earliest legal moment after the core
+     * released it. A transition that reads state under one acquisition and publishes under a
+     * second is observably broken here; a transition that does both under one is not.
+     */
+    var afterUnlock: (() -> Unit)? = null
+
+    /** Set to make the response-info accessor throw, modelling a beta SDK accessor blowing up. */
+    var responseInfoError: Throwable? = null
+
     fun enqueue(result: AdAttemptResult<List<FakeAd>>) {
         batches += result
     }
@@ -36,7 +49,10 @@ internal class FakeNativePlatform(
         ad.destroyed = true
     }
 
-    override fun responseInfo(ad: FakeAd): AdResponseInfo? = null
+    override fun responseInfo(ad: FakeAd): AdResponseInfo? {
+        responseInfoError?.let { throw it }
+        return null
+    }
 
     override fun mediaInfo(ad: FakeAd): NativeMediaInfo? = null
 
@@ -56,7 +72,16 @@ internal class FakeNativePlatform(
     // core from a single runTest coroutine. Invoking directly is also trivially reentrant,
     // which is the property the seam actually requires (see NativePoolPlatform.withPoolLock).
     // The real locking contract is exercised by the platform pools, not here.
-    override fun <T> withPoolLock(block: () -> T): T = block()
+    override fun <T> withPoolLock(block: () -> T): T {
+        val result = block()
+        afterUnlock?.let { hook ->
+            // One-shot, and cleared BEFORE invoking so a hook that itself takes the lock
+            // (clear() does) cannot re-enter itself.
+            afterUnlock = null
+            hook()
+        }
+        return result
+    }
 }
 
 class NativePoolCoreTest {
@@ -357,5 +382,50 @@ class NativePoolCoreTest {
         val impression = seen.single { it is AdEvent.Impression } as AdEvent.Impression
         assertNull(impression.adInstanceId, "an untracked ad must not be attributed a stale token")
         collector.cancel()
+    }
+
+    @Test
+    fun `clear racing failed recovery does not resurrect Loaded`() = runTest {
+        val platform = FakeNativePlatform()
+        platform.enqueue(AdAttemptResult.Success(listOf(FakeAd(1), FakeAd(2))))
+        val pool = core(platform)
+        pool.preload(2, testRequestOptions(), testNativeOptions())
+        assertTrue(pool.loadState.value is AdLoadState.Loaded)
+
+        // Second (top-up) preload fails. Arm clear() to land at the earliest legal moment
+        // after the recovery path's decision — i.e. exactly in the window a check-then-write
+        // failOrRestore left open. clear() drains inventory, bumps the generation and
+        // publishes Idle; recovery must not overwrite that from its stale decision.
+        platform.enqueue(AdAttemptResult.Failure(AdError.message("top-up failed")))
+        platform.beforeReturn = { platform.afterUnlock = { pool.clear() } }
+        pool.preload(3, testRequestOptions(), testNativeOptions())
+
+        assertEquals(
+            AdLoadState.Idle,
+            pool.loadState.value,
+            "a completed clear() must not be overwritten by recovery's stale inventory check"
+        )
+        assertEquals(0, pool.availableCount())
+    }
+
+    @Test
+    fun `a throwing response info accessor destroys the batch it could not admit`() = runTest {
+        val platform = FakeNativePlatform()
+        val ads = listOf(FakeAd(1), FakeAd(2))
+        platform.enqueue(AdAttemptResult.Success(ads))
+        platform.responseInfoError = IllegalStateException("SDK accessor blew up")
+        val pool = core(platform)
+
+        // The ads never enter pool ownership, so nothing else can ever destroy them —
+        // admit() is their only chance. (runCatching, not assertFailsWith: the latter's block
+        // is not a suspend lambda, so preload() cannot be called inside it.)
+        val thrown = runCatching { pool.preload(2, testRequestOptions(), testNativeOptions()) }
+        assertTrue(
+            thrown.exceptionOrNull() is IllegalStateException,
+            "the accessor's throwable must propagate, not be swallowed"
+        )
+
+        assertTrue(ads.all { it.destroyed }, "ads that failed admission must not leak")
+        assertEquals(0, pool.availableCount())
     }
 }

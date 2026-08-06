@@ -186,7 +186,16 @@ internal class NativePoolCore<A : Any>(
         if (loaded.isEmpty()) {
             return failIfCurrent(requiredGeneration, AdError.message("No native ads returned."))
         }
-        val info = platform.responseInfo(loaded.first())
+        // The batch is UNOWNED until the pool admits it below. responseInfo is a platform SDK
+        // call and can throw — the catch(Throwable) in preload() names "a response-info
+        // accessor" as an expected thrower — and a throw here would strand every ad in the
+        // batch: never cached, never destroyed, never reachable again.
+        val info = try {
+            platform.responseInfo(loaded.first())
+        } catch (t: Throwable) {
+            loaded.forEach { safelyDestroy(it) }
+            throw t
+        }
         val rejected = mutableListOf<A>()
         val published = platform.withPoolLock {
             if (generation != requiredGeneration) {
@@ -303,14 +312,35 @@ internal class NativePoolCore<A : Any>(
      *
      * A top-up preload that blows up must not erase the fact that earlier ads are still
      * cached and servable — that is the same inventory-blindness P1-3 fixed for cancellation.
+     *
+     * The inventory check and the publication happen in ONE lock acquisition. Split across two,
+     * a `clear()` landing in between — it takes only the pool lock, never [loadMutex] — was
+     * republished over: the pool went Idle with an empty deque, then recovery put Loaded back
+     * from its stale decision.
      */
     private fun failOrRestore(requiredGeneration: Long, error: AdError): AdLoadState {
-        val hasInventory = platform.withPoolLock { generation == requiredGeneration && ads.isNotEmpty() }
-        return if (hasInventory) {
-            platform.withPoolLock { _loadState.value = AdLoadState.Loaded(lastResponseInfo) }
-            _loadState.value
-        } else {
-            failIfCurrent(requiredGeneration, error)
+        val restored = platform.withPoolLock {
+            if (generation == requiredGeneration && ads.isNotEmpty()) {
+                _loadState.value = AdLoadState.Loaded(lastResponseInfo)
+                true
+            } else {
+                false
+            }
+        }
+        return if (restored) _loadState.value else failIfCurrent(requiredGeneration, error)
+    }
+
+    /**
+     * Teardown that cannot itself derail an in-flight failure path. Used where the pool is
+     * discarding ads it has decided not to own; a throwing `destroy` there would replace the
+     * original failure with a confusing secondary one. Mirrors
+     * `FullScreenSlotCore.safelyDestroyAd`.
+     */
+    private fun safelyDestroy(ad: A) {
+        try {
+            platform.destroy(ad)
+        } catch (t: Throwable) {
+            AdLogger.e("Failed to destroy native ad for ${placement.id}.", t)
         }
     }
 

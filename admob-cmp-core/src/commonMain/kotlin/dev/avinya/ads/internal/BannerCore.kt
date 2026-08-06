@@ -4,6 +4,7 @@ import dev.avinya.ads.AdAttemptResult
 import dev.avinya.ads.AdError
 import dev.avinya.ads.AdEvent
 import dev.avinya.ads.AdLoadState
+import dev.avinya.ads.AdLogger
 import dev.avinya.ads.AdPlacement
 import dev.avinya.ads.AdRequestOptions
 import dev.avinya.ads.AdResponseInfo
@@ -89,14 +90,27 @@ internal class BannerCore<V : Any, S : Any>(
     private var banner: V? = null
     private var generation = 0L
 
-    // Set by an actual load; this is the P1-4 replay source and always wins.
-    private var lastRequest: ResolvedBannerRequest<S>? = null
+    // Response info for the CURRENTLY OWNED banner, captured once at admission.
+    //
+    // Recovery paths (failOrRestore/onCancelled) must be able to republish Loaded without
+    // calling back into the platform. Reading it lazily instead was wrong twice over: it
+    // touched a GMA object while holding the state lock — which on iOS is also taken from GMA
+    // callback threads, the exact thing NativePoolCore.mediaInfo documents as forbidden — and
+    // it could read from a banner that clear() had already retired and destroyed. Mirrors
+    // NativePoolCore.lastResponseInfo.
+    private var bannerResponseInfo: AdResponseInfo? = null
 
-    // Set by the composable's container measurement WITHOUT loading, so a Manual-policy
-    // placement (which performs no automatic load) can still refresh() at the measured
-    // width. Kept separate from lastRequest so registering geometry can never overwrite the
-    // custom request options a real load resolved — that would silently undo P1-4.
-    private var registeredRequest: ResolvedBannerRequest<S>? = null
+    // The single record refresh() replays. Its fields have two DIFFERENT owners with
+    // different lifetimes, so it is merged on write rather than chosen between on read:
+    //   - requestOptions is owned by the load() caller. P1-4: a refresh must replay the
+    //     options that call resolved, never rebuild them from placement.requestOptions.
+    //   - size/sizePolicy are owned by the host's container measurement and change on every
+    //     resize (rotation, split-screen, fold).
+    // This was previously two records (lastRequest / registeredRequest) picked between in
+    // refresh(). That cannot work: choosing either whole record discards the other owner's
+    // half — preferring the load record replayed a stale width after a resize, preferring
+    // the geometry record dropped custom request options. See registerGeometry.
+    private var replayRequest: ResolvedBannerRequest<S>? = null
 
     // Count of live UI attachments (BannerAdView composables) bound to this controller.
     // The controller is manager-cached for the whole process, so it can't destroy its ad on
@@ -155,11 +169,10 @@ internal class BannerCore<V : Any, S : Any>(
 
     suspend fun refresh(blockedError: () -> AdError? = { null }): AdLoadState {
         val requiredGeneration = currentGeneration()
-        // P1-4: replay the WHOLE resolved request, not just the size. Both controllers
-        // previously kept only lastResolvedAdSize and rebuilt options from
-        // placement.requestOptions, silently dropping custom options from the original
-        // load — contradicting the KDoc.
-        val resolved = platform.withStateLock { lastRequest ?: registeredRequest }
+        // P1-4: replay the WHOLE resolved request, not just the size. There is exactly one
+        // replay record; load() and registerGeometry each update the fields they own, so no
+        // precedence decision is needed here.
+        val resolved = platform.withStateLock { replayRequest }
             ?: return failIfCurrent(
                 requiredGeneration,
                 AdError.message("Banner refresh requires a prior successful load to replay.")
@@ -175,18 +188,29 @@ internal class BannerCore<V : Any, S : Any>(
      * deliberately performs no automatic load but the consumer still drives [refresh].
      * Without it, such a placement could never refresh: it has no prior load to replay
      * and no way to hand geometry in.
+     *
+     * Updates ONLY the geometry-derived fields of the replay record. The host re-measures on
+     * every rotation, split-screen change and fold, and a re-measure is not a statement about
+     * request options — so [requestOptions] seeds the record only when no load has resolved
+     * options yet. Overwriting them here would undo P1-4; ignoring the new geometry would
+     * make [refresh] replay a stale width for the rest of the session.
      */
     fun registerGeometry(
         geometry: BannerGeometry,
         sizePolicy: AdSizePolicy,
         requestOptions: AdRequestOptions
     ) {
+        // resolveSize is a platform call and stays outside the state lock: on iOS that lock is
+        // also taken from GMA callback threads (the rule NativePoolCore documents).
+        val resolvedSize = platform.resolveSize(sizePolicy, geometry.widthDp)
         platform.withStateLock {
-            registeredRequest = ResolvedBannerRequest(
-                size = platform.resolveSize(sizePolicy, geometry.widthDp),
-                sizePolicy = sizePolicy,
-                requestOptions = requestOptions.ownedSnapshot()
-            )
+            val existing = replayRequest
+            replayRequest = existing?.copy(size = resolvedSize, sizePolicy = sizePolicy)
+                ?: ResolvedBannerRequest(
+                    size = resolvedSize,
+                    sizePolicy = sizePolicy,
+                    requestOptions = requestOptions.ownedSnapshot()
+                )
         }
     }
 
@@ -200,7 +224,9 @@ internal class BannerCore<V : Any, S : Any>(
     ): V? = loadMutex.withLock {
         val previousAd = platform.withStateLock {
             if (generation != requiredGeneration) return@withStateLock null
-            lastRequest = resolved
+            // An actual load is the authoritative source for every field, request options
+            // included — unlike registerGeometry, which owns only the geometry-derived half.
+            replayRequest = resolved
             _loadState.value = AdLoadState.Loading
             // Box so a null previous ad is distinguishable from a stale generation.
             Box(banner)
@@ -240,10 +266,22 @@ internal class BannerCore<V : Any, S : Any>(
             )
             when (result) {
                 is AdAttemptResult.Success -> {
-                    val responseInfo = platform.responseInfo(result.value)
+                    // The handle is UNOWNED until the admission below stores it. responseInfo is
+                    // a platform SDK call and can throw — the catch(Throwable) at the bottom of
+                    // this try exists precisely because SDK accessors do. Without destroying here
+                    // the freshly loaded banner would be neither retained nor torn down: a leak
+                    // that survives for the process lifetime. FullScreenSlotCore already uses
+                    // this unowned-until-admitted shape; this restores the parity.
+                    val responseInfo = try {
+                        platform.responseInfo(result.value)
+                    } catch (t: Throwable) {
+                        safelyDestroy(result.value)
+                        throw t
+                    }
                     val accepted = platform.withStateLock {
                         if (generation != requiredGeneration) false else {
                             banner = result.value
+                            bannerResponseInfo = responseInfo
                             _loadState.value = AdLoadState.Loaded(responseInfo)
                             true
                         }
@@ -272,9 +310,7 @@ internal class BannerCore<V : Any, S : Any>(
             // Cancelled mid-load: the previously displayed ad (if any) stays as-is. If the
             // SDK still delivers the in-flight ad, the platform's own isActive guard
             // destroys it there, so nothing leaks.
-            platform.withStateLock {
-                if (generation == requiredGeneration) _loadState.value = AdLoadState.Idle
-            }
+            onCancelled(requiredGeneration)
             throw e
         } catch (t: Throwable) {
             // P1-1: only cancellation was handled, so a throw from a beta SDK call or a
@@ -314,27 +350,64 @@ internal class BannerCore<V : Any, S : Any>(
         generation++
         val retired = banner
         banner = null
-        lastRequest = null
-        registeredRequest = null
+        bannerResponseInfo = null
+        replayRequest = null
         _loadState.value = AdLoadState.Idle
         return retired
     }
 
     /**
+     * Terminal state for a cancelled load: derive it from what the core still OWNS.
+     *
+     * Publishing [AdLoadState.Idle] unconditionally (what this did before) contradicted the
+     * cancellation comment two lines up — the previous banner really does stay displayed, but
+     * `BannerAdView` reads Idle as "cleared/destroyed, drop the reference" and blanked the
+     * slot. A restarted `LaunchedEffect`, a resize or an explicit cancel would wipe a perfectly
+     * live ad. This is the same inventory-blindness [NativePoolCore.onCancelled] fixed for the
+     * pool (P1-3); the banner never got the matching fix.
+     */
+    private fun onCancelled(requiredGeneration: Long) {
+        platform.withStateLock {
+            if (generation != requiredGeneration) return@withStateLock
+            _loadState.value = if (banner != null) {
+                AdLoadState.Loaded(bannerResponseInfo)
+            } else {
+                AdLoadState.Idle
+            }
+        }
+    }
+
+    /**
      * Terminal state for an unexpected (non-cancellation) failure: keep reporting [Loaded]
      * when a banner is still displayed, otherwise publish [AdLoadState.Failed].
+     *
+     * Decision and publication happen in ONE lock acquisition. Splitting them let `clear()`
+     * — which takes only the state lock, never [loadMutex] — land in between, so recovery
+     * republished Loaded over a generation that had just been retired and drained.
      */
     private fun failOrRestore(requiredGeneration: Long, error: AdError): AdLoadState {
-        val displayed = platform.withStateLock {
-            if (generation == requiredGeneration) banner else null
-        }
-        return if (displayed != null) {
-            platform.withStateLock {
-                _loadState.value = AdLoadState.Loaded(platform.responseInfo(displayed))
+        val restored = platform.withStateLock {
+            if (generation == requiredGeneration && banner != null) {
+                _loadState.value = AdLoadState.Loaded(bannerResponseInfo)
+                true
+            } else {
+                false
             }
-            _loadState.value
-        } else {
-            failIfCurrent(requiredGeneration, error)
+        }
+        return if (restored) _loadState.value else failIfCurrent(requiredGeneration, error)
+    }
+
+    /**
+     * Teardown that cannot itself derail an in-flight failure path. Used where the core is
+     * discarding a banner it has decided not to own; a throwing `destroy` there would replace
+     * the original failure with a confusing secondary one. Mirrors
+     * `FullScreenSlotCore.safelyDestroyAd` and `NativePoolCore.safelyDestroy`.
+     */
+    private fun safelyDestroy(banner: V) {
+        try {
+            platform.destroy(banner)
+        } catch (t: Throwable) {
+            AdLogger.e("Failed to destroy banner for ${placement.id}.", t)
         }
     }
 

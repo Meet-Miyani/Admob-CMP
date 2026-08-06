@@ -8,9 +8,18 @@ import androidx.compose.runtime.staticCompositionLocalOf
 /**
  * An immutable, Compose-stable holder for a list of [AdPlacement]s.
  * Provides lookup by id via [AdPlacements.placement].
+ *
+ * [items] is defensively copied at construction. `@Immutable` is a promise to the Compose
+ * runtime that nothing observable here can change after construction, and it acts on that
+ * promise by skipping recomposition. Retaining the caller's `List` reference broke the
+ * promise: passing a `MutableList` and mutating it later changed placement lookups behind
+ * Compose's back, with no identity change to signal it.
  */
 @Immutable
-public class AdPlacements(public val items: List<AdPlacement>)
+public class AdPlacements(items: List<AdPlacement>) {
+    /** The placements held by this instance. */
+    public val items: List<AdPlacement> = items.toList()
+}
 
 /**
  * CompositionLocal providing the active [AdManager] to the composable tree.

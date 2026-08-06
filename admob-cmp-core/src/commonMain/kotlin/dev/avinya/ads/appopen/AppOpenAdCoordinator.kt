@@ -1,3 +1,5 @@
+@file:OptIn(dev.avinya.ads.InternalAdMobCmpApi::class)
+
 package dev.avinya.ads.appopen
 
 import dev.avinya.ads.AdManager
@@ -151,13 +153,19 @@ public class AppOpenAdCoordinator internal constructor(
     private suspend fun onForeground() {
         val backgroundDuration = backgroundedAtInstant?.let { elapsedSince(it) } ?: Duration.ZERO
         backgroundedAtInstant = null
+        // Capture scope BEFORE acquiring admission. If stop() already nulled it, skip the
+        // acquisition entirely — otherwise tryAcquireShowAdmission() takes the process-wide
+        // probe token and sets showInFlight, but scope?.launch returns null, and showNow()'s
+        // finally never runs to release them.
+        val activeScope = scope ?: return
         if (backgroundDuration >= config.minBackgroundDuration && tryAcquireShowAdmission()) {
-            showNow()
+            activeScope.launch {
+                showNow()
+                if (!controller.isReady()) controller.load()
+            }
+        } else if (!controller.isReady()) {
+            activeScope.launch { controller.load() }
         }
-        // Reload off the lifecycle collector so a slow/retrying load can't stall the
-        // collector and make us miss the next background/foreground transition (which would
-        // corrupt backgroundDuration accounting and silently drop later shows).
-        if (!controller.isReady()) scope?.launch { controller.load() }
     }
 
     /**

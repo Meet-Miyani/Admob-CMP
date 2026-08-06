@@ -133,6 +133,9 @@ public actual fun NativeAdView(
                     // Do not rebuild or re-register NativeAdView during normal recomposition.
                     // The SDK-owned view tree is recreated only when token or layout identity changes.
                 },
+                onRelease = { nativeAdView ->
+                    nativeAdView.destroy()
+                },
                 modifier = modifier
             )
         }

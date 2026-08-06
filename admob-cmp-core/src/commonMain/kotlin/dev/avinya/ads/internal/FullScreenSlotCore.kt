@@ -1,3 +1,5 @@
+@file:OptIn(dev.avinya.ads.InternalAdMobCmpApi::class)
+
 package dev.avinya.ads.internal
 
 import dev.avinya.ads.AdAttemptResult
@@ -131,6 +133,7 @@ internal abstract class FullScreenSlotCore<AdT : Any>(
     private val activePresentation = AtomicReference<FullScreenPresentationHandle?>(null)
     private val reloadJob = AtomicReference<Job?>(null)
     private val reloadScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val orphanedAds = mutableListOf<AdT>()
 
     override val loadState: StateFlow<AdLoadState> = LoadStateFlow(slotState)
     override val events: SharedFlow<AdEvent> = _events
@@ -411,7 +414,8 @@ internal abstract class FullScreenSlotCore<AdT : Any>(
                     cache = emptyList()
                 )
                 if (slotState.compareAndSet(current, cleared)) {
-                    result = current.cache.map { it.ad }
+                    val retiredOrphans = orphanedAds.toList().also { orphanedAds.clear() }
+                    result = current.cache.map { it.ad } + retiredOrphans
                     break
                 }
             }
@@ -454,10 +458,11 @@ internal abstract class FullScreenSlotCore<AdT : Any>(
             // load fall through into the load loop on iOS. Equality against the data
             // object is compiled correctly on both backends.
             val isLoading = nextLoadState == AdLoadState.Loading
+            val retiredOrphans = orphanedAds.toList().also { orphanedAds.clear() }
             return LoadPreparation(
                 immediateResult = if (isLoading) null else nextLoadState,
                 slotsToLoad = if (isLoading) placement.cachePolicy.maxSize - fresh.size else 0,
-                retiredAds = expired.map { it.ad }
+                retiredAds = expired.map { it.ad } + retiredOrphans
             )
         }
     }
@@ -562,10 +567,14 @@ internal abstract class FullScreenSlotCore<AdT : Any>(
             // activePresentation is already set.
             val token = if (selected != null) {
                 arbiter.tryAcquire(placement.id, placement.format)
-                    ?: return ShowPreparation(
-                        immediateResult = AdShowResult.NotReady,
-                        retiredAds = expired.map { it.ad }
-                    )
+                    ?: run {
+                        val cleaned = SlotState(current.generation, current.loadState, fresh)
+                        if (!slotState.compareAndSet(current, cleaned)) continue
+                        return ShowPreparation(
+                            immediateResult = AdShowResult.NotReady,
+                            retiredAds = expired.map { it.ad }
+                        )
+                    }
             } else {
                 null
             }
@@ -628,7 +637,13 @@ internal abstract class FullScreenSlotCore<AdT : Any>(
             // parallel release mechanism exists or should be added.
             arbiter.release(token)
             activePresentation.compareAndSet(handle, null)
-            if (destroyAfterPresentation(wasShown)) safelyDestroyAd(ad)
+            if (destroyAfterPresentation(wasShown)) {
+                safelyDestroyAd(ad)
+            } else {
+                publicationLock.withLock {
+                    orphanedAds.add(ad)
+                }
+            }
             if (wasShown && placement.cachePolicy.reloadAfterShow) scheduleReload(generation)
         }
         activePresentation.store(handle)

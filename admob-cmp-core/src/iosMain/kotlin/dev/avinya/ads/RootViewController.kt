@@ -19,8 +19,11 @@ internal fun topViewController(): UIViewController? {
         ?: return null
     var top = window.rootViewController ?: return null
     while (top.presentedViewController != null) {
-        top = top.presentedViewController!!
+        val presented = top.presentedViewController!!
+        if (presented.isBeingDismissed()) break
+        top = presented
     }
+    if (top.isBeingDismissed() || top.isBeingPresented()) return null
     return top
 }
 

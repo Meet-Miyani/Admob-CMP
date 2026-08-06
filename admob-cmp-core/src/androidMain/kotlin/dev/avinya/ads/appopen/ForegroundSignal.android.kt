@@ -16,15 +16,14 @@ internal actual fun appForegroundState(): Flow<Boolean> = callbackFlow {
     val observer = LifecycleEventObserver { _, event ->
         when (event) {
             Lifecycle.Event.ON_START -> trySend(true)
-            Lifecycle.Event.ON_STOP -> trySend(false)
+            Lifecycle.Event.ON_STOP  -> trySend(false)
             else -> Unit
         }
     }
-    // Lifecycle observers must be (un)registered on the main thread regardless of
-    // which dispatcher collects this flow.
-    withContext(Dispatchers.Main.immediate) { owner.lifecycle.addObserver(observer) }
+    val handler = Handler(Looper.getMainLooper())
+    handler.post { owner.lifecycle.addObserver(observer) }
     awaitClose {
-        Handler(Looper.getMainLooper()).post { owner.lifecycle.removeObserver(observer) }
+        handler.post { owner.lifecycle.removeObserver(observer) }
     }
 }
 

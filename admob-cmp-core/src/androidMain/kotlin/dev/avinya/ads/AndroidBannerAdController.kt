@@ -77,8 +77,9 @@ internal class AndroidBannerAdController internal constructor(
 
     override fun destroy(banner: AndroidLoadedBanner) = banner.destroy()
 
-    override fun responseInfo(banner: AndroidLoadedBanner): AdResponseInfo? =
-        banner.ad.getResponseInfo().toCommon()
+    // Pure field read of a value snapshotted on Main at load time, so this is safe to call
+    // from whatever dispatcher BannerCore's caller resumed on.
+    override fun responseInfo(banner: AndroidLoadedBanner): AdResponseInfo? = banner.responseInfo
 
     override suspend fun loadBanner(
         size: AdSize,
@@ -130,7 +131,11 @@ internal class AndroidBannerAdController internal constructor(
                     // loaded ad immediately so the SDK's server-driven refresh loop is cancelled;
                     // BannerCore remains the single owner of refresh/load-once semantics.
                     val detachedAd = adView.unregisterBannerAd() ?: ad
-                    val loaded = AndroidLoadedBanner(adView, detachedAd)
+                    // Capture response info HERE, on Main. This callback is Main-confined, but
+                    // BannerCore resumes on whatever dispatcher its caller used, so reading it
+                    // there put a GMA access on an arbitrary thread (CLAUDE.md invariant #5).
+                    // Response info is fixed once the ad is loaded, so a snapshot loses nothing.
+                    val loaded = AndroidLoadedBanner(adView, detachedAd, detachedAd.getResponseInfo().toCommon())
                     continuation.resume(
                         AdAttemptResult.Success(loaded),
                         onCancellation = { _, _, _ -> loaded.destroy() }
@@ -151,6 +156,8 @@ internal class AndroidBannerAdController internal constructor(
 internal data class AndroidLoadedBanner(
     val view: AdView,
     val ad: BannerAd,
+    /** Snapshotted on Main at load time — see the capture site in `loadBanner`. */
+    val responseInfo: AdResponseInfo?,
 ) {
     fun destroy() {
         val cleanup = {

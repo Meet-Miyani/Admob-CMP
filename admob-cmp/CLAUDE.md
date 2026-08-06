@@ -56,8 +56,10 @@ AGENTS.md, not this file.
 4. **iOS ObjC delegates are weak.** Keep a strong Kotlin ref alongside the ad
    (pool `NativeEntry`, slot `delegate` fields); capture ads in paid-event
    handlers via `WeakReference` to avoid ARC cycles.
-5. **All GMA/UMP calls happen on `Dispatchers.Main`** (`.immediate`). The consent
-   gate (`adRequestBlockedError()`) is checked in **both** `load()` and `show()`,
+5. **All GMA/UMP calls happen on `Dispatchers.Main`** (`.immediate`), **except
+   `MobileAds.initialize()` which is `@WorkerThread` in GMA Next-Gen and runs on
+   `Dispatchers.IO`** (its completion callback fires on Main regardless of calling thread).
+   The consent gate (`adRequestBlockedError()`) is checked in **both** `load()` and `show()`,
    and `canPresent()` is re-checked at present time — don't remove either check.
 6. **Banner controllers have no layout context.** Geometry is host-supplied:
    `load(geometry: BannerGeometry?, …)` takes the width, and `BannerAdView` measures

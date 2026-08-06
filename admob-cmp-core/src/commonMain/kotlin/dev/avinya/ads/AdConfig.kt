@@ -120,8 +120,15 @@ internal suspend fun AdConfig.dispatchInitializationHooks(phase: AdInitializatio
  */
 internal fun AdConfig.testModeWarningOrNull(): String? {
     if (!testMode) return null
-    val hasTestDeviceIds = testDeviceIds.isNotEmpty() || debugOptions.consentTestDeviceIds.isNotEmpty()
-    if (hasTestDeviceIds) return null
+    // ONLY GlobalRequestConfiguration.testDeviceIds counts. debugOptions.consentTestDeviceIds
+    // is deliberately not accepted: it reaches UMP's ConsentDebugSettings and nothing else
+    // (AndroidGoogleAdManager's consent debug builder / IosConsentController), and never
+    // touches GMA's RequestConfiguration (AndroidAdMappers.toAndroidRequestConfiguration,
+    // IosAdMappers.applyTo). Treating it as evidence of a GMA test configuration made this
+    // warning fail OPEN — a physical device with consent debugging on, and no GMA test
+    // registration at all, was told nothing while requesting live ads. Invariant #10: test
+    // safety fails closed.
+    if (testDeviceIds.isNotEmpty()) return null
     return "AdConfig.testMode is true but no test device IDs are configured. testMode alone " +
         "does NOT force GMA to serve test ads on a physical device — only emulators/simulators " +
         "qualify automatically. Populate GlobalRequestConfiguration.testDeviceIds with this " +

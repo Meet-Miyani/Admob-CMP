@@ -49,7 +49,9 @@ public data class AdUnitIds(
  *   lookups via [List<AdPlacement>.placement].
  * @param strictTestMode When true, the placement throws at construction if any ad unit id
  *   is not a Google test ad unit. Opt-in and default false; intended for debug builds only.
- *   Does not affect production builds.
+ *   **Not build-type aware** — this throws wherever it is enabled, release builds included.
+ *   Gate it on your own debug flag (e.g. `strictTestMode = BuildConfig.DEBUG`) rather than
+ *   leaving it on in shared configuration.
  * @throws IllegalArgumentException if [id] is blank, [cachePolicy.maxSize] < 1, or
  *   [strictTestMode] is enabled and any ad unit id is not a test unit.
  */
