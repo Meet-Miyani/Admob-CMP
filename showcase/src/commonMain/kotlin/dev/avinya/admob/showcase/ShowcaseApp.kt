@@ -43,7 +43,7 @@ fun ShowcaseApp() {
                 when (onboardingComplete) {
                     null -> Box(Modifier.fillMaxSize())
                     else -> {
-                        val backStack = remember(onboardingComplete) {
+                        val backStack = remember {
                             mutableStateListOf<ShowcaseNavKey>(
                                 if (onboardingComplete == true) {
                                     ShowcaseNavKey.Feed
