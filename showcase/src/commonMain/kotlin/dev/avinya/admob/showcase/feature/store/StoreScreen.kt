@@ -78,11 +78,11 @@ fun StoreScreen() {
                     enabled = state.adsEnabled && state.sdkReady &&
                         state.rewarded == RewardedUiState.Idle,
                     onClick = {
-                        // launch, not inline: the presentation suspends for the
-                        // ad's whole lifetime and must not gate the UI thread's
-                        // effect processing.
+                        // Set the state synchronously so a rapid second click sees a disabled
+                        // button; the `runRewarded` body still launches in a child coroutine
+                        // because `show()` suspends for the ad's whole lifetime.
+                        viewModel.setRewardedState(RewardedUiState.Showing)
                         scope.launch {
-                            viewModel.setRewardedState(RewardedUiState.Showing)
                             val outcome = runRewarded(
                                 load = { rewarded.load() },
                                 show = { onReward -> rewarded.show(onRewardEarned = onReward) },
@@ -122,6 +122,9 @@ fun StoreScreen() {
     if (state.offerWallVisible) {
         OfferWallDialog(
             onAccept = {
+                // Same guard as the main button: set state synchronously so a
+                // rapid second tap on Accept does not launch two presentations.
+                viewModel.setRewardedState(RewardedUiState.Showing)
                 viewModel.onIntent(StoreIntent.AcceptOfferWall)
                 scope.launch {
                     val outcome = runRewarded(
