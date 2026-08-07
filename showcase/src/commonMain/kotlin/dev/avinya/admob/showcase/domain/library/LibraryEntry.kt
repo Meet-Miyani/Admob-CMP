@@ -8,5 +8,19 @@ data class LibraryEntry(
     val readTimeMin: Int,
     val kind: Kind,
 ) {
-    enum class Kind { Bookmarked, InProgress, Unlocked }
+    /**
+     * Why a row appears in the Library. A single article can qualify under
+     * more than one — the union is shown, and the order in which the kinds
+     * are listed here is the order in which they appear in the Library list.
+     */
+    enum class Kind {
+        /** The user has bookmarked this article. */
+        Bookmarked,
+
+        /** The user opened this article but has not finished it. */
+        InProgress,
+
+        /** The user paid to read this premium article (coins or rewarded). */
+        Unlocked,
+    }
 }

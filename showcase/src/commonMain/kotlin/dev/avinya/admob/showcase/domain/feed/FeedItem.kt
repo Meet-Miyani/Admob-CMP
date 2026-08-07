@@ -6,6 +6,15 @@ sealed interface FeedItem {
     /** Stable identity for Compose's `key` and for Paging's diffing. */
     val key: String
 
+    /**
+     * A paged article as it appears in the feed.
+     *
+     * [feedOrdinal] is the article's position in the **un-inserted** feed — its
+     * index before [FeedAdInserter] interleaves ad slots. The inserter reads
+     * this to decide where to put an ad; nothing in the inserter or the screen
+     * should compute it from the slot's list position, which is a different
+     * number and shifts on every page.
+     */
     data class Article(
         val id: String,
         val title: String,

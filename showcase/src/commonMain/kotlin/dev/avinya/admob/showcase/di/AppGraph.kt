@@ -113,6 +113,12 @@ val LocalAppOpenSuppressor: ProvidableCompositionLocal<AppOpenSuppressor> = comp
     error("LocalAppOpenSuppressor accessed outside ShowcaseApp")
 }
 
+/**
+ * Remembers the process-wide [AppGraph]. Called once from
+ * [dev.avinya.admob.showcase.ShowcaseApp] and exposed through [LocalAppGraph]
+ * so the rest of the composition can read repositories without taking them as
+ * parameters.
+ */
 @Composable
 internal fun rememberAppGraph(): AppGraph {
     val storage = rememberPlatformStorage()

@@ -21,8 +21,21 @@ enum class SuppressionReason {
     NotReady,
 }
 
+/**
+ * The outcome of asking [AdPolicy] whether an ad may appear.
+ *
+ * [Show] is silent; [Suppress] is never silent — it carries a [SuppressionReason]
+ * that the Inspector renders verbatim, so "no ad appeared and I don't know why"
+ * never reaches a user.
+ */
 sealed interface AdDecision {
+    /** Show the ad. */
     data object Show : AdDecision
+
+    /**
+     * Do not show the ad. [reason] is the rule that was unsatisfied and is the
+     * only thing the Inspector needs to attribute the absence.
+     */
     data class Suppress(val reason: SuppressionReason) : AdDecision
 }
 
