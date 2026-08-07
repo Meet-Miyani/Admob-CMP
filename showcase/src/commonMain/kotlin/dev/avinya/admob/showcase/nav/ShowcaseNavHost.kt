@@ -19,6 +19,7 @@ import dev.avinya.admob.showcase.feature.onboarding.OnboardingScreen
 import dev.avinya.admob.showcase.feature.feed.FeedScreen
 import dev.avinya.admob.showcase.feature.article.ArticleScreen
 import dev.avinya.admob.showcase.feature.settings.SettingsScreen
+import dev.avinya.admob.showcase.feature.store.StoreScreen
 
 /**
  * The app's navigation shell.
@@ -71,7 +72,7 @@ fun ShowcaseNavHost(backStack: SnapshotStateList<ShowcaseNavKey>) {
                     )
                 }
                 entry<ShowcaseNavKey.Library> { PlaceholderScreen("Library") }
-                entry<ShowcaseNavKey.Store> { PlaceholderScreen("Store") }
+                entry<ShowcaseNavKey.Store> { StoreScreen() }
                 entry<ShowcaseNavKey.Settings> { SettingsScreen() }
                 entry<ShowcaseNavKey.ArticleDetail> { key -> ArticleScreen(articleId = key.articleId, onBack = { backStack.removeLast() }) }
             },

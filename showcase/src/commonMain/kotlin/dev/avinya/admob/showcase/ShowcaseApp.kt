@@ -11,10 +11,12 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import dev.avinya.admob.showcase.di.LocalAppGraph
+import dev.avinya.admob.showcase.di.LocalAppOpenSuppressor
 import dev.avinya.admob.showcase.di.ProvideAdManager
 import dev.avinya.admob.showcase.di.rememberAppGraph
 import dev.avinya.admob.showcase.nav.ShowcaseNavHost
 import dev.avinya.admob.showcase.nav.ShowcaseNavKey
+import dev.avinya.admob.showcase.ui.ad.AppOpenSuppressor
 import dev.avinya.admob.showcase.ui.theme.ShowcaseTheme
 import dev.avinya.admob.showcase.ui.theme.ThemeMode
 import kotlinx.coroutines.flow.map
@@ -35,7 +37,12 @@ fun ShowcaseApp() {
 
     LaunchedEffect(graph) { graph.articles.seedIfEmpty() }
 
-    CompositionLocalProvider(LocalAppGraph provides graph) {
+    val suppressor = remember { AppOpenSuppressor() }
+
+    CompositionLocalProvider(
+        LocalAppGraph provides graph,
+        LocalAppOpenSuppressor provides suppressor,
+    ) {
         ProvideAdManager {
             ShowcaseTheme(themeMode = themeMode) {
                 // Hold the first screen until the preference resolves, otherwise

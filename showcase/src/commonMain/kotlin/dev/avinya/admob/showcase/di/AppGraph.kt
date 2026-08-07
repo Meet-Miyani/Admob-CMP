@@ -15,6 +15,7 @@ import dev.avinya.admob.showcase.data.prefs.SettingsRepository
 import dev.avinya.admob.showcase.data.repo.AdStateRepository
 import dev.avinya.admob.showcase.data.repo.ArticleRepository
 import dev.avinya.admob.showcase.data.repo.WalletRepository
+import dev.avinya.admob.showcase.ui.ad.AppOpenSuppressor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -69,6 +70,18 @@ class AppGraph(storage: PlatformStorage) {
  */
 val LocalAppGraph: ProvidableCompositionLocal<AppGraph> = compositionLocalOf {
     error("LocalAppGraph accessed outside ShowcaseApp")
+}
+
+/**
+ * Lets a flow declare that an app-open ad must not appear over it. The Store
+ * uses this for coin-unlock transactions; Phase 6's coordinator binds
+ * [AppOpenSuppressor.isBlocked] to the SDK's app-open gate.
+ *
+ * Same access rule as [LocalAppGraph]: provided once in `ShowcaseApp` and
+ * unresolved anywhere else is a programming error.
+ */
+val LocalAppOpenSuppressor: ProvidableCompositionLocal<AppOpenSuppressor> = compositionLocalOf {
+    error("LocalAppOpenSuppressor accessed outside ShowcaseApp")
 }
 
 @Composable
