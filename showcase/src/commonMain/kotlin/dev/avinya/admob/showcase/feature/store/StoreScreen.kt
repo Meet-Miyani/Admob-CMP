@@ -21,11 +21,14 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -36,6 +39,9 @@ import dev.avinya.admob.showcase.di.LocalAppGraph
 import dev.avinya.admob.showcase.di.LocalAppOpenSuppressor
 import dev.avinya.admob.showcase.domain.ad.ShowcasePlacements
 import dev.avinya.admob.showcase.ui.ad.runRewarded
+import dev.avinya.admob.showcase.ui.inspector.InspectorEntryPoint
+import dev.avinya.admob.showcase.ui.inspector.InspectorSheet
+import dev.avinya.admob.showcase.ui.inspector.LocalInspectorPlacements
 import kotlinx.coroutines.launch
 
 @Composable
@@ -59,64 +65,83 @@ fun StoreScreen() {
         adManager.rewardedInterstitial(ShowcasePlacements.storeRewardedInterstitial)
     }
 
+    val inspectorEnabled by graph.settings.inspectorEnabled.collectAsState(initial = true)
+    var showInspector by remember { mutableStateOf(false) }
+    val placements = remember {
+        listOf(ShowcasePlacements.storeRewarded, ShowcasePlacements.storeRewardedInterstitial)
+    }
+
     LaunchedEffect(viewModel) {
         viewModel.effects.collect { effect ->
             snackbar.showSnackbar(effect.message())
         }
     }
 
-    Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            item { Text("${state.balance} coins", style = MaterialTheme.typography.headlineLarge) }
+    CompositionLocalProvider(LocalInspectorPlacements provides placements) {
+        Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                item {
+                    InspectorEntryPoint(
+                        title = "Store",
+                        enabled = inspectorEnabled,
+                        onOpen = { showInspector = true },
+                    )
+                }
+                item { Text("${state.balance} coins", style = MaterialTheme.typography.headlineLarge) }
 
-            item {
-                Button(
-                    enabled = state.adsEnabled && state.sdkReady &&
-                        state.rewarded == RewardedUiState.Idle,
-                    onClick = {
-                        // Set the state synchronously so a rapid second click sees a disabled
-                        // button; the `runRewarded` body still launches in a child coroutine
-                        // because `show()` suspends for the ad's whole lifetime.
-                        viewModel.setRewardedState(RewardedUiState.Showing)
-                        scope.launch {
-                            val outcome = runRewarded(
-                                load = { rewarded.load() },
-                                show = { onReward -> rewarded.show(onRewardEarned = onReward) },
-                                wallet = graph.wallet,
-                                grantKey = viewModel.nextGrantKey(ShowcasePlacements.storeRewarded.id),
-                            )
-                            viewModel.onRewardOutcome(outcome)
-                        }
-                    },
-                ) {
-                    Text(
-                        when (state.rewarded) {
-                            RewardedUiState.Showing -> "Loading…"
-                            else -> "Watch an ad to earn coins"
+                item {
+                    Button(
+                        enabled = state.adsEnabled && state.sdkReady &&
+                            state.rewarded == RewardedUiState.Idle,
+                        onClick = {
+                            // Set the state synchronously so a rapid second click sees a disabled
+                            // button; the `runRewarded` body still launches in a child coroutine
+                            // because `show()` suspends for the ad's whole lifetime.
+                            viewModel.setRewardedState(RewardedUiState.Showing)
+                            scope.launch {
+                                val outcome = runRewarded(
+                                    load = { rewarded.load() },
+                                    show = { onReward -> rewarded.show(onRewardEarned = onReward) },
+                                    wallet = graph.wallet,
+                                    grantKey = viewModel.nextGrantKey(ShowcasePlacements.storeRewarded.id),
+                                )
+                                viewModel.onRewardOutcome(outcome)
+                            }
                         },
+                    ) {
+                        Text(
+                            when (state.rewarded) {
+                                RewardedUiState.Showing -> "Loading…"
+                                else -> "Watch an ad to earn coins"
+                            },
+                        )
+                    }
+                }
+
+                item {
+                    OutlinedButton(
+                        enabled = state.adsEnabled && state.sdkReady,
+                        onClick = { viewModel.onIntent(StoreIntent.OpenOfferWall) },
+                    ) { Text("See today's offer") }
+                }
+
+                items(state.premium, key = { it.id }) { article ->
+                    PremiumRow(
+                        article = article,
+                        balance = state.balance,
+                        onUnlock = { viewModel.onIntent(StoreIntent.Unlock(article)) },
                     )
                 }
             }
-
-            item {
-                OutlinedButton(
-                    enabled = state.adsEnabled && state.sdkReady,
-                    onClick = { viewModel.onIntent(StoreIntent.OpenOfferWall) },
-                ) { Text("See today's offer") }
-            }
-
-            items(state.premium, key = { it.id }) { article ->
-                PremiumRow(
-                    article = article,
-                    balance = state.balance,
-                    onUnlock = { viewModel.onIntent(StoreIntent.Unlock(article)) },
-                )
-            }
         }
+    }
+
+    if (showInspector) {
+        InspectorSheet(placements = placements, onDismiss = { showInspector = false })
     }
 
     if (state.offerWallVisible) {

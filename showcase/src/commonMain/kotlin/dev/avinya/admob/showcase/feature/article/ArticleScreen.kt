@@ -14,11 +14,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,6 +38,8 @@ import dev.avinya.admob.showcase.domain.article.inlineAdSlotIndex
 import dev.avinya.admob.showcase.domain.article.splitParagraphs
 import dev.avinya.admob.showcase.ui.ad.AdEffectHandler
 import dev.avinya.admob.showcase.ui.ad.inlineNativeAdLayout
+import dev.avinya.admob.showcase.ui.inspector.InspectorSheet
+import dev.avinya.admob.showcase.ui.inspector.LocalInspectorPlacements
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 
@@ -58,6 +63,16 @@ fun ArticleScreen(articleId: String, onBack: () -> Unit) {
     val state by viewModel.state.collectAsState()
     val listState = rememberLazyListState()
 
+    val inspectorEnabled by graph.settings.inspectorEnabled.collectAsState(initial = true)
+    var showInspector by remember { mutableStateOf(false) }
+    val placements = remember {
+        listOf(
+            ShowcasePlacements.articleNative,
+            ShowcasePlacements.articleBanner,
+            ShowcasePlacements.articleInterstitial,
+        )
+    }
+
     AdEffectHandler(
         effects = viewModel.effects,
         onSuppressed = { reason: SuppressionReason ->
@@ -69,20 +84,28 @@ fun ArticleScreen(articleId: String, onBack: () -> Unit) {
         onShown = { viewModel.onInterstitialShown() },
     )
 
-    when {
-        state.article != null -> ArticleBody(
-            article = state.article!!,
-            bookmarked = state.bookmarked,
-            initialProgress = state.initialProgress,
-            adsEnabled = state.adsEnabled,
-            sdkReady = state.sdkReady,
-            listState = listState,
-            onBack = { viewModel.onIntent(ArticleIntent.Close) },
-            onToggleBookmark = { viewModel.onIntent(ArticleIntent.ToggleBookmark) },
-            onProgress = { viewModel.onIntent(ArticleIntent.ProgressUpdated(it)) },
-        )
-        state.loading -> CenteredMessage("Loading…")
-        else -> CenteredMessage("Article not found")
+    CompositionLocalProvider(LocalInspectorPlacements provides placements) {
+        when {
+            state.article != null -> ArticleBody(
+                article = state.article!!,
+                bookmarked = state.bookmarked,
+                initialProgress = state.initialProgress,
+                adsEnabled = state.adsEnabled,
+                sdkReady = state.sdkReady,
+                listState = listState,
+                onBack = { viewModel.onIntent(ArticleIntent.Close) },
+                onToggleBookmark = { viewModel.onIntent(ArticleIntent.ToggleBookmark) },
+                onProgress = { viewModel.onIntent(ArticleIntent.ProgressUpdated(it)) },
+                inspectorEnabled = inspectorEnabled,
+                onOpenInspector = { showInspector = true },
+            )
+            state.loading -> CenteredMessage("Loading…")
+            else -> CenteredMessage("Article not found")
+        }
+    }
+
+    if (showInspector) {
+        InspectorSheet(placements = placements, onDismiss = { showInspector = false })
     }
 }
 
@@ -98,6 +121,8 @@ private fun ArticleBody(
     onBack: () -> Unit,
     onToggleBookmark: () -> Unit,
     onProgress: (Float) -> Unit,
+    inspectorEnabled: Boolean,
+    onOpenInspector: () -> Unit,
 ) {
     val paragraphs = remember(article.body) { splitParagraphs(article.body) }
     val adIndex = remember(paragraphs.size) { inlineAdSlotIndex(paragraphs.size) }
@@ -156,6 +181,8 @@ private fun ArticleBody(
             bookmarked = bookmarked,
             onBack = onBack,
             onToggleBookmark = onToggleBookmark,
+            inspectorEnabled = inspectorEnabled,
+            onOpenInspector = onOpenInspector,
         )
         LazyColumn(
             modifier = Modifier.fillMaxSize().weight(1f),
@@ -217,6 +244,8 @@ private fun ArticleHeader(
     bookmarked: Boolean,
     onBack: () -> Unit,
     onToggleBookmark: () -> Unit,
+    inspectorEnabled: Boolean,
+    onOpenInspector: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
@@ -228,9 +257,14 @@ private fun ArticleHeader(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             TextButton(onClick = onBack) { Text("← Back") }
-            // Unicode star — the project bans material-icons as a dependency.
-            TextButton(onClick = onToggleBookmark) {
-                Text(if (bookmarked) "★ Bookmarked" else "☆ Bookmark")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (inspectorEnabled) {
+                    TextButton(onClick = onOpenInspector) { Text("Inspect") }
+                }
+                // Unicode star — the project bans material-icons as a dependency.
+                TextButton(onClick = onToggleBookmark) {
+                    Text(if (bookmarked) "★ Bookmarked" else "☆ Bookmark")
+                }
             }
         }
         Text(section.uppercase(), style = MaterialTheme.typography.labelSmall)

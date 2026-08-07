@@ -15,10 +15,12 @@ import dev.avinya.admob.showcase.di.LocalAppGraph
 import dev.avinya.admob.showcase.di.LocalAppOpenSuppressor
 import dev.avinya.admob.showcase.di.ProvideAdManager
 import dev.avinya.admob.showcase.di.rememberAppGraph
+import dev.avinya.admob.showcase.domain.ad.ShowcasePlacements
 import dev.avinya.admob.showcase.nav.ShowcaseNavHost
 import dev.avinya.admob.showcase.nav.ShowcaseNavKey
 import dev.avinya.admob.showcase.ui.ad.AppOpenHost
 import dev.avinya.admob.showcase.ui.ad.AppOpenSuppressor
+import dev.avinya.admob.showcase.ui.inspector.LocalInspectorPlacements
 import dev.avinya.admob.showcase.ui.theme.ShowcaseTheme
 import dev.avinya.admob.showcase.ui.theme.ThemeMode
 import kotlinx.coroutines.flow.map
@@ -44,6 +46,10 @@ fun ShowcaseApp() {
     CompositionLocalProvider(
         LocalAppGraph provides graph,
         LocalAppOpenSuppressor provides suppressor,
+        // Fallback for any screen that does not override the Inspector
+        // placements. The full catalogue is the safe default; a screen can
+        // narrow it via `CompositionLocalProvider` inside its own body.
+        LocalInspectorPlacements provides ShowcasePlacements.allPlacements,
     ) {
         ProvideAdManager {
             val adManager = LocalAdManager.current
