@@ -74,15 +74,23 @@ internal class NativeAdLoadReservation(
 )
 
 /**
- * Outcome of a [NativeAdGovernor.reserve] call. [reservations] are the
- * new permits the coordinator may now call [NativeAdGovernor.admit] on;
- * [retiredRecordIds] are the records the governor evicted in the same
- * locked mutation to make room — the coordinator is responsible for
- * destroying their platform objects after releasing the governor lock.
+ * Outcome of a [NativeAdGovernor.reserve] call.
+ *
+ * - [reservations] are the new permits the coordinator may now call
+ *   [NativeAdGovernor.admit] on.
+ * - [retiredRecordIds] are the records the governor evicted in the same
+ *   locked mutation to make room — the coordinator is responsible for
+ *   destroying their platform objects after releasing the governor lock.
+ * - [cancelledReservations] are speculative permits the governor
+ *   dropped to satisfy visible demand at the hard cap. The platform
+ *   may still call back for these permits (the request is in flight);
+ *   the coordinator must drop those callbacks at the generation
+ *   check, before any record is admitted.
  */
 internal data class NativeAdReservationDecision(
     val reservations: List<NativeAdLoadReservation>,
     val retiredRecordIds: List<NativeAdRecordId> = emptyList(),
+    val cancelledReservations: List<NativeAdLoadReservation> = emptyList(),
 )
 
 /**
@@ -255,9 +263,11 @@ internal class NativeAdGovernor(
         val maxGrantable = free + speculatives.size + victims.size
         return when {
             count <= maxGrantable -> {
-                val cancelCount = minOf(count, speculatives.size)
-                val remainingAfterCancel = count - cancelCount
-                val evictCount = maxOf(0, remainingAfterCancel - free)
+                // needed = how many non-free slots we must source by cancellation
+                // or retirement; free already covers the rest.
+                val needed = count - free
+                val cancelCount = minOf(needed, speculatives.size)
+                val evictCount = needed - cancelCount
                 val toCancel = speculatives.take(cancelCount)
                 toCancel.forEach { (id, _) ->
                     pendingReservations.remove(id)
@@ -268,6 +278,7 @@ internal class NativeAdGovernor(
                 NativeAdReservationDecision(
                     createReservations(NativeAdDemandClass.Visible, priority, count),
                     toRetire.map { it.first },
+                    toCancel.map { it.second },
                 )
             }
             allowPartial && maxGrantable > 0 -> {
@@ -279,6 +290,7 @@ internal class NativeAdGovernor(
                 NativeAdReservationDecision(
                     createReservations(NativeAdDemandClass.Visible, priority, maxGrantable),
                     victims.map { it.first },
+                    speculatives.map { it.second },
                 )
             }
             else -> NativeAdReservationDecision(emptyList())

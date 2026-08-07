@@ -404,6 +404,11 @@ class NativeAdGovernorTest {
             visible.retiredRecordIds.isEmpty(),
             "no record should be retired while a pending speculative reservation can be cancelled",
         )
+        assertEquals(
+            listOf(speculativeReservation),
+            visible.cancelledReservations,
+            "the cancelled speculative permit must be returned in the decision",
+        )
         // The cancelled reservation is no longer known to the governor; the visible
         // permit is the only outstanding reservation.
         assertFailsWith<IllegalStateException> {
@@ -414,6 +419,55 @@ class NativeAdGovernorTest {
         admitOne(gov, visible.reservations.single())
         assertEquals(2, gov.state().loadedRecords)
         assertEquals(0, gov.state().reservedLoads)
+    }
+
+    @Test fun `free capacity prevents unnecessary cancellation of speculative permits`() {
+        val gov = governor(NativeAdMemoryPolicy(softLimit = 2, hardLimit = 4))
+        // 1 speculative permit outstanding, 0 records. Hard cap has 3 free slots.
+        val speculative = reserveSpeculative(gov, NativeAdPriority.Speculative, 1).reservations.single()
+        // Visible reserves 2 — fully satisfied by free capacity; no cancellation,
+        // no retirement.
+        val visible = reserveVisible(gov, NativeAdPriority.ActiveReadyAhead, 2)
+        assertEquals(2, visible.reservations.size)
+        assertTrue(visible.cancelledReservations.isEmpty(),
+            "no speculative permit should be cancelled when free capacity covers the request")
+        assertTrue(visible.retiredRecordIds.isEmpty())
+        // State: 1 speculative + 2 visible = 3 reserved.
+        assertEquals(3, gov.state().reservedLoads)
+        // The speculative permit is still alive.
+        admitOne(gov, speculative)
+        assertEquals(1, gov.state().loadedRecords)
+    }
+
+    @Test fun `partial admission returns every cancelled permit`() {
+        val gov = governor(NativeAdMemoryPolicy(softLimit = 2, hardLimit = 2))
+        // 2 speculative permits, no records. The system is at the hard cap.
+        val spec1 = reserveSpeculative(gov, NativeAdPriority.Speculative, 1).reservations.single()
+        val spec2 = reserveSpeculative(gov, NativeAdPriority.Speculative, 1).reservations.single()
+        // Visible reserves 5 with allowPartial=true: free=0, need 5, can cancel 2.
+        // Partial fill: grant 2 (free 0 + cancellations 2), retire 0.
+        val visible = reserveVisible(gov, NativeAdPriority.ActiveReadyAhead, 5, allowPartial = true)
+        assertEquals(2, visible.reservations.size, "partial fill grants free + cancellations")
+        assertEquals(setOf(spec1, spec2), visible.cancelledReservations.toSet(),
+            "every cancelled speculative permit is returned so the coordinator can drop late callbacks")
+        assertTrue(visible.retiredRecordIds.isEmpty(), "no records to retire")
+        // Final state: 2 visible permits, 0 speculative permits.
+        assertEquals(2, gov.state().reservedLoads)
+        assertEquals(0, gov.state().loadedRecords)
+    }
+
+    @Test fun `visible demand at hard limit returns the exact cancelled reservation`() {
+        val gov = governor(NativeAdMemoryPolicy(softLimit = 2, hardLimit = 2))
+        // 2 speculative permits, no records.
+        val spec1 = reserveSpeculative(gov, NativeAdPriority.Speculative, 1).reservations.single()
+        val spec2 = reserveSpeculative(gov, NativeAdPriority.Speculative, 1).reservations.single()
+        val visible = reserveVisible(gov, NativeAdPriority.ActiveReadyAhead, 1)
+        assertEquals(1, visible.reservations.size)
+        assertEquals(1, visible.cancelledReservations.size, "exactly one speculative permit cancelled")
+        // The cancelled permit is one of the two speculative ones; identity matters
+        // so the coordinator can later admit-or-discard the platform callback.
+        val cancelled = visible.cancelledReservations.single()
+        assertTrue(cancelled === spec1 || cancelled === spec2)
     }
 
     @Test fun `releaseReservation rejects a forged token`() {
@@ -439,27 +493,23 @@ class NativeAdGovernorTest {
         }
     }
 
-    @Test fun `concurrent reserves and admits never exceed hard limit`() = runBlocking {
+    @Test fun `concurrent reserve wave grants exactly hardLimit permits`() = runBlocking {
         val gov = governor(NativeAdMemoryPolicy(softLimit = 4, hardLimit = 6))
         val coroutineCount = 30
-        val iterationsPerCoroutine = 20
         val errors = Channel<Throwable>(Channel.UNLIMITED)
+        val grants = Channel<Unit>(Channel.UNLIMITED)
 
         val jobs = (1..coroutineCount).map {
             launch(Dispatchers.Default) {
                 try {
-                    repeat(iterationsPerCoroutine) {
-                        val decision = gov.reserve(
-                            NativeAdDemandClass.Visible,
-                            NativeAdPriority.Speculative,
-                            1,
-                            allowPartial = true,
-                        )
-                        if (decision.reservations.isNotEmpty()) {
-                            val id = gov.admit(decision.reservations.single())
-                            // Retire immediately so the slot is available for the next iteration.
-                            gov.retire(id)
-                        }
+                    val decision = gov.reserve(
+                        NativeAdDemandClass.Visible,
+                        NativeAdPriority.Speculative,
+                        1,
+                        allowPartial = true,
+                    )
+                    if (decision.reservations.isNotEmpty()) {
+                        grants.send(Unit)
                     }
                 } catch (e: Throwable) {
                     errors.send(e)
@@ -467,19 +517,26 @@ class NativeAdGovernorTest {
             }
         }
         jobs.joinAll()
+        grants.close()
         errors.close()
 
-        val collected = mutableListOf<Throwable>()
-        for (err in errors) collected.add(err)
+        val collectedErrors = mutableListOf<Throwable>()
+        for (err in errors) collectedErrors.add(err)
+        val grantedCount = mutableListOf<Unit>()
+        for (u in grants) grantedCount.add(u)
 
         assertTrue(
-            collected.isEmpty(),
-            "no coroutine should throw during concurrent access; got: ${collected.map { it.message }}",
+            collectedErrors.isEmpty(),
+            "no coroutine should throw during concurrent access; got: ${collectedErrors.map { it.message }}",
+        )
+        // Exactly hardLimit coroutines got a permit; the rest were denied.
+        assertEquals(
+            6,
+            grantedCount.size,
+            "exactly hardLimit (6) permits should be granted under a simultaneous reserve wave",
         )
         val state = gov.state()
-        // Invariant: loaded + reserved <= hardLimit at every moment. After all
-        // coroutines retire their admitted records, the state must be empty.
-        assertEquals(0, state.loadedRecords, "all records should be retired by the end")
-        assertEquals(0, state.reservedLoads, "all reservations should be released by the end")
+        assertEquals(0, state.loadedRecords, "no records admitted in a reserve-only wave")
+        assertEquals(6, state.reservedLoads, "the governor retains exactly hardLimit reservations")
     }
 }
