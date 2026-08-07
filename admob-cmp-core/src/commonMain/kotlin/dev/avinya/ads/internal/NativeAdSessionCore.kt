@@ -25,13 +25,13 @@ import kotlinx.coroutines.flow.asStateFlow
  * [recordFailed]; the session rejects callbacks that carry an older
  * generation (e.g. an admit that arrived after [expireSlot] already
  * retired the slot, or a callback from a window that has since
- * scrolled past). The same mechanism is the platform-callback side
- * of the coordinator's generation check.
+ * scrolled past).
  */
 internal data class SlotDemandEntry(
     val key: String,
     val placement: AdPlacement,
     val generation: Long,
+    val band: NativeAdBand,
 )
 
 /**
@@ -45,31 +45,42 @@ internal data class SlotDemandEntry(
 internal data class SlotDemand(val slots: List<SlotDemandEntry>)
 
 /**
+ * Which viewport band a slot is in. The session tracks this so the
+ * published [NativeAdSlotState] can distinguish "visible and loaded"
+ * ([NativeAdSlotState.Ready] / [NativeAdSlotState.Mounted]) from
+ * "prefetched or retained" ([NativeAdSlotState.Retained]) and so
+ * retired records that fall out of the window can be picked up by
+ * the next [NativeAdSessionCore.updateWindow] at the right priority.
+ */
+internal enum class NativeAdBand { Visible, PrefetchAhead, RetainBehind, Out }
+
+/**
  * Per-session slot state machine. The session owns the slot map
  * (slotKey -> [SlotEntry]) and the transitions between the public
  * [NativeAdSlotState] values; the [NativeAdGovernor] owns the
  * process-wide record and reservation counts; the coordinator owns
- * the actual platform ad objects behind the record ids.
+ * the actual platform ad objects behind the record ids and is
+ * responsible for retiring them on close/clear/expiry.
  *
- * The session's invariants:
+ * Contract:
  * - Each slot has at most one [NativeAdRecordId] at a time.
  * - A demand for a slot carries a generation; recordAdmitted /
  *   recordFailed carry the same generation. A stale generation is
- *   rejected and the callback is dropped (the slot is in Empty /
- *   Loading for a newer generation, or in some other state that
- *   does not accept this callback).
- * - [updateWindow] dedupes (key, placement) duplicates on first
- *   occurrence (visible > prefetchAhead > retainBehind) and admits
- *   demand for the first [NativeAdSessionPolicy.maxRetainedAds]
- *   ranked slots. Lower-priority slots are not loaded; if they have
- *   a record it stays as a "far behind" anchor.
+ *   rejected and the callback is dropped.
+ * - [updateWindow] is idempotent: emitting demand for a slot whose
+ *   current generation is already in flight is a no-op. A new
+ *   generation is only emitted when the previous one has resolved
+ *   (admitted, failed, or superseded by expiry).
+ * - Out-of-window slot entries with no record, no in-flight demand,
+ *   and no terminal error are pruned so the map cannot grow
+ *   unbounded under scrolling. Entries that own a record or have
+ *   an in-flight demand are preserved (the platform ad is still
+ *   alive in the coordinator and the next window may pull the slot
+ *   back in).
  * - [deactivate] retains at most `min(NativeAdMemoryPolicy.inactiveSessionLimit,
- *   policy.maxRetainedAds)` anchors, picking the last visible slot
- *   first, falling back to the most recently admitted record. All
- *   other detached records are retired.
- * - The slot map only retains entries that have a record, an
- *   in-flight demand, or are in the current window. Walking a
- *   thousand unique slot keys does not grow the map unbounded.
+ *   policy.maxRetainedAds)` anchors (mounted first, then last
+ *   visible, then most recently admitted). All other detached
+ *   records are retired.
  *
  * All mutating operations are protected by an internal lock and
  * publish [state] atomically. Public [NativeAdSlotState] values are
@@ -89,16 +100,19 @@ internal class NativeAdSessionCore(
         var recordId: NativeAdRecordId? = null,
         var demandInFlight: Long? = null,
         var mounted: Boolean = false,
-        var inVisible: Boolean = false,
+        var band: NativeAdBand = NativeAdBand.Out,
         var lastError: AdError? = null,
     )
 
     private val slots = mutableMapOf<String, SlotEntry>()
     private var active: Boolean = true
-    // Generation starts at 1 so callers can use `generation > 0` as a sanity
-    // check for "freshly emitted" demand without colliding with the default
-    // zero value of a never-touched slot entry.
     private var nextGeneration: Long = 1L
+    // In-flight cap. The session refuses to emit new demand for a slot
+    // whose band is anything other than the current viewport when the
+    // in-flight count is at this cap. Default: hardLimit, so the
+    // session's in-flight matches the governor's capacity. A consumer
+    // that wants a tighter cap can pass a smaller value.
+    private val inFlightCap: Int = memoryPolicy.hardLimit
 
     private val _state = MutableStateFlow(
         NativeAdSessionState(active = true, slots = emptyMap()),
@@ -107,57 +121,60 @@ internal class NativeAdSessionCore(
 
     /**
      * Reports the new viewport window. Returns the slots the
-     * coordinator must (re)load to satisfy the new ranking.
+     * coordinator must (re)load to satisfy the new ranking. Marks
+     * the session as active.
      *
      * Ranking is visible > prefetchAhead > retainBehind with
      * first-occurrence dedup. Demand is emitted for the first
      * [NativeAdSessionPolicy.maxRetainedAds] ranked slots that do
      * not already have a record or an in-flight demand on a current
-     * generation. Out-of-window slots that have a record keep it
-     * (they become far-behind candidates for the governor's trim);
-     * out-of-window slots with neither record nor in-flight demand
-     * are removed from the map.
+     * generation, and only while the session's in-flight count is
+     * below [inFlightCap]. Demand is band-aware: a visible slot is
+     * preferred over a prefetch slot, a prefetch slot over a retain
+     * slot, but every band gets a chance to load once the cap is
+     * hit. Out-of-window entries with no record, no in-flight
+     * demand, and no terminal error are pruned.
      *
      * @throws IllegalArgumentException if a slot in the window
      *   carries a placement that differs from the one the session
      *   already recorded for the same key.
      */
     fun updateWindow(window: NativeAdWindow): SlotDemand = lock.withLock {
+        active = true
         validatePlacementConsistency(window)
 
-        val ranked = rankSlots(window)
-        val rankedKeys = ranked.map { it.key }.toSet()
+        val ranked = rankAndClassify(window)
+        val windowKeys = ranked.map { it.entry.key }.toSet()
         val demand = mutableListOf<SlotDemandEntry>()
+        val inFlightBefore = currentInFlightCount()
 
-        for (slot in ranked.take(policy.maxRetainedAds)) {
+        for (rankedSlot in ranked.take(policy.maxRetainedAds)) {
+            val (band, slot) = rankedSlot
             val entry = slots.getOrPut(slot.key) {
                 SlotEntry(placement = slot.placement, generation = nextGeneration++)
             }
-            entry.placement // sanity: slot.placement == entry.placement validated above
-            entry.inVisible = true
-            // Demand only when there is no record and no current in-flight demand
-            // for the same generation. A previous demand for a stale generation
-            // does not block a new demand — the old callback will be dropped on
-            // arrival (the session compares the callback's generation against
-            // the entry's current generation and rejects mismatches).
-            if (entry.recordId == null) {
-                val gen = nextGeneration++
-                entry.generation = gen
-                entry.demandInFlight = gen
-                entry.lastError = null
-                demand.add(SlotDemandEntry(slot.key, slot.placement, gen))
-            }
+            // If the placement changed for an existing slot, validatePlacementConsistency
+            // would have already thrown. The slot.placement here matches entry.placement.
+            entry.band = band
+            if (entry.recordId != null) continue
+            if (entry.demandInFlight != null) continue  // Idempotent: previous demand still in flight.
+            if (inFlightBefore + demand.size >= inFlightCap) continue  // Cap reached.
+            // Emit a new demand at a fresh generation.
+            val gen = nextGeneration++
+            entry.generation = gen
+            entry.demandInFlight = gen
+            entry.lastError = null
+            demand.add(SlotDemandEntry(slot.key, slot.placement, gen, band))
         }
 
-        // Slots that left the window entirely. The session tracks the current
-        // viewport, not the history: out-of-window entries are removed
-        // regardless of record or in-flight state. The governor still owns
-        // the records (as far-behind candidates for the next moderate
-        // trim); any pending demand's eventual admit is dropped at the
-        // session's generation check (the slot is no longer in the map).
-        for ((key, _) in slots.toMap()) {
-            if (key !in rankedKeys) {
-                slots.remove(key)
+        // Out-of-window entries: update the band, then prune anything that
+        // owns nothing. Anchors (records) and in-flight entries stay.
+        for ((key, entry) in slots.toMap()) {
+            if (key !in windowKeys) {
+                entry.band = NativeAdBand.Out
+                if (entry.recordId == null && entry.demandInFlight == null && entry.lastError == null) {
+                    slots.remove(key)
+                }
             }
         }
 
@@ -169,41 +186,42 @@ internal class NativeAdSessionCore(
      * Coordinator callback: a reservation was admitted to a record.
      * The [generation] must match the entry's current generation;
      * a mismatch means a newer [updateWindow] or [expireSlot] has
-     * since superseded this slot and the callback is dropped.
+     * since superseded this slot and the callback is dropped. The
+     * returned [Boolean] is true when the generation was accepted.
      */
-    fun recordAdmitted(slotKey: String, recordId: NativeAdRecordId, generation: Long) = lock.withLock {
-        val entry = slots[slotKey] ?: return@withLock
-        if (entry.generation != generation) return@withLock
+    fun recordAdmitted(slotKey: String, recordId: NativeAdRecordId, generation: Long): Boolean = lock.withLock {
+        val entry = slots[slotKey] ?: return@withLock false
+        if (entry.generation != generation) return@withLock false
         entry.recordId = recordId
         entry.demandInFlight = null
         entry.lastError = null
         publishState()
+        true
     }
 
     /**
-     * Coordinator callback: a load attempt failed. The slot's state
-     * becomes [NativeAdSlotState.Failed]. Stale generations are
-     * rejected; a future [updateWindow] can reissue demand.
+     * Coordinator callback: a load attempt failed. Returns true when
+     * the generation was accepted.
      */
-    fun recordFailed(slotKey: String, error: AdError, generation: Long) = lock.withLock {
-        val entry = slots[slotKey] ?: return@withLock
-        if (entry.generation != generation) return@withLock
+    fun recordFailed(slotKey: String, error: AdError, generation: Long): Boolean = lock.withLock {
+        val entry = slots[slotKey] ?: return@withLock false
+        if (entry.generation != generation) return@withLock false
         entry.recordId = null
         entry.demandInFlight = null
         entry.lastError = error
         publishState()
+        true
     }
 
     /**
      * Coordinator callback: the record for this slot expired (the
      * 1-hour native TTL fired, or the platform reported expiry).
-     * The session retires the old record, clears the slot to Empty
-     * (no in-flight demand — the new demand is emitted via the
-     * returned [SlotDemand] and the coordinator's first
-     * [recordAdmitted] is what transitions the slot to Loading /
-     * Ready), and bumps the generation. Any platform callback for
-     * the old generation is dropped at the coordinator's generation
-     * check.
+     * The session retires the old record (so the coordinator can
+     * destroy the platform ad), clears the slot to Empty, and
+     * emits a fresh demand at a new generation. The coordinator
+     * will call [recordAdmitted] at that generation; any platform
+     * callback for the old generation is dropped at the coordinator's
+     * generation check.
      */
     fun expireSlot(slotKey: String): SlotDemand = lock.withLock {
         val entry = slots[slotKey] ?: return@withLock SlotDemand(emptyList())
@@ -211,14 +229,19 @@ internal class NativeAdSessionCore(
         if (recordId != null) {
             governor.retire(recordId)
         }
+        // Clear the in-flight, bump the generation, leave the band
+        // intact so the next platform callback can route the admit
+        // back here. The slot returns to Empty until the coordinator
+        // submits the reload demand.
+        entry.demandInFlight = null
         entry.recordId = null
         entry.mounted = false
-        entry.demandInFlight = null
         entry.lastError = null
         val gen = nextGeneration++
         entry.generation = gen
+        entry.demandInFlight = gen
         publishState()
-        SlotDemand(listOf(SlotDemandEntry(slotKey, entry.placement, gen)))
+        SlotDemand(listOf(SlotDemandEntry(slotKey, entry.placement, gen, entry.band)))
     }
 
     /**
@@ -236,15 +259,13 @@ internal class NativeAdSessionCore(
     }
 
     /**
-     * Marks the session inactive. The session picks up to
-     * `min(memoryPolicy.inactiveSessionLimit, policy.maxRetainedAds)`
-     * anchor records — preferring mounted records, then the last
-     * visible slot, falling back to the most recently admitted
-     * record. Every other detached record is retired (the
-     * coordinator destroys the platform objects after this call
-     * returns; this method just removes them from the governor).
-     * Mounted anchors are automatically unmounted because the
-     * session is no longer tracking the viewport.
+     * Marks the session inactive. Retains at most
+     * `min(NativeAdMemoryPolicy.inactiveSessionLimit, policy.maxRetainedAds)`
+     * anchors, picks the last visible slot first, then mounted, then
+     * most-recently admitted. All other detached records are
+     * retired; the slot entries that lost their record become
+     * Empty. The session is marked inactive so the public state
+     * reflects it; the next [updateWindow] re-marks it active.
      */
     fun deactivate(): List<NativeAdRecordId> = lock.withLock {
         active = false
@@ -263,19 +284,15 @@ internal class NativeAdSessionCore(
                     entry.recordId = null
                     entry.demandInFlight = null
                     entry.mounted = false
-                    entry.inVisible = false
+                    entry.band = NativeAdBand.Out
                     entry.lastError = null
                 }
                 rid != null && rid in anchorRecordIds -> {
-                    // Anchor: unmount automatically and drop the inVisible flag,
-                    // but keep the record. After deactivate the session is no
-                    // longer tracking the viewport, so the anchor's status
-                    // collapses to Retained.
                     if (entry.mounted) {
                         governor.setMounted(rid, false)
                         entry.mounted = false
                     }
-                    entry.inVisible = false
+                    entry.band = NativeAdBand.Out
                 }
             }
         }
@@ -298,11 +315,32 @@ internal class NativeAdSessionCore(
 
     /**
      * Returns the current record id for a slot, or null if the slot
-     * has no record (Empty, Loading, or Failed). The coordinator
-     * uses this to map a slot to a render handle.
+     * has no record (Empty, Loading, or Failed).
      */
     fun recordIdFor(slotKey: String): NativeAdRecordId? = lock.withLock {
         slots[slotKey]?.recordId
+    }
+
+    private fun currentInFlightCount(): Int = slots.values.count { it.demandInFlight != null }
+
+    private data class RankedSlot(val band: NativeAdBand, val entry: NativeAdSlot)
+
+    private fun rankAndClassify(window: NativeAdWindow): List<RankedSlot> {
+        val result = mutableListOf<RankedSlot>()
+        val seen = mutableSetOf<String>()
+        // Visible first.
+        for (slot in window.visible) {
+            if (seen.add(slot.key)) result.add(RankedSlot(NativeAdBand.Visible, slot))
+        }
+        // Then prefetch-ahead.
+        for (slot in window.prefetchAhead) {
+            if (seen.add(slot.key)) result.add(RankedSlot(NativeAdBand.PrefetchAhead, slot))
+        }
+        // Then retain-behind.
+        for (slot in window.retainBehind) {
+            if (seen.add(slot.key)) result.add(RankedSlot(NativeAdBand.RetainBehind, slot))
+        }
+        return result
     }
 
     private fun pickAnchors(
@@ -310,13 +348,9 @@ internal class NativeAdSessionCore(
         anchorLimit: Int,
     ): List<SlotEntry> {
         if (anchorLimit <= 0 || candidates.isEmpty()) return emptyList()
-        // Rank: mounted first, then last visible slot first, then most recent.
-        // higher inVisibleIndex is "later in viewport" which the plan specifies
-        // as the preferred anchor; the slot map preserves insertion order which
-        // mirrors the viewport order from the most recent updateWindow call.
         return candidates.sortedWith(
             compareByDescending<SlotEntry> { it.mounted }
-                .thenByDescending { it.inVisible }
+                .thenBy { it.band.ordinal }  // Visible first, then PrefetchAhead, then RetainBehind
                 .thenByDescending { it.generation },
         ).take(anchorLimit)
     }
@@ -327,7 +361,7 @@ internal class NativeAdSessionCore(
                 val existing = slots[slot.key]
                 if (existing != null && existing.placement != slot.placement) {
                     throw IllegalArgumentException(
-                        "NativeAdSession '${key}': slot '${slot.key}' placement changed " +
+                        "NativeAdSession '$key': slot '${slot.key}' placement changed " +
                             "from '${existing.placement.id}' to '${slot.placement.id}'. " +
                             "Reuse the same AdPlacement instance for the same key across " +
                             "viewport updates."
@@ -335,17 +369,6 @@ internal class NativeAdSessionCore(
                 }
             }
         }
-    }
-
-    private fun rankSlots(window: NativeAdWindow): List<NativeAdSlot> {
-        val result = mutableListOf<NativeAdSlot>()
-        val seen = mutableSetOf<String>()
-        for (band in listOf(window.visible, window.prefetchAhead, window.retainBehind)) {
-            for (slot in band) {
-                if (seen.add(slot.key)) result.add(slot)
-            }
-        }
-        return result
     }
 
     private fun publishState() {
@@ -361,7 +384,7 @@ internal class NativeAdSessionCore(
         entry.recordId == null && entry.demandInFlight != null -> NativeAdSlotState.Loading
         entry.recordId == null -> NativeAdSlotState.Empty
         entry.mounted -> NativeAdSlotState.Mounted(null)
-        entry.inVisible -> NativeAdSlotState.Ready(null)
+        entry.band == NativeAdBand.Visible -> NativeAdSlotState.Ready(null)
         else -> NativeAdSlotState.Retained(null)
     }
 }

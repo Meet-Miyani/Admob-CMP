@@ -455,6 +455,80 @@ Run: `./gradlew :admob-cmp-core:testAndroidHostTest --tests '*NativeAdCoordinato
 
 Expected: PASS.
 
+#### Task 3-4 review correction gate (must pass before Task 5)
+
+The first Task 3-4 implementation compiled on both targets but did not implement the
+ownership, lifecycle, and scheduling contracts above. Correct these items before any
+platform coordinator work begins:
+
+- [ ] **Make session reconciliation idempotent and band-aware.** Track whether a slot
+  is visible, prefetch-ahead, retain-behind, or outside the current window. Emit no new
+  demand while the current generation is already in flight. Set `active = true` on
+  `updateWindow()` after deactivation, and publish `Ready` only for visible loaded ads;
+  retained and prefetched records must use their correct state and governor priority.
+- [ ] **Preserve ownership until explicit retirement.** Never remove a slot entry while
+  it still owns a record or an in-flight generation. `updateWindow`, `deactivate`,
+  expiry, and `close` must return explicit retirement/invalidation actions; the
+  coordinator applies governor changes and destroys platform objects after releasing
+  the session lock. Prune only entries with no record, no in-flight generation, and no
+  current-window membership. Enforce `maxRetainedAds` across existing records plus new
+  demand so scrolling cannot orphan records or exceed the session cap.
+- [ ] **Make stale admission observable.** `recordAdmitted` must report whether the
+  generation was accepted and store the admitted ad's `NativeMediaInfo`. If the slot
+  was removed, expired, deactivated beyond its anchor allowance, or closed, the
+  coordinator must retire the governor record and destroy the returned platform ad
+  exactly once. A closed session object cannot be reactivated.
+- [ ] **Give the coordinator real platform-object ownership.** Store each admitted
+  platform ad together with record id, placement, session/slot/generation, load time,
+  response info, and media info. Route window retirement, governor eviction, TTL,
+  session close, `clear`, and consent invalidation through one exact-once retirement
+  helper that removes metadata, retires governor accounting, updates scheduler state,
+  and calls `platform.destroy` outside locks.
+- [ ] **Reserve before loading and load only the granted count.** Map each granted
+  reservation to one slot entry; do not invoke the platform when none are granted.
+  Consume both `retiredRecordIds` and `cancelledReservations` returned by the governor.
+  A partial platform result admits only matching reservations, releases every unused
+  permit, and moves every unmatched slot out of `Loading` to a terminal `Empty` or
+  `Failed` state. Never index the reservation list using the originally requested
+  batch size.
+- [ ] **Implement the declared scheduler contract.** Serialize per placement, classify
+  visible demand separately from speculative prefetch/retention, and wrap the complete
+  `retryAdLoad` sequence in `placement.timeoutPolicy.loadTimeout`. Keep shared session,
+  record, scheduler, and clock maps under one documented lock order; platform calls and
+  destruction occur outside locks. Remove a scheduler only when it has no queued work,
+  job, reservations, or owned records.
+- [ ] **Connect inactivity and registry semantics.** Add a coordinator-owned deactivate
+  path that updates both the session core and `inactiveOrder`; direct calls on the core
+  must not bypass registry accounting. Reusing a session key must reject a different
+  policy, blank keys must be rejected, inactive TTL/LRU must destroy real loaded ads,
+  and reactivation must remove the session from inactive tracking and set its public
+  state active again. Fix close-session generation invalidation before deleting record
+  metadata.
+- [ ] **Make TTL reload and cleanup complete.** One-hour expiry destroys the old ad,
+  retires its governor record, updates the slot generation, and submits the returned
+  reload demand only when the slot/session still qualifies. Session TTL, `clear`, and
+  consent revocation release pending reservations and drain late results without leaks
+  or double destruction.
+
+Add non-vacuous tests for repeated identical windows, active/inactive transitions,
+band-to-demand/priority mapping, bounded ownership after long scrolling, stale admit
+rejection, media-info publication, zero/partial reservation admission, retry and whole-
+sequence timeout, exact-once destruction on every invalidation path, a loaded-record
+TTL reload, loaded inactive-session TTL/LRU eviction, policy mismatch, scheduler cleanup
+after its final record is retired, and concurrent clear/close/result races. Tests must
+assert platform load counts, destroyed object identities, governor counts, registry
+counts, and final slot states rather than relying on initially-empty slot maps.
+
+Run after correction:
+
+```bash
+./gradlew :admob-cmp-core:testAndroidHostTest \
+  --tests '*NativeAdSessionCoreTest*' \
+  --tests '*NativeAdCoordinatorCoreTest*' \
+  --no-configuration-cache
+./gradlew :admob-cmp-core:iosSimulatorArm64Test --no-configuration-cache
+```
+
 ---
 
 ### Task 5: Replace the Android native pool

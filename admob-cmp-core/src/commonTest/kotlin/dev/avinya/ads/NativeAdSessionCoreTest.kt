@@ -221,23 +221,23 @@ class NativeAdSessionCoreTest {
         val placement = nativePlacement("p")
         val window = NativeAdWindow(visible = listOf(NativeAdSlot("a", placement)))
         val records = setup(gov, session, window)
-        val originalId = records.getValue("a")
         // TTL expired; the coordinator calls expireSlot on the session.
         val demand = session.expireSlot("a")
-        // The slot returns to Empty (no record, no in-flight demand) and the
-        // session emits a reload demand at a new generation.
+        // The slot is now in Loading (new reload demand in flight) and the
+        // session emits the demand for the coordinator to act on. The old
+        // record is retired — it will never remount.
+        val slotAfter = session.state.value.slots["a"]
         assertTrue(
-            session.state.value.slots["a"] is NativeAdSlotState.Empty,
-            "expected Empty after expire, got ${session.state.value.slots["a"]}",
+            slotAfter is NativeAdSlotState.Loading,
+            "expected Loading after expire (reload demand in flight), got $slotAfter",
         )
         assertEquals(listOf("a"), demand.slots.map { it.key })
-        // The original record is retired and gone from the session's view.
+        // The original record is gone from the session's view.
         assertNull(session.recordIdFor("a"))
         assertEquals(0, countInGovernor(gov))
         // The reload demand references a fresh generation so the coordinator can
         // race the platform callback without mis-attributing it to the expired
-        // record. The session uses a monotonically increasing counter starting
-        // at 1, so the new generation is strictly positive.
+        // record.
         assertTrue(demand.slots.single().generation > 0, "reload generation must be positive")
     }
 
