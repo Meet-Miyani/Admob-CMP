@@ -1,5 +1,6 @@
 package dev.avinya.admob.showcase.feature.article
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,11 +9,24 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Analytics
+import androidx.compose.material.icons.rounded.Bookmark
+import androidx.compose.material.icons.rounded.BookmarkBorder
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -25,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.avinya.ads.LocalAdManager
@@ -76,8 +91,6 @@ fun ArticleScreen(articleId: String, onBack: () -> Unit) {
     AdEffectHandler(
         effects = viewModel.effects,
         onSuppressed = { reason: SuppressionReason ->
-            // Phase 6's Inspector will read this; for now a print is the
-            // minimum that proves the wiring reaches the UI.
             println("Article ad suppressed: $reason")
         },
         onNavigateBack = onBack,
@@ -127,18 +140,9 @@ private fun ArticleBody(
     val paragraphs = remember(article.body) { splitParagraphs(article.body) }
     val adIndex = remember(paragraphs.size) { inlineAdSlotIndex(paragraphs.size) }
     val showInlineAd = adsEnabled && sdkReady
-    // The ad row is only in the list when both the article carries a slot
-    // AND the gate is on. When the gate is off, the row is dropped entirely
-    // (per the plan: an ad failure is never a user-facing error — no
-    // zero-height placeholder, no displaced paragraph, no shift in flow).
     val showAdRow = adIndex != null && showInlineAd
-    // Use a sentinel past the end of any LazyColumn row so the paragraph↔row
-    // shift below becomes a no-op when no ad row is in the list.
     val effectiveAdIndex = adIndex?.takeIf { showInlineAd } ?: Int.MAX_VALUE
 
-    // Fraction as a derived state of the LazyListState. We approximate the
-    // visible-row offset by index alone — coarse but stable across re-layouts,
-    // and the persisted value is only ever used to re-scroll on re-entry.
     val fraction by remember(listState, paragraphs.size) {
         derivedStateOf {
             val total = paragraphs.size
@@ -151,22 +155,16 @@ private fun ArticleBody(
         }
     }
 
-    // Restore the saved reading position once the article and the lazy list
-    // are both real. Doing it before either is ready is a no-op or a crash.
     LaunchedEffect(article.id) {
         if (initialProgress > 0f && paragraphs.isNotEmpty()) {
             val target = (initialProgress * (paragraphs.size - 1))
                 .toInt()
                 .coerceIn(0, paragraphs.lastIndex)
-            // The ad row shifts every LazyColumn index at and after it by one,
-            // so the paragraph-based target needs the matching offset.
             val listTarget = target + (if (target >= effectiveAdIndex) 1 else 0)
             listState.scrollToItem(listTarget)
         }
     }
 
-    // Debounce scroll writes. Without this, every fling updates Room on every
-    // frame, which is the exact behaviour `setProgress` exists to prevent.
     LaunchedEffect(listState) {
         snapshotFlow { fraction }.debounce(PROGRESS_DEBOUNCE_MS).collect(onProgress)
     }
@@ -204,23 +202,30 @@ private fun ArticleBody(
             ) { index ->
                 when {
                     showAdRow && index == adIndex -> {
-                        NativeAdView(
-                            placement = ShowcasePlacements.articleNative,
-                            itemKey = "article_native_${article.id}",
-                            layout = inlineNativeAdLayout,
+                        Card(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 8.dp),
-                        )
+                            shape = RoundedCornerShape(16.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.4f)),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        ) {
+                            NativeAdView(
+                                placement = ShowcasePlacements.articleNative,
+                                itemKey = "article_native_${article.id}",
+                                layout = inlineNativeAdLayout,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                            )
+                        }
                     }
-                    showAdRow && index > adIndex -> Text(
-                        text = paragraphs[index - 1],
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                    else -> Text(
-                        text = paragraphs[index],
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
+                    showAdRow && index > adIndex -> {
+                        ParagraphCard(text = paragraphs[index - 1])
+                    }
+                    else -> {
+                        ParagraphCard(text = paragraphs[index])
+                    }
                 }
             }
         }
@@ -231,6 +236,23 @@ private fun ArticleBody(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+    }
+}
+
+@Composable
+private fun ParagraphCard(text: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(16.dp),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -249,37 +271,120 @@ private fun ArticleHeader(
 ) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TextButton(onClick = onBack) { Text("← Back") }
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                    contentDescription = "Back",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 if (inspectorEnabled) {
-                    TextButton(onClick = onOpenInspector) { Text("Inspect") }
+                    IconButton(onClick = onOpenInspector) {
+                        Icon(
+                            imageVector = Icons.Rounded.Analytics,
+                            contentDescription = "Inspect Telemetry",
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
-                // Unicode star — the project bans material-icons as a dependency.
-                TextButton(onClick = onToggleBookmark) {
-                    Text(if (bookmarked) "★ Bookmarked" else "☆ Bookmark")
+                IconButton(onClick = onToggleBookmark) {
+                    Icon(
+                        imageVector = if (bookmarked) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
+                        contentDescription = if (bookmarked) "Remove bookmark" else "Bookmark article",
+                        tint = if (bookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
         }
-        Text(section.uppercase(), style = MaterialTheme.typography.labelSmall)
-        Text(title, style = MaterialTheme.typography.headlineSmall)
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                contentColor = MaterialTheme.colorScheme.primary,
+            ) {
+                Text(
+                    text = section.uppercase(),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            if (isPremium) {
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f),
+                    contentColor = MaterialTheme.colorScheme.tertiary,
+                ) {
+                    Text(
+                        text = "PREMIUM",
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+        }
+
         Text(
-            buildString {
-                append(author)
-                append(" · ")
-                append(readTimeMin)
-                append(" min")
-                if (isPremium) append(" · Premium")
-            },
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            text = title,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground,
         )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Person,
+                    contentDescription = "Author",
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = author,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Schedule,
+                    contentDescription = "Read time",
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = "$readTimeMin min read",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
@@ -289,3 +394,4 @@ private fun CenteredMessage(text: String) {
         Text(text)
     }
 }
+
