@@ -8,18 +8,22 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
+import dev.avinya.ads.AdManager
 import dev.avinya.admob.showcase.core.time.Clock
 import dev.avinya.admob.showcase.core.time.SystemClock
 import dev.avinya.admob.showcase.data.db.ShowcaseDatabase
 import dev.avinya.admob.showcase.data.prefs.SettingsRepository
 import dev.avinya.admob.showcase.data.repo.AdStateRepository
+import dev.avinya.admob.showcase.data.repo.AdTelemetryRepository
 import dev.avinya.admob.showcase.data.repo.ArticleRepository
 import dev.avinya.admob.showcase.data.repo.WalletRepository
+import dev.avinya.admob.showcase.domain.ad.ShowcasePlacements
 import dev.avinya.admob.showcase.ui.ad.AppOpenSuppressor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import okio.Path.Companion.toPath
 
 /**
@@ -62,6 +66,31 @@ class AppGraph(storage: PlatformStorage) {
     private val coldStartAt: Long = clock.nowMillis()
 
     val adState: AdStateRepository = AdStateRepository(preferences, clock, coldStartAt)
+
+    /**
+     * Drained from `adManager.events` by [startTelemetry]. Owns placement-id
+     * → format lookup, so the mappers stay pure and the DAO never sees an
+     * unknown id as a null.
+     */
+    val telemetry: AdTelemetryRepository = AdTelemetryRepository(
+        telemetryDao = database.telemetryDao(),
+        formatByPlacement = ShowcasePlacements.allPlacements.associate { it.id to it.format },
+        appScope = appScope,
+        clock = clock,
+    )
+
+    /**
+     * Launches a single app-scoped collector over [AdManager.events]. Called
+     * once from `ShowcaseApp` after the `LocalAdManager` provider is in
+     * place; calling it more than once would double-record every event.
+     */
+    fun startTelemetry(adManager: AdManager) {
+        appScope.launch {
+            adManager.events.collect { event ->
+                telemetry.record(event, clock.nowMillis())
+            }
+        }
+    }
 }
 
 /**

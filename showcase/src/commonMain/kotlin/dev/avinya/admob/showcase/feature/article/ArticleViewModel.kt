@@ -7,10 +7,12 @@ import dev.avinya.admob.showcase.core.mvi.MviViewModel
 import dev.avinya.admob.showcase.core.time.Clock
 import dev.avinya.admob.showcase.data.prefs.SettingsRepository
 import dev.avinya.admob.showcase.data.repo.AdStateRepository
+import dev.avinya.admob.showcase.data.repo.AdTelemetryRepository
 import dev.avinya.admob.showcase.data.repo.ArticleRepository
 import dev.avinya.admob.showcase.domain.ad.AdDecision
 import dev.avinya.admob.showcase.domain.ad.AdPolicy
 import dev.avinya.admob.showcase.domain.ad.AdPolicySnapshot
+import dev.avinya.admob.showcase.domain.ad.ShowcasePlacements
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
@@ -35,6 +37,7 @@ class ArticleViewModel(
     private val articles: ArticleRepository,
     private val settings: SettingsRepository,
     private val adState: AdStateRepository,
+    private val telemetry: AdTelemetryRepository,
     private val adManager: AdManager,
     private val clock: Clock,
     private val articleId: String,
@@ -113,6 +116,11 @@ class ArticleViewModel(
      * The cooldown write lives in [onInterstitialShown] and is invoked from
      * `AdEffectHandler` only on `AdShowResult.Shown` — recording the timestamp
      * here would burn 60 seconds of cooldown for an ad that never rendered.
+     *
+     * The decision itself is also forwarded to [telemetry] so the Inspector's
+     * Events tab can answer "why did no ad appear" rather than just "what
+     * happened". `Show` is recorded the same way as `Suppress(<reason>)` —
+     * interleaving the two is the point.
      */
     private suspend fun handleClose() {
         adState.incrementArticlesRead()
@@ -126,7 +134,9 @@ class ArticleViewModel(
             wasRewardedUnlock = false,
             adsEnabled = state.value.adsEnabled,
         )
-        when (val decision = adPolicy.decideInterstitial(snapshot)) {
+        val decision = adPolicy.decideInterstitial(snapshot)
+        telemetry.recordPolicyDecision(ShowcasePlacements.articleInterstitial.id, decision)
+        when (decision) {
             AdDecision.Show -> emitEffect(ArticleEffect.ShowInterstitial)
             is AdDecision.Suppress -> emitEffect(ArticleEffect.AdSuppressed(decision.reason))
         }

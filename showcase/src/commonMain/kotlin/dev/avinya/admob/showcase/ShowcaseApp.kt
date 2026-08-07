@@ -10,6 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import dev.avinya.ads.LocalAdManager
 import dev.avinya.admob.showcase.di.LocalAppGraph
 import dev.avinya.admob.showcase.di.LocalAppOpenSuppressor
 import dev.avinya.admob.showcase.di.ProvideAdManager
@@ -45,6 +46,8 @@ fun ShowcaseApp() {
         LocalAppOpenSuppressor provides suppressor,
     ) {
         ProvideAdManager {
+            val adManager = LocalAdManager.current
+            LaunchedEffect(graph, adManager) { graph.startTelemetry(adManager) }
             AppOpenHost(suppressor = suppressor) {
                 ShowcaseTheme(themeMode = themeMode) {
                     // Hold the first screen until the preference resolves, otherwise

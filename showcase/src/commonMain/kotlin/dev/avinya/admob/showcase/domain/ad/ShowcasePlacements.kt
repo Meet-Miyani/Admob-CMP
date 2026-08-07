@@ -109,4 +109,20 @@ object ShowcasePlacements {
         adUnitIds = AdUnitIds(android = TestAdIds.ANDROID_APP_OPEN, ios = TestAdIds.IOS_APP_OPEN),
         strictTestMode = true,
     )
+
+    /**
+     * The full catalog, in a stable order. Used by the Inspector / telemetry
+     * pipeline to resolve `placementId -> AdFormat` without re-listing the
+     * ids; controllers and pools are unaffected.
+     */
+    val allPlacements: List<AdPlacement> = listOf(
+        feedBanner,
+        feedNative,
+        articleNative,
+        articleBanner,
+        articleInterstitial,
+        storeRewarded,
+        storeRewardedInterstitial,
+        appOpen,
+    )
 }

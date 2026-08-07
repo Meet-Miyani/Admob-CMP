@@ -49,6 +49,7 @@ fun ArticleScreen(articleId: String, onBack: () -> Unit) {
             articles = graph.articles,
             settings = graph.settings,
             adState = graph.adState,
+            telemetry = graph.telemetry,
             adManager = adManager,
             clock = graph.clock,
             articleId = articleId,
