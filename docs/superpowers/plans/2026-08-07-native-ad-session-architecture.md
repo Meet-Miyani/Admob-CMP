@@ -229,8 +229,10 @@ Expected: PASS.
 - Test: `admob-cmp-core/src/commonTest/kotlin/dev/avinya/ads/NativeAdGovernorTest.kt`
 
 **Interfaces:**
-- Consumes: `NativeAdMemoryPolicy`, monotonic timestamps supplied by a test clock.
-- Produces: demand-aware `reserve`, `admit`, `releaseReservation`, `touch`, `setMounted`, `retire`, and `trim` operations for the coordinator.
+- Consumes: `NativeAdMemoryPolicy` and the repository's cross-platform
+  `FullScreenStateLock` (or an internal non-public generalization of it).
+- Produces: demand-aware `reserve`, `admit`, `releaseReservation`, `touch`,
+  `reclassify`, `setMounted`, `retire`, and `trim` operations for the coordinator.
 
 Define an internal demand classification at this boundary:
 
@@ -242,6 +244,26 @@ Every reservation must carry one of these values. `Visible` means the slot is in
 reported visible band. `Speculative` covers prefetch-ahead, retain-behind warm-up,
 inactive-anchor backfill, and every other load that is not currently visible. Do not
 infer the class from placement or session identity inside the governor.
+
+Use explicit mutation results so capacity retirement and platform cleanup remain
+separate:
+
+```kotlin
+internal data class NativeAdReservationDecision(
+    val reservations: List<NativeAdLoadReservation>,
+    val retiredRecordIds: List<NativeAdRecordId> = emptyList(),
+)
+
+internal data class NativeAdTrimResult(
+    val retiredRecordIds: List<NativeAdRecordId>,
+    val cancelledReservations: List<NativeAdLoadReservation>,
+)
+```
+
+`NativeAdLoadReservation` must be an identity token registered by the governor, not a
+forgeable value whose caller-supplied priority is trusted during `admit`. `admit` uses
+the governor's stored demand/priority and rejects an unknown, already-resolved, or
+different token instance.
 
 - [ ] **Step 1: Write failing governor tests**
 
@@ -255,9 +277,15 @@ Cover these exact cases:
 @Test fun `mounted ads are never eviction candidates`() { /* mounted survives retained LRU */ }
 @Test fun `speculative ads evict before inactive anchors`() { /* assert victim identity */ }
 @Test fun `inactive anchors evict before active retained ads`() { /* assert priority */ }
+@Test fun `reclassifying a record changes its later eviction order`() { /* prefetched -> active -> inactive */ }
+@Test fun `touch uses deterministic monotonic access order for LRU`() { /* no wall-clock dependence or ties */ }
 @Test fun `moderate trim returns non-mounted victims until soft limit`() { /* loaded count trends to 4 */ }
 @Test fun `critical trim returns only non-mounted records`() { /* mounted excluded */ }
+@Test fun `critical trim cancels every in-flight reservation`() { /* late callbacks have no live permit */ }
+@Test fun `moderate trim cancels speculative reservations before loaded records`() { /* total loaded plus reserved trends to 4 */ }
 @Test fun `releasing a partial batch frees unused reservations`() { /* 3 reserved, 1 admitted */ }
+@Test fun `all-or-nothing reservation leaves state unchanged when full count cannot fit`() { /* allowPartial=false */ }
+@Test fun `admit rejects a forged or already resolved reservation token`() { /* canonical token only */ }
 @Test fun `mixed visible and speculative races never exceed hard limit`() { /* loaded plus reserved always <= 6 */ }
 ```
 
@@ -269,7 +297,12 @@ Expected: compilation fails because `NativeAdGovernor` does not exist.
 
 - [ ] **Step 3: Implement the governor under one lock**
 
-Use an internal `NativeAdRecordId` and `NativeAdLoadReservation`. The invariant after every mutation must be:
+Use an internal `NativeAdRecordId` and identity-based `NativeAdLoadReservation`. Use
+`FullScreenStateLock.withLock` for every mutation; raw `synchronized` is unavailable in
+Kotlin/Native common code and is prohibited here. Keep an incrementing access ordinal
+under that lock for deterministic LRU ordering; do not use `Clock.System` wall time.
+
+The invariant after every mutation must be:
 
 ```kotlin
 loadedRecordCount + reservedLoadCount <= policy.hardLimit
@@ -289,18 +322,38 @@ Reservation and trim rules are exact:
 - If no eligible victim exists because every record is mounted, deny the reservation;
   never violate the hard limit and never evict a mounted record.
 - Moderate trim returns non-mounted victims until the count is at or below
-  `policy.softLimit`. Critical trim returns every non-mounted record regardless of the
-  soft limit.
+  `policy.softLimit`. Count both loaded records and pending reservations. Cancel
+  speculative pending reservations first, then retire records by eviction priority;
+  cancel visible pending reservations last if that is the only way to approach the
+  target. Mounted records may leave the result above the soft limit.
+- Critical trim atomically removes every pending reservation and every non-mounted
+  record. Return both collections in `NativeAdTrimResult`; late platform callbacks are
+  handled by the coordinator's generation check and must never be admitted.
 
 Eviction order is speculative prefetch, inactive retained anchor, active
 retain-behind, active ready-ahead. Mounted records are never returned as victims. LRU
-breaks ties inside a priority class. Batch reservations may be partially granted only
-when the caller explicitly accepts the returned count; otherwise deny the whole
-reservation so accounting and requested load counts cannot diverge.
+breaks ties inside a priority class. Provide `reclassify(recordId, priority)` because a
+single record changes class as its slot moves from prefetched to visible, retained
+behind, or an inactive anchor; its reservation-time priority is not permanent.
+
+The reservation operation accepts `demandClass`, `priority`, `count`, and
+`allowPartial`. Batch reservations may be partially granted only when
+`allowPartial = true`; otherwise deny the whole request without mutating records or
+reservations so accounting and requested load counts cannot diverge.
 
 - [ ] **Step 4: Run the governor tests**
 
-Run the same focused command. Expected: PASS.
+Run:
+
+```bash
+./gradlew :admob-cmp-core:testAndroidHostTest \
+  --tests '*NativeAdGovernorTest*' \
+  --no-configuration-cache
+./gradlew :admob-cmp-core:iosSimulatorArm64Test --no-configuration-cache
+```
+
+Expected: PASS on both platforms. The iOS command is mandatory for this commonMain
+lock implementation; an Android-only pass does not complete Task 2.
 
 ---
 
