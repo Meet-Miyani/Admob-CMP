@@ -1,24 +1,45 @@
 package dev.avinya.admob.showcase.feature.settings
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Analytics
+import androidx.compose.material.icons.rounded.BugReport
+import androidx.compose.material.icons.rounded.Dns
+import androidx.compose.material.icons.rounded.NightsStay
+import androidx.compose.material.icons.rounded.PhoneAndroid
+import androidx.compose.material.icons.rounded.Security
+import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,6 +52,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -39,6 +62,7 @@ import dev.avinya.admob.showcase.domain.ad.ShowcasePlacements
 import dev.avinya.admob.showcase.ui.inspector.InspectorEntryPoint
 import dev.avinya.admob.showcase.ui.inspector.InspectorSheet
 import dev.avinya.admob.showcase.ui.inspector.LocalInspectorPlacements
+import dev.avinya.admob.showcase.ui.theme.EmeraldPrimary
 import dev.avinya.admob.showcase.ui.theme.ThemeMode
 import dev.avinya.ads.AdTrackingAuthorization
 import dev.avinya.ads.ConsentDebugGeography
@@ -69,7 +93,7 @@ fun SettingsScreen() {
             LazyColumn(
                 modifier = Modifier.fillMaxSize().padding(padding),
                 contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
                 item {
                     InspectorEntryPoint(
@@ -78,36 +102,52 @@ fun SettingsScreen() {
                         onOpen = { showInspector = true },
                     )
                 }
-                item {
-                    SettingsSection("SDK") {
-                        LabelledValue("Status", state.sdkStatus)
-                        LabelledValue("Version", state.sdkVersion ?: "unavailable")
-                        LabelledValue("Adapters", state.adapters.size.toString())
-                    }
-                }
-                item {
-                    SettingsSection("Consent") {
-                        LabelledValue("Status", state.consentStatus.toString())
-                        LabelledValue("Can request ads", state.canRequestAds.toString())
-                        LabelledValue("Privacy options", state.privacyOptions.name)
 
-                        // Gated ONLY on the requirement status — never on
-                        // ConsentStatus.Obtained. See shouldShowPrivacyOptionsButton.
-                        if (shouldShowPrivacyOptionsButton(state.privacyOptions)) {
-                            Button(
-                                enabled = !state.busy,
-                                onClick = { viewModel.onIntent(SettingsIntent.ShowPrivacyOptions) },
-                            ) { Text("Manage consent") }
-                        }
-                    }
-                }
+                // Glass SDK Status Card
                 item {
-                    SettingsSection("Consent debugging") {
+                    SdkStatusCard(
+                        status = state.sdkStatus,
+                        consentStatus = state.consentStatus.toString(),
+                        testDeviceId = state.debugGeography.name,
+                        version = state.sdkVersion ?: "1.0.0",
+                        canRequestAds = state.canRequestAds.toString(),
+                        privacyOptions = state.privacyOptions.name,
+                        showPrivacyButton = shouldShowPrivacyOptionsButton(state.privacyOptions),
+                        busy = state.busy,
+                        onManageConsent = { viewModel.onIntent(SettingsIntent.ShowPrivacyOptions) },
+                    )
+                }
+
+                // Theme Selector Card with Segmented Chips
+                item {
+                    ThemeSelectorCard(
+                        selectedMode = state.themeMode,
+                        onSelectMode = { viewModel.onIntent(SettingsIntent.SetThemeMode(it)) },
+                    )
+                }
+
+                // Inspector & Telemetry Toggle Card
+                item {
+                    InspectorToggleCard(
+                        inspectorEnabled = state.inspectorEnabled,
+                        adsEnabled = state.adsEnabled,
+                        busy = state.busy,
+                        onInspectorToggle = { viewModel.onIntent(SettingsIntent.SetInspectorEnabled(it)) },
+                        onAdsToggle = { viewModel.onIntent(SettingsIntent.SetAdsEnabled(it)) },
+                        onOpenAdInspector = { viewModel.onIntent(SettingsIntent.OpenAdInspector) },
+                    )
+                }
+
+                // Consent Debugging Card
+                item {
+                    SettingsSection(title = "Consent Debugging", icon = Icons.Rounded.Security) {
                         Text(
                             "Debug geography forces UMP to behave as if the device were " +
                                 "in the selected region. Applies on next launch.",
                             style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
                         ConsentDebugGeography.entries.forEach { geography ->
                             RadioRow(
                                 label = geography.name,
@@ -115,60 +155,38 @@ fun SettingsScreen() {
                                 onClick = { viewModel.onIntent(SettingsIntent.SetDebugGeography(geography)) },
                             )
                         }
+                        Spacer(modifier = Modifier.height(4.dp))
                         OutlinedButton(
                             enabled = !state.busy,
                             onClick = { viewModel.onIntent(SettingsIntent.ResetConsent) },
-                        ) { Text("Reset consent") }
+                            shape = RoundedCornerShape(8.dp),
+                        ) { Text("Reset consent state") }
                     }
                 }
+
+                // Tracking Permission Card
                 item {
-                    SettingsSection("Tracking") {
-                        LabelledValue("Authorisation", state.tracking.name)
+                    SettingsSection(title = "App Tracking Transparency", icon = Icons.Rounded.BugReport) {
+                        LabelledValue("Authorisation Status", state.tracking.name)
                         if (state.tracking == AdTrackingAuthorization.NotApplicable) {
                             Text(
                                 "App Tracking Transparency is an iOS concept. Android " +
                                     "always reports NotApplicable.",
                                 style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         } else {
-                            Button(onClick = { viewModel.onIntent(SettingsIntent.RequestTracking) }) {
+                            Button(
+                                onClick = { viewModel.onIntent(SettingsIntent.RequestTracking) },
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = EmeraldPrimary,
+                                    contentColor = Color.Black,
+                                ),
+                            ) {
                                 Text("Request tracking permission")
                             }
                         }
-                    }
-                }
-                item {
-                    SettingsSection("Diagnostics") {
-                        Button(
-                            enabled = !state.busy,
-                            onClick = { viewModel.onIntent(SettingsIntent.OpenAdInspector) },
-                        ) { Text("Open Ad Inspector") }
-                    }
-                }
-                item {
-                    SettingsSection("App") {
-                        ThemeMode.entries.forEach { mode ->
-                            RadioRow(
-                                label = mode.name,
-                                selected = state.themeMode == mode,
-                                onClick = { viewModel.onIntent(SettingsIntent.SetThemeMode(mode)) },
-                            )
-                        }
-                        SwitchRow(
-                            label = "Show inspector",
-                            checked = state.inspectorEnabled,
-                            onCheckedChange = { viewModel.onIntent(SettingsIntent.SetInspectorEnabled(it)) },
-                        )
-                        SwitchRow(
-                            label = "Show ads",
-                            checked = state.adsEnabled,
-                            onCheckedChange = { viewModel.onIntent(SettingsIntent.SetAdsEnabled(it)) },
-                        )
-                        Text(
-                            "Turning ads off suppresses every placement locally without " +
-                                "changing any SDK or consent state. The app stays fully usable.",
-                            style = MaterialTheme.typography.labelSmall,
-                        )
                     }
                 }
             }
@@ -181,19 +199,265 @@ fun SettingsScreen() {
 }
 
 @Composable
+private fun SdkStatusCard(
+    status: String,
+    consentStatus: String,
+    testDeviceId: String,
+    version: String,
+    canRequestAds: String,
+    privacyOptions: String,
+    showPrivacyButton: Boolean,
+    busy: Boolean,
+    onManageConsent: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(EmeraldPrimary.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Dns,
+                        contentDescription = null,
+                        tint = EmeraldPrimary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                Text("SDK & Initialization", style = MaterialTheme.typography.titleMedium)
+            }
+
+            LabelledValue("SDK Status", status)
+            LabelledValue("SDK Version", version)
+            LabelledValue("CMP Consent", consentStatus)
+            LabelledValue("Can Request Ads", canRequestAds)
+            LabelledValue("Privacy Options", privacyOptions)
+            LabelledValue("Test Geography", testDeviceId)
+
+            if (showPrivacyButton) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Button(
+                    enabled = !busy,
+                    onClick = onManageConsent,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = EmeraldPrimary,
+                        contentColor = Color.Black,
+                    ),
+                ) {
+                    Text("Manage Consent Settings")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThemeSelectorCard(
+    selectedMode: ThemeMode,
+    onSelectMode: (ThemeMode) -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("Appearance Theme", style = MaterialTheme.typography.titleMedium)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                ThemeChip(
+                    label = "System",
+                    icon = Icons.Rounded.PhoneAndroid,
+                    selected = selectedMode == ThemeMode.System,
+                    onClick = { onSelectMode(ThemeMode.System) },
+                    modifier = Modifier.weight(1f),
+                )
+                ThemeChip(
+                    label = "Light",
+                    icon = Icons.Rounded.WbSunny,
+                    selected = selectedMode == ThemeMode.Light,
+                    onClick = { onSelectMode(ThemeMode.Light) },
+                    modifier = Modifier.weight(1f),
+                )
+                ThemeChip(
+                    label = "Dark",
+                    icon = Icons.Rounded.NightsStay,
+                    selected = selectedMode == ThemeMode.Dark,
+                    onClick = { onSelectMode(ThemeMode.Dark) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThemeChip(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        color = if (selected) EmeraldPrimary else MaterialTheme.colorScheme.surface,
+        border = BorderStroke(
+            1.dp,
+            if (selected) EmeraldPrimary else MaterialTheme.colorScheme.outline,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (selected) Color.Black else MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = if (selected) Color.Black else MaterialTheme.colorScheme.onSurface,
+            )
+        }
+    }
+}
+
+@Composable
+private fun InspectorToggleCard(
+    inspectorEnabled: Boolean,
+    adsEnabled: Boolean,
+    busy: Boolean,
+    onInspectorToggle: (Boolean) -> Unit,
+    onAdsToggle: (Boolean) -> Unit,
+    onOpenAdInspector: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text("Ad Telemetry Inspector", style = MaterialTheme.typography.titleMedium)
+                    // Live Telemetry Pulse Indicator
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(if (inspectorEnabled) EmeraldPrimary else Color.Gray),
+                    )
+                }
+                Switch(
+                    checked = inspectorEnabled,
+                    onCheckedChange = onInspectorToggle,
+                )
+            }
+
+            SwitchRow(
+                label = "Show Placement Ads",
+                checked = adsEnabled,
+                onCheckedChange = onAdsToggle,
+            )
+
+            Text(
+                "Turning ads off suppresses every placement locally without " +
+                    "changing any SDK or consent state.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+            OutlinedButton(
+                enabled = !busy,
+                onClick = onOpenAdInspector,
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Analytics,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text("Open Google Ad Inspector")
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun SettingsSection(
     title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = EmeraldPrimary,
+                    modifier = Modifier.size(18.dp),
+                )
+                Text(title, style = MaterialTheme.typography.titleMedium)
+            }
             content()
         }
     }
@@ -209,8 +473,16 @@ private fun LabelledValue(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium)
-        Text(value, style = MaterialTheme.typography.bodyMedium)
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 
@@ -260,3 +532,4 @@ private fun SwitchRow(
         )
     }
 }
+

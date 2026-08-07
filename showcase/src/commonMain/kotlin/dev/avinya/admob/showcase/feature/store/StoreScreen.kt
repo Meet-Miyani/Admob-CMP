@@ -1,23 +1,41 @@
 package dev.avinya.admob.showcase.feature.store
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Bolt
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -31,6 +49,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.avinya.ads.LocalAdManager
@@ -42,6 +62,7 @@ import dev.avinya.admob.showcase.ui.ad.runRewarded
 import dev.avinya.admob.showcase.ui.inspector.InspectorEntryPoint
 import dev.avinya.admob.showcase.ui.inspector.InspectorSheet
 import dev.avinya.admob.showcase.ui.inspector.LocalInspectorPlacements
+import dev.avinya.admob.showcase.ui.theme.EmeraldPrimary
 import kotlinx.coroutines.launch
 
 @Composable
@@ -91,16 +112,32 @@ fun StoreScreen() {
                         onOpen = { showInspector = true },
                     )
                 }
-                item { Text("${state.balance} coins", style = MaterialTheme.typography.headlineLarge) }
+
+                // Glass Balance Card
+                item {
+                    BalanceCard(balance = state.balance)
+                }
+
+                // Reward & Suppression Cards
+                item {
+                    Text(
+                        "Coin Boosters & Offers",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                }
 
                 item {
-                    Button(
-                        enabled = state.adsEnabled && state.sdkReady &&
-                            state.rewarded == RewardedUiState.Idle,
+                    AdSuppressionCard(
+                        title = "Watch Ad to Earn Coins",
+                        description = "Watch a short video ad to earn 25 coins for unlocking premium articles.",
+                        icon = Icons.Rounded.Bolt,
+                        buttonText = when (state.rewarded) {
+                            RewardedUiState.Showing -> "Loading…"
+                            else -> "Earn Coins"
+                        },
+                        enabled = state.adsEnabled && state.sdkReady && state.rewarded == RewardedUiState.Idle,
                         onClick = {
-                            // Set the state synchronously so a rapid second click sees a disabled
-                            // button; the `runRewarded` body still launches in a child coroutine
-                            // because `show()` suspends for the ad's whole lifetime.
                             viewModel.setRewardedState(RewardedUiState.Showing)
                             scope.launch {
                                 val outcome = runRewarded(
@@ -112,21 +149,27 @@ fun StoreScreen() {
                                 viewModel.onRewardOutcome(outcome)
                             }
                         },
-                    ) {
-                        Text(
-                            when (state.rewarded) {
-                                RewardedUiState.Showing -> "Loading…"
-                                else -> "Watch an ad to earn coins"
-                            },
-                        )
-                    }
+                    )
                 }
 
                 item {
-                    OutlinedButton(
+                    AdSuppressionCard(
+                        title = "Special Offer Pass",
+                        description = "View today's special offer wall for bonus coin rewards and ad suppression.",
+                        icon = Icons.Rounded.Shield,
+                        buttonText = "See Today's Offer",
                         enabled = state.adsEnabled && state.sdkReady,
                         onClick = { viewModel.onIntent(StoreIntent.OpenOfferWall) },
-                    ) { Text("See today's offer") }
+                    )
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Premium Articles",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
                 }
 
                 items(state.premium, key = { it.id }) { article ->
@@ -147,8 +190,6 @@ fun StoreScreen() {
     if (state.offerWallVisible) {
         OfferWallDialog(
             onAccept = {
-                // Same guard as the main button: set state synchronously so a
-                // rapid second tap on Accept does not launch two presentations.
                 viewModel.setRewardedState(RewardedUiState.Showing)
                 viewModel.onIntent(StoreIntent.AcceptOfferWall)
                 scope.launch {
@@ -173,13 +214,127 @@ private fun rememberSessionId(clock: dev.avinya.admob.showcase.core.time.Clock):
     remember { clock.nowMillis().toString() }
 
 @Composable
+private fun BalanceCard(balance: Int) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Column {
+                Text(
+                    "BALANCE",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "$balance Coins",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(EmeraldPrimary.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Star,
+                    contentDescription = null,
+                    tint = EmeraldPrimary,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdSuppressionCard(
+    title: String,
+    description: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    buttonText: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(EmeraldPrimary.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = EmeraldPrimary,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Button(
+                    onClick = onClick,
+                    enabled = enabled,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = EmeraldPrimary,
+                        contentColor = Color.Black,
+                    ),
+                ) {
+                    Text(buttonText, style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun PremiumRow(
     article: PremiumArticle,
     balance: Int,
     onUnlock: () -> Unit,
 ) {
+    val featureIcon = when {
+        article.section.lowercase().contains("sdk") -> Icons.Rounded.Shield
+        article.section.lowercase().contains("tech") -> Icons.Rounded.Bolt
+        else -> Icons.Rounded.Star
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Row(
@@ -187,36 +342,95 @@ private fun PremiumRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    article.section.uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.surface),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = featureIcon,
+                    contentDescription = null,
+                    tint = EmeraldPrimary,
+                    modifier = Modifier.size(20.dp),
                 )
-                Text(article.title, style = MaterialTheme.typography.titleMedium)
+            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = EmeraldPrimary.copy(alpha = 0.12f),
+                ) {
+                    Text(
+                        article.section.uppercase(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = EmeraldPrimary,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
+                }
                 Text(
-                    "${article.costCoins} coins",
+                    article.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    "${article.costCoins} coins required",
                     style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             when {
-                article.isUnlocked -> Text(
-                    "Unlocked",
-                    style = MaterialTheme.typography.labelLarge,
-                )
+                article.isUnlocked -> Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = EmeraldPrimary.copy(alpha = 0.15f),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Check,
+                            contentDescription = null,
+                            tint = EmeraldPrimary,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Text(
+                            "Unlocked",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = EmeraldPrimary,
+                        )
+                    }
+                }
                 balance < article.costCoins -> TextButton(
                     onClick = {},
                     enabled = false,
-                ) { Text("Not enough coins") }
-                else -> Button(onClick = onUnlock) { Text("Unlock") }
+                ) { Text("Need coins", style = MaterialTheme.typography.labelSmall) }
+                else -> Button(
+                    onClick = onUnlock,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = EmeraldPrimary,
+                        contentColor = Color.Black,
+                    ),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Lock,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                        )
+                        Text("Unlock")
+                    }
+                }
             }
         }
     }
 }
 
-/**
- * Reward-interstitial intro: the user must be able to refuse before any ad
- * loads. Equal-weight buttons, not dismiss-by-tap-outside.
- */
 @Composable
 private fun OfferWallDialog(
     onAccept: () -> Unit,
@@ -224,7 +438,7 @@ private fun OfferWallDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDecline,
-        title = { Text("Today's offer") },
+        title = { Text("Today's Offer") },
         text = {
             Text(
                 "Watch a short video to earn 25 coins. You can decline — there's " +
@@ -232,11 +446,12 @@ private fun OfferWallDialog(
             )
         },
         confirmButton = {
-            Button(onClick = onAccept) { Text("Accept") }
+            Button(
+                onClick = onAccept,
+                colors = ButtonDefaults.buttonColors(containerColor = EmeraldPrimary, contentColor = Color.Black),
+            ) { Text("Accept") }
         },
         dismissButton = {
-            // Outlined so "Decline" reads as a real choice, not a cancel
-            // hidden behind the X. Both buttons are equal weight.
             OutlinedButton(onClick = onDecline) { Text("Decline") }
         },
     )
@@ -258,3 +473,4 @@ private fun StoreEffect.message(): String = when (this) {
     is StoreEffect.Unlocked -> "Unlocked: $title"
     is StoreEffect.NeedMoreCoins -> "You need $shortfall more coins"
 }
+
