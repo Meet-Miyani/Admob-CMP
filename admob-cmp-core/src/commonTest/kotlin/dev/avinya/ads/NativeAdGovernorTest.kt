@@ -7,6 +7,11 @@ import dev.avinya.ads.internal.NativeAdPriority
 import dev.avinya.ads.internal.NativeAdRecordId
 import dev.avinya.ads.internal.NativeMemoryPressure
 import dev.avinya.ads.nativead.NativeAdMemoryPolicy
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -75,9 +80,14 @@ class NativeAdGovernorTest {
         // Visible can climb past softLimit up to hardLimit.
         val fifthAndSixth = reserveVisible(gov, NativeAdPriority.ActiveReadyAhead, 2)
         assertEquals(2, fifthAndSixth.reservations.size)
-        // A seventh visible is denied because we are now at hardLimit.
-        val denied = reserveVisible(gov, NativeAdPriority.ActiveReadyAhead, 1)
-        assertTrue(denied.reservations.isEmpty(), "seventh visible must be denied at hard limit")
+        // The 6 slots are full: 4 speculative pending + 2 visible pending. A seventh
+        // visible still wins capacity by cancelling a pending speculative permit
+        // (cheaper than retiring a record) — the documented "replace pending
+        // speculative capacity" behaviour. The governor stays at hardLimit.
+        val seventh = reserveVisible(gov, NativeAdPriority.ActiveReadyAhead, 1)
+        assertEquals(1, seventh.reservations.size, "seventh visible granted by cancelling a pending speculative")
+        assertTrue(seventh.retiredRecordIds.isEmpty(), "no record retired when a speculative permit can be cancelled")
+        assertEquals(6, gov.state().loadedRecords + gov.state().reservedLoads)
     }
 
     // --- 4 ---------------------------------------------------------------------
@@ -363,12 +373,113 @@ class NativeAdGovernorTest {
         val visible2 = reserveVisible(gov, NativeAdPriority.ActiveReadyAhead, 1)
         assertEquals(1, visible2.reservations.size)
         assertEquals(0 + 6, gov.state().loadedRecords + gov.state().reservedLoads)
-        // Both a seventh visible and a fifth speculative are denied.
-        val deniedVisible = reserveVisible(gov, NativeAdPriority.ActiveReadyAhead, 1)
+        // A seventh visible is granted by cancelling a pending speculative permit;
+        // a fifth speculative is denied (speculative cap is the soft limit and
+        // we are already at it). The total stays at hardLimit.
+        val seventhVisible = reserveVisible(gov, NativeAdPriority.ActiveReadyAhead, 1)
         val deniedSpeculative = reserveSpeculative(gov, NativeAdPriority.Speculative, 1)
-        assertTrue(deniedVisible.reservations.isEmpty())
+        assertEquals(1, seventhVisible.reservations.size)
         assertTrue(deniedSpeculative.reservations.isEmpty())
         // Invariant holds: total at hardLimit, not over.
         assertEquals(6, gov.state().loadedRecords + gov.state().reservedLoads)
+    }
+
+    // --- Task 2 corrections -----------------------------------------------------
+
+    @Test fun `visible demand at hard limit cancels pending speculative reservations before retiring records`() {
+        val gov = governor(NativeAdMemoryPolicy(softLimit = 2, hardLimit = 2))
+        // 1 speculative record admitted, 1 speculative reservation pending. The
+        // soft cap is full, the hard cap is full. A visible request must free
+        // capacity by cancelling the pending reservation, not by retiring the
+        // already-admitted record.
+        admitOne(
+            gov,
+            reserveSpeculative(gov, NativeAdPriority.Speculative, 1).reservations.single(),
+        )
+        val speculativeReservation = reserveSpeculative(gov, NativeAdPriority.Speculative, 1)
+            .reservations.single()
+        val visible = reserveVisible(gov, NativeAdPriority.ActiveReadyAhead, 1)
+        assertEquals(1, visible.reservations.size, "visible reservation must be granted")
+        assertTrue(
+            visible.retiredRecordIds.isEmpty(),
+            "no record should be retired while a pending speculative reservation can be cancelled",
+        )
+        // The cancelled reservation is no longer known to the governor; the visible
+        // permit is the only outstanding reservation.
+        assertFailsWith<IllegalStateException> {
+            gov.admit(speculativeReservation)
+        }
+        // Admit the visible and confirm the final state: the surviving speculative
+        // record plus the new visible record fill the hard cap.
+        admitOne(gov, visible.reservations.single())
+        assertEquals(2, gov.state().loadedRecords)
+        assertEquals(0, gov.state().reservedLoads)
+    }
+
+    @Test fun `releaseReservation rejects a forged token`() {
+        val gov = governor(NativeAdMemoryPolicy(softLimit = 1, hardLimit = 4))
+        val real = reserveSpeculative(gov, NativeAdPriority.Speculative, 1).reservations.single()
+        val forged = NativeAdLoadReservation(
+            id = real.id,
+            demandClass = NativeAdDemandClass.Visible,
+            priority = NativeAdPriority.ActiveReadyAhead,
+        )
+        assertFailsWith<IllegalStateException> {
+            gov.releaseReservation(forged)
+        }
+        // The genuine token still releases cleanly.
+        gov.releaseReservation(real)
+        assertEquals(0, gov.state().reservedLoads)
+    }
+
+    @Test fun `reserve rejects a negative count`() {
+        val gov = governor(NativeAdMemoryPolicy())
+        assertFailsWith<IllegalArgumentException> {
+            gov.reserve(NativeAdDemandClass.Visible, NativeAdPriority.Speculative, -1, allowPartial = true)
+        }
+    }
+
+    @Test fun `concurrent reserves and admits never exceed hard limit`() = runBlocking {
+        val gov = governor(NativeAdMemoryPolicy(softLimit = 4, hardLimit = 6))
+        val coroutineCount = 30
+        val iterationsPerCoroutine = 20
+        val errors = Channel<Throwable>(Channel.UNLIMITED)
+
+        val jobs = (1..coroutineCount).map {
+            launch(Dispatchers.Default) {
+                try {
+                    repeat(iterationsPerCoroutine) {
+                        val decision = gov.reserve(
+                            NativeAdDemandClass.Visible,
+                            NativeAdPriority.Speculative,
+                            1,
+                            allowPartial = true,
+                        )
+                        if (decision.reservations.isNotEmpty()) {
+                            val id = gov.admit(decision.reservations.single())
+                            // Retire immediately so the slot is available for the next iteration.
+                            gov.retire(id)
+                        }
+                    }
+                } catch (e: Throwable) {
+                    errors.send(e)
+                }
+            }
+        }
+        jobs.joinAll()
+        errors.close()
+
+        val collected = mutableListOf<Throwable>()
+        for (err in errors) collected.add(err)
+
+        assertTrue(
+            collected.isEmpty(),
+            "no coroutine should throw during concurrent access; got: ${collected.map { it.message }}",
+        )
+        val state = gov.state()
+        // Invariant: loaded + reserved <= hardLimit at every moment. After all
+        // coroutines retire their admitted records, the state must be empty.
+        assertEquals(0, state.loadedRecords, "all records should be retired by the end")
+        assertEquals(0, state.reservedLoads, "all reservations should be released by the end")
     }
 }

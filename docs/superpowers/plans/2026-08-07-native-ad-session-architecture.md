@@ -252,6 +252,7 @@ separate:
 internal data class NativeAdReservationDecision(
     val reservations: List<NativeAdLoadReservation>,
     val retiredRecordIds: List<NativeAdRecordId> = emptyList(),
+    val cancelledReservations: List<NativeAdLoadReservation> = emptyList(),
 )
 
 internal data class NativeAdTrimResult(
@@ -286,7 +287,9 @@ Cover these exact cases:
 @Test fun `releasing a partial batch frees unused reservations`() { /* 3 reserved, 1 admitted */ }
 @Test fun `all-or-nothing reservation leaves state unchanged when full count cannot fit`() { /* allowPartial=false */ }
 @Test fun `admit rejects a forged or already resolved reservation token`() { /* canonical token only */ }
-@Test fun `mixed visible and speculative races never exceed hard limit`() { /* loaded plus reserved always <= 6 */ }
+@Test fun `release rejects a forged reservation without consuming the canonical token`() { /* canonical token only */ }
+@Test fun `visible demand cancels speculative pending work before denying at hard limit`() { /* cancelled permit returned atomically */ }
+@Test fun `mixed visible and speculative concurrent callers never exceed hard limit`() { /* use genuinely parallel callers; loaded plus reserved always <= 6 */ }
 ```
 
 - [ ] **Step 2: Run the focused tests**
@@ -316,9 +319,13 @@ Reservation and trim rules are exact:
 - A `Visible` reservation may consume capacity above the soft limit, but never above
   `policy.hardLimit`.
 - If visible demand arrives at the hard limit, the governor may atomically retire
-  eligible non-mounted records and grant the replacement reservation in the same
-  locked mutation. Return those retired record IDs with the reservation decision so
-  the coordinator destroys their platform objects after releasing the governor lock.
+  eligible capacity and grant the replacement reservation in the same locked mutation.
+  Cancel speculative pending reservations first, oldest first, then retire eligible
+  non-mounted records by eviction priority and LRU. Return both cancelled reservation
+  tokens and retired record IDs with the reservation decision so the coordinator can
+  discard late load callbacks and destroy platform objects after releasing the governor
+  lock. Never cancel an existing visible reservation merely to replace it with another
+  visible reservation.
 - If no eligible victim exists because every record is mounted, deny the reservation;
   never violate the hard limit and never evict a mounted record.
 - Moderate trim returns non-mounted victims until the count is at or below
@@ -340,6 +347,11 @@ The reservation operation accepts `demandClass`, `priority`, `count`, and
 `allowPartial`. Batch reservations may be partially granted only when
 `allowPartial = true`; otherwise deny the whole request without mutating records or
 reservations so accounting and requested load counts cannot diverge.
+
+Both `admit` and `releaseReservation` must compare the supplied reservation by identity
+with the governor's canonical stored token. Releasing an unknown/already-resolved token
+is idempotent, but a different token instance carrying a live ID is rejected and must not
+consume the real reservation. Reject negative reservation counts; `count = 0` is a no-op.
 
 - [ ] **Step 4: Run the governor tests**
 

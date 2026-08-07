@@ -174,17 +174,18 @@ internal class NativeAdGovernor(
      *   governor never evicts to satisfy a speculative request.
      * - [NativeAdDemandClass.Visible] may consume capacity above the
      *   soft cap up to [NativeAdMemoryPolicy.hardLimit]. At the hard
-     *   cap, the governor may atomically retire non-mounted records
-     *   in the same locked mutation; their ids are returned in the
-     *   [NativeAdReservationDecision.retiredRecordIds] field so the
-     *   coordinator can destroy the platform objects after releasing
-     *   the lock. Mounted records are never victims.
+     *   cap, the governor may atomically cancel pending speculative
+     *   reservations first, then retire non-mounted records, in the
+     *   same locked mutation. Retired record ids are returned in
+     *   the [NativeAdReservationDecision.retiredRecordIds] field so
+     *   the coordinator can destroy the platform objects after
+     *   releasing the lock. Mounted records are never victims.
      *
      * [allowPartial] controls partial fill: if true, the governor grants
-     * as many as fit (with eviction for Visible as needed); if false, a
-     * shortfall denies the entire request without mutating records or
-     * reservations, so accounting and requested load counts cannot
-     * diverge.
+     * as many as fit (with cancellation and eviction for Visible as
+     * needed); if false, a shortfall denies the entire request without
+     * mutating records or reservations, so accounting and requested load
+     * counts cannot diverge.
      */
     fun reserve(
         demandClass: NativeAdDemandClass,
@@ -192,7 +193,8 @@ internal class NativeAdGovernor(
         count: Int,
         allowPartial: Boolean,
     ): NativeAdReservationDecision = lock.withLock {
-        if (count <= 0) return@withLock NativeAdReservationDecision(emptyList())
+        require(count >= 0) { "reserve count must be non-negative, was $count" }
+        if (count == 0) return@withLock NativeAdReservationDecision(emptyList())
 
         val currentTotal = records.size + pendingReservations.size
 
@@ -245,10 +247,22 @@ internal class NativeAdGovernor(
         victims: List<Pair<NativeAdRecordId, MutableRecord>>,
         allowPartial: Boolean,
     ): NativeAdReservationDecision {
-        val maxGrantable = free + victims.size
+        // Capacity is sourced in this order: free → cancel pending speculative
+        // reservations → retire non-mounted records. Cancelling a speculative
+        // permit is cheaper than retiring a record (no platform object to
+        // destroy), so we always prefer it. Mounted records are never victims.
+        val speculatives = cancelableSpeculativeReservations()
+        val maxGrantable = free + speculatives.size + victims.size
         return when {
             count <= maxGrantable -> {
-                val evictCount = count - free
+                val cancelCount = minOf(count, speculatives.size)
+                val remainingAfterCancel = count - cancelCount
+                val evictCount = maxOf(0, remainingAfterCancel - free)
+                val toCancel = speculatives.take(cancelCount)
+                toCancel.forEach { (id, _) ->
+                    pendingReservations.remove(id)
+                    reservationOrder.remove(id)
+                }
                 val toRetire = victims.take(evictCount)
                 toRetire.forEach { (id, _) -> records.remove(id) }
                 NativeAdReservationDecision(
@@ -257,6 +271,10 @@ internal class NativeAdGovernor(
                 )
             }
             allowPartial && maxGrantable > 0 -> {
+                speculatives.forEach { (id, _) ->
+                    pendingReservations.remove(id)
+                    reservationOrder.remove(id)
+                }
                 victims.forEach { (id, _) -> records.remove(id) }
                 NativeAdReservationDecision(
                     createReservations(NativeAdDemandClass.Visible, priority, maxGrantable),
@@ -266,6 +284,12 @@ internal class NativeAdGovernor(
             else -> NativeAdReservationDecision(emptyList())
         }
     }
+
+    private fun cancelableSpeculativeReservations(): List<Pair<NativeAdRecordId, NativeAdLoadReservation>> =
+        reservationOrder.mapNotNull { id ->
+            pendingReservations[id]?.takeIf { it.demandClass == NativeAdDemandClass.Speculative }
+                ?.let { id to it }
+        }
 
     private fun createReservations(
         demandClass: NativeAdDemandClass,
@@ -319,10 +343,19 @@ internal class NativeAdGovernor(
     /**
      * Discards a reservation without admitting it. Use this when the
      * platform returned fewer ads than reserved (partial-batch failure,
-     * timeout, cancellation). Idempotent on an unknown reservation.
+     * timeout, cancellation). No-op on an unknown reservation; throws
+     * [IllegalStateException] if the supplied [reservation] is a
+     * different instance from the one the governor stored (a forged
+     * token). The identity check is the same one [admit] applies, so
+     * a forged permit cannot be released to make capacity appear free.
      */
     fun releaseReservation(reservation: NativeAdLoadReservation) {
         lock.withLock {
+            val stored = pendingReservations[reservation.id] ?: return@withLock
+            check(stored === reservation) {
+                "releaseReservation: reservation ${reservation.id.value} identity mismatch " +
+                    "(forged or different instance)"
+            }
             pendingReservations.remove(reservation.id)
             reservationOrder.remove(reservation.id)
         }
@@ -379,14 +412,14 @@ internal class NativeAdGovernor(
      * coordinator's generation check must drop from any in-flight
      * platform callback).
      *
-     * [NativeAdMemoryPressure.Moderate] trims toward
+     * [NativeMemoryPressure.Moderate] trims toward
      * [NativeAdMemoryPolicy.softLimit]:
      *   1. cancel speculative pending reservations, oldest first;
      *   2. retire non-mounted records by (priority rank, LRU);
      *   3. only as a last resort, cancel visible pending reservations.
      * Mounted records may leave the result above the soft limit.
      *
-     * [NativeAdMemoryPressure.Critical] atomically cancels every
+     * [NativeMemoryPressure.Critical] atomically cancels every
      * pending reservation and retires every non-mounted record.
      * Mounted records are preserved. The result may therefore exceed
      * the soft limit if there are more mounted records than the soft
