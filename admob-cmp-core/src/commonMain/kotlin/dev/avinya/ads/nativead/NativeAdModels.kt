@@ -21,7 +21,18 @@ public data class NativeAdOptions(
     /** Options for native video ads. */
     val videoOptions: NativeVideoOptions = NativeVideoOptions(),
     /** Custom click gesture. **Android only.** Ignored on iOS. */
-    val customClickGesture: NativeCustomClickGesture? = null
+    val customClickGesture: NativeCustomClickGesture? = null,
+    /**
+     * Batching strategy for this placement.
+     *
+     * Defaults to [NativeAdBatching.Sequential], which is the only safe choice
+     * for mediated or unknown inventory. Set to [NativeAdBatching.GoogleOnly]
+     * only when the consumer has confirmed the placement is direct-sold
+     * Google inventory; the platform adapter will then issue a single
+     * multi-ad request (capped at 5) instead of sequential single-ad
+     * requests. The SDK never infers this from server-side configuration.
+     */
+    val batching: NativeAdBatching = NativeAdBatching.Sequential,
 )
 
 /** Preferred aspect ratio for native ad media. */

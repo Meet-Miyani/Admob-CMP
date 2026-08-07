@@ -17,8 +17,8 @@
 - All GMA/UMP calls remain on `Dispatchers.Main.immediate`, except `MobileAds.initialize()` as documented in `admob-cmp/CLAUDE.md`.
 - Android batch callback state remains synchronized because callbacks and cancellation can arrive on different threads.
 - iOS `GADAdLoader.delegate` and native delegates remain strongly retained by Kotlin owners until terminal cleanup.
-- Default active-session retention is 3 ads; default inactive-session retention is 1 anchor ad.
-- Default application normal target is 4 native ads and hard limit is 6, counting loaded ads plus in-flight reservations.
+- Default active-session retention is 3 ads; default inactive-session retention is up to `min(NativeAdMemoryPolicy.inactiveSessionLimit, NativeAdSessionPolicy.maxRetainedAds)` ranked anchors (default 1).
+- Default application **soft limit** is 4 native ads and **hard limit** is 6, counting loaded ads plus in-flight reservations. Speculative loading (prefetch-ahead, retain-behind warm-ups, backfill) stops at the soft limit; visible demand may exceed it up to the hard limit. Moderate memory pressure trims non-mounted records toward the soft limit; critical pressure retains mounted ads only.
 - Native-ad TTL remains 1 hour. Inactive session metadata expires after 30 minutes; the registry keeps at most 32 inactive sessions and 64 total session records.
 - A Google multi-ad request is explicitly opt-in, capped at 5, may partially fill, and must never be used for mediated or unknown inventory.
 - Mounted ads are never evicted. Critical memory pressure retains mounted ads only.
@@ -98,16 +98,16 @@
 class NativeAdPolicyTest {
     @Test fun `default memory policy is bounded`() {
         val policy = NativeAdMemoryPolicy()
-        assertEquals(4, policy.normalTarget)
+        assertEquals(4, policy.softLimit)
         assertEquals(6, policy.hardLimit)
         assertEquals(1, policy.inactiveSessionLimit)
         assertEquals(32, policy.maxInactiveSessions)
         assertEquals(64, policy.maxSessionRecords)
     }
 
-    @Test fun `hard limit cannot be lower than normal target`() {
+    @Test fun `hard limit cannot be lower than soft limit`() {
         assertFailsWith<IllegalArgumentException> {
-            NativeAdMemoryPolicy(normalTarget = 6, hardLimit = 4)
+            NativeAdMemoryPolicy(softLimit = 6, hardLimit = 4)
         }
     }
 
@@ -132,7 +132,7 @@ Define these exact declarations in `NativeAdPolicies.kt`:
 
 ```kotlin
 public data class NativeAdMemoryPolicy(
-    val normalTarget: Int = 4,
+    val softLimit: Int = 4,
     val hardLimit: Int = 6,
     val inactiveSessionLimit: Int = 1,
     val maxInactiveSessions: Int = 32,
@@ -149,7 +149,7 @@ public data class NativeAdSessionPolicy(
 public enum class NativeAdBatching { Sequential, GoogleOnly }
 ```
 
-Validation must reject non-positive limits, a normal target above the hard limit, an inactive limit above the hard limit, `maxInactiveSessions > maxSessionRecords`, negative viewport distances, and a session window whose requested speculative parts cannot fit inside `maxRetainedAds`.
+Validation must reject non-positive limits, a soft limit above the hard limit, an inactive limit above the hard limit, `maxInactiveSessions > maxSessionRecords`, non-finite or non-positive TTLs, negative viewport distances, and a session window whose requested speculative parts cannot fit inside `maxRetainedAds` (using `Long` arithmetic so the addition is overflow-safe at the boundary).
 
 - [ ] **Step 4: Add the public session models and interfaces**
 
@@ -208,7 +208,7 @@ public interface NativeAdManager {
 }
 ```
 
-Require non-blank session/slot keys, native-format placements, unique slot keys in a window, and consistent placement configuration when a key is reused.
+Require non-blank session/slot keys, native-format placements, deduplication of identical `(key, placement)` duplicates in a window (the session core dedupes on first occurrence, visible > prefetchAhead > retainBehind), and a deterministic throw when the same key is reported with conflicting placements in the same window. `NativeAdManager.session(key, policy)` must throw when a session already exists for `key` with a different `policy`, matching the SDK's existing placement-collision behaviour.
 
 - [ ] **Step 5: Add batching to `NativeAdOptions` and global policy to `AdConfig`**
 
@@ -230,7 +230,18 @@ Expected: PASS.
 
 **Interfaces:**
 - Consumes: `NativeAdMemoryPolicy`, monotonic timestamps supplied by a test clock.
-- Produces: `reserve`, `admit`, `releaseReservation`, `touch`, `setMounted`, `retire`, and `trim` operations for the coordinator.
+- Produces: demand-aware `reserve`, `admit`, `releaseReservation`, `touch`, `setMounted`, `retire`, and `trim` operations for the coordinator.
+
+Define an internal demand classification at this boundary:
+
+```kotlin
+internal enum class NativeAdDemandClass { Visible, Speculative }
+```
+
+Every reservation must carry one of these values. `Visible` means the slot is in the
+reported visible band. `Speculative` covers prefetch-ahead, retain-behind warm-up,
+inactive-anchor backfill, and every other load that is not currently visible. Do not
+infer the class from placement or session identity inside the governor.
 
 - [ ] **Step 1: Write failing governor tests**
 
@@ -238,11 +249,16 @@ Cover these exact cases:
 
 ```kotlin
 @Test fun `reservations count against the hard limit`() { /* reserve 6; seventh is denied */ }
+@Test fun `speculative reservation stops at soft limit`() { /* fifth speculative request is denied at default 4 */ }
+@Test fun `visible reservation may exceed soft limit up to hard limit`() { /* visible fifth and sixth granted; seventh denied */ }
+@Test fun `visible demand at hard limit retires eligible speculative victim atomically`() { /* victim returned, invariant preserved */ }
 @Test fun `mounted ads are never eviction candidates`() { /* mounted survives retained LRU */ }
 @Test fun `speculative ads evict before inactive anchors`() { /* assert victim identity */ }
 @Test fun `inactive anchors evict before active retained ads`() { /* assert priority */ }
+@Test fun `moderate trim returns non-mounted victims until soft limit`() { /* loaded count trends to 4 */ }
 @Test fun `critical trim returns only non-mounted records`() { /* mounted excluded */ }
 @Test fun `releasing a partial batch frees unused reservations`() { /* 3 reserved, 1 admitted */ }
+@Test fun `mixed visible and speculative races never exceed hard limit`() { /* loaded plus reserved always <= 6 */ }
 ```
 
 - [ ] **Step 2: Run the focused tests**
@@ -259,7 +275,28 @@ Use an internal `NativeAdRecordId` and `NativeAdLoadReservation`. The invariant 
 loadedRecordCount + reservedLoadCount <= policy.hardLimit
 ```
 
-Eviction order is speculative prefetch, inactive retained anchor, active retained-behind, active ready-ahead. Mounted records are never returned as victims. LRU breaks ties inside a priority class.
+Reservation and trim rules are exact:
+
+- A `Speculative` reservation may consume only the remaining capacity below
+  `policy.softLimit`. Deny it when `loadedRecordCount + reservedLoadCount` is already
+  at the soft limit, even if hard-limit headroom remains.
+- A `Visible` reservation may consume capacity above the soft limit, but never above
+  `policy.hardLimit`.
+- If visible demand arrives at the hard limit, the governor may atomically retire
+  eligible non-mounted records and grant the replacement reservation in the same
+  locked mutation. Return those retired record IDs with the reservation decision so
+  the coordinator destroys their platform objects after releasing the governor lock.
+- If no eligible victim exists because every record is mounted, deny the reservation;
+  never violate the hard limit and never evict a mounted record.
+- Moderate trim returns non-mounted victims until the count is at or below
+  `policy.softLimit`. Critical trim returns every non-mounted record regardless of the
+  soft limit.
+
+Eviction order is speculative prefetch, inactive retained anchor, active
+retain-behind, active ready-ahead. Mounted records are never returned as victims. LRU
+breaks ties inside a priority class. Batch reservations may be partially granted only
+when the caller explicitly accepts the returned count; otherwise deny the whole
+reservation so accounting and requested load counts cannot diverge.
 
 - [ ] **Step 4: Run the governor tests**
 
@@ -299,7 +336,7 @@ Run: `./gradlew :admob-cmp-core:testAndroidHostTest --tests '*NativeAdSessionCor
 
 - [ ] **Step 4: Implement inactivity behavior**
 
-`deactivate()` retains the visible slot with the greatest visible priority as the single anchor. If there was no mounted/visible slot, retain the most recently accessed ready record. Retire all other detached records.
+`deactivate()` retains up to `min(NativeAdMemoryPolicy.inactiveSessionLimit, policy.maxRetainedAds)` ranked anchors, preferring mounted and visible slots in viewport order, falling back to the most recently accessed ready record if there is no visible slot. The default policy keeps one anchor; consumers that want a wider inactive ring raise `inactiveSessionLimit` deliberately. Retire all other detached records.
 
 - [ ] **Step 5: Run the session tests**
 

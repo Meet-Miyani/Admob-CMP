@@ -1,6 +1,7 @@
 package dev.avinya.ads
 
 import dev.avinya.ads.internal.ownedSnapshot
+import dev.avinya.ads.nativead.NativeAdMemoryPolicy
 
 
 /**
@@ -33,6 +34,14 @@ public data class AdConfig(
      * [GlobalRequestConfiguration.ageRestrictedTreatment], which controls GMA ad requests.
      */
     val consentTagForUnderAgeOfConsent: Boolean = false,
+    /**
+     * Process-wide capacity and retention policy for the native-ad manager.
+     *
+     * Deliberately **not** part of the platform-initialization identity:
+     * changing this field does not require a GMA re-initialization, so the
+     * existing init check stays stable. See [initializationIdentity].
+     */
+    val nativeAdMemoryPolicy: NativeAdMemoryPolicy = NativeAdMemoryPolicy(),
     /** Hooks invoked during initialization phases. */
     val initializationHooks: List<AdInitializationHook> = emptyList()
 ) {
@@ -49,6 +58,9 @@ public data class AdConfig(
      * @param debugGeography Force UMP debug geography.
      * @param ageRestrictedTreatment Age treatment applied to GMA ad requests.
      * @param consentTagForUnderAgeOfConsent UMP-only under-age-of-consent tag.
+     * @param nativeAdMemoryPolicy Process-wide native-ad memory and retention policy.
+     *   Forwarded to the primary constructor verbatim. Deliberately **not** part of
+     *   [initializationIdentity], so changing it does not require GMA re-init.
      * @param initializationHooks Hooks invoked during initialization phases.
      */
     public constructor(
@@ -59,6 +71,7 @@ public data class AdConfig(
         debugGeography: ConsentDebugGeography = ConsentDebugGeography.Disabled,
         ageRestrictedTreatment: AgeRestrictedTreatment = AgeRestrictedTreatment.Unspecified,
         consentTagForUnderAgeOfConsent: Boolean = false,
+        nativeAdMemoryPolicy: NativeAdMemoryPolicy = NativeAdMemoryPolicy(),
         initializationHooks: List<AdInitializationHook> = emptyList()
     ) : this(
         appIds = AdAppIds(androidAppId, iosAppId),
@@ -68,6 +81,7 @@ public data class AdConfig(
         ),
         debugOptions = AdDebugOptions(testMode = testMode, consentDebugGeography = debugGeography),
         consentTagForUnderAgeOfConsent = consentTagForUnderAgeOfConsent,
+        nativeAdMemoryPolicy = nativeAdMemoryPolicy,
         initializationHooks = initializationHooks
     )
 
