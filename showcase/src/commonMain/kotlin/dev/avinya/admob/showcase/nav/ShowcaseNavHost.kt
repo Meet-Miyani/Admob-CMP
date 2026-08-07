@@ -1,11 +1,22 @@
 package dev.avinya.admob.showcase.nav
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Bookmark
+import androidx.compose.material.icons.rounded.Newspaper
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Storefront
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -13,6 +24,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
@@ -40,16 +53,47 @@ fun ShowcaseNavHost(backStack: SnapshotStateList<ShowcaseNavKey>) {
     Scaffold(
         bottomBar = {
             if (showsBottomBar(current)) {
-                NavigationBar {
-                    TOP_LEVEL_KEYS.forEach { key ->
-                        NavigationBarItem(
-                            selected = current == key,
-                            onClick = { switchTopLevel(backStack, key) },
-                            // Text initials, not material-icons: that artifact is not on the
-                            // approved dependency list. The Phase 6 plan's polish pass revisits this.
-                            icon = { Text(key.label.first().toString()) },
-                            label = { Text(key.label) },
-                        )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 16.dp),
+                    contentAlignment = Alignment.BottomCenter,
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(28.dp),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    ) {
+                        NavigationBar(
+                            containerColor = Color.Transparent,
+                        ) {
+                            TOP_LEVEL_KEYS.forEach { key ->
+                                val selected = current == key
+                                val icon = when (key) {
+                                    ShowcaseNavKey.Feed -> Icons.Rounded.Newspaper
+                                    ShowcaseNavKey.Library -> Icons.Rounded.Bookmark
+                                    ShowcaseNavKey.Store -> Icons.Rounded.Storefront
+                                    ShowcaseNavKey.Settings -> Icons.Rounded.Settings
+                                    else -> Icons.Rounded.Newspaper
+                                }
+                                NavigationBarItem(
+                                    selected = selected,
+                                    onClick = { switchTopLevel(backStack, key) },
+                                    icon = {
+                                        Icon(
+                                            imageVector = icon,
+                                            contentDescription = key.label,
+                                            tint = if (selected) {
+                                                MaterialTheme.colorScheme.primary
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurfaceVariant
+                                            },
+                                        )
+                                    },
+                                    label = { Text(key.label) },
+                                )
+                            }
+                        }
                     }
                 }
             }
