@@ -3,6 +3,7 @@ package dev.avinya.ads
 import dev.avinya.ads.internal.NativeAdCoordinatorCore
 import dev.avinya.ads.internal.NativeAdPlatform
 import dev.avinya.ads.nativead.NativeAdMemoryPolicy
+import dev.avinya.ads.nativead.NativeAdSessionPolicy
 import dev.avinya.ads.nativead.NativeAdSlot
 import dev.avinya.ads.nativead.NativeAdSlotState
 import dev.avinya.ads.nativead.NativeAdWindow
@@ -67,6 +68,61 @@ class NativeAdCoordinatorCoreTest {
         assertFailsWith<IllegalStateException> {
             coord.session("s4")
         }
+    }
+
+    // --- Test 1b: blank session key is rejected --------------------------------
+
+    @Test fun `blank session key is rejected`() {
+        val platform = fakePlatform { _, _, _ -> AdAttemptResult.Success(emptyList()) }
+        val coord = coordinator(platform = platform)
+        assertFailsWith<IllegalArgumentException> { coord.session("") }
+    }
+
+    // --- Test 1c: policy mismatch on reuse is rejected -------------------------
+
+    @Test fun `reusing a session key with a different policy is rejected`() {
+        val platform = fakePlatform { _, _, _ -> AdAttemptResult.Success(emptyList()) }
+        val coord = coordinator(platform = platform)
+        coord.session("s1", NativeAdSessionPolicy(maxRetainedAds = 3))
+        assertFailsWith<IllegalStateException> {
+            coord.session("s1", NativeAdSessionPolicy(maxRetainedAds = 4))
+        }
+    }
+
+    // --- Test 1d: repeated identical windows do not re-issue demand -----------
+
+    @Test fun `repeated identical windows do not re-issue demand`() = runTest(dispatcher) {
+        val platform = fakePlatform { _, count, _ ->
+            AdAttemptResult.Success((0 until count).map { FakeAd(it) })
+        }
+        val coord = coordinator(platform = platform)
+        val session = coord.session("s1")
+        val window = windowWith("a", "b", "c")
+        coord.updateWindow("s1", window)
+        advanceUntilIdle()
+        val firstCallCount = platform.loadCalls.size
+        coord.updateWindow("s1", window)
+        advanceUntilIdle()
+        assertEquals(
+            firstCallCount,
+            platform.loadCalls.size,
+            "second identical window must not re-issue demand",
+        )
+    }
+
+    // --- Test 1e: clear destroys every owned platform ad exactly once -------
+
+    @Test fun `clear destroys every owned platform ad exactly once`() = runTest(dispatcher) {
+        val platform = fakePlatform { _, count, _ ->
+            AdAttemptResult.Success((0 until count).map { FakeAd(it) })
+        }
+        val coord = coordinator(platform = platform)
+        coord.session("s1")
+        coord.updateWindow("s1", windowWith("a", "b"))
+        advanceUntilIdle()
+        coord.clear()
+        assertEquals(2, platform.destroyed.size, "two ads destroyed on clear")
+        assertEquals(2, platform.destroyed.toSet().size, "no duplicate destroy")
     }
 
     // --- Test 2: partial batch admission admits only the resolved ads -------

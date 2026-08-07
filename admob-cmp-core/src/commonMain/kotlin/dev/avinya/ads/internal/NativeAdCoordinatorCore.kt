@@ -7,6 +7,9 @@ import dev.avinya.ads.AdError
 import dev.avinya.ads.AdPlacement
 import dev.avinya.ads.nativead.NativeAdMemoryPolicy
 import dev.avinya.ads.nativead.NativeAdSessionPolicy
+import dev.avinya.ads.nativead.NativeAdSessionState
+import dev.avinya.ads.nativead.NativeAdSlotState
+import dev.avinya.ads.nativead.NativeAdWindow
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -24,38 +27,46 @@ import kotlin.time.Instant
  * platform-specific [NativeAdPlatform] to the public
  * [dev.avinya.ads.nativead.NativeAdManager] / [dev.avinya.ads.nativead.NativeAdSession] surface.
  *
- * Architecture:
- * - The coordinator owns a [NativeAdGovernor] (created from the same
- *   [NativeAdMemoryPolicy] every session uses) and one
- *   [PlacementScheduler] per placement that has ever had demand.
- * - Every [session] / [updateWindow] / [setMounted] / [closeSession] /
- *   [clear] / [onConsentRevoked] call routes through the coordinator's
- *   per-instance lock; per-placement scheduling and per-session slot
- *   transitions are atomic from the caller's perspective.
- * - Platform load work is launched on [scope]. The coordinator never
- *   blocks on a platform call.
+ * **Ownership model.** The coordinator is the **sole owner of every
+ * admitted platform ad**. The [NativeAdGovernor] only tracks record ids
+ * and reservation counts; the platform-side object lives in the
+ * coordinator's [records] map and is destroyed exactly once via
+ * [destroyRecord] on any of the invalidation paths:
+ *  - [closeSession] / [closeAll] / [clear] / [onConsentRevoked]
+ *  - per-record 1-hour native TTL (the [tickLocked] pass)
+ *  - inactive-session reap at [NativeAdMemoryPolicy.inactiveSessionTtl]
+ *  - inactive-session LRU eviction at [NativeAdMemoryPolicy.maxInactiveSessions]
  *
- * Generation model:
- * - Each placement has a generation counter. [clear] and
- *   [onConsentRevoked] bump every placement's generation. Late
- *   platform callbacks that arrive under an older generation are
- *   destroyed on arrival — they never reach a session.
- * - Per-slot generation is owned by [NativeAdSessionCore]; the
- *   coordinator threads it through admit/fail callbacks so a stale
- *   admit for a since-superseded slot is dropped at the session.
+ * **Generation model.** Each placement has a generation counter. [clear]
+ * and [onConsentRevoked] bump every placement's generation. A late
+ * platform callback that arrives under an older generation is destroyed
+ * on arrival — it never reaches a session. Per-slot generation is owned
+ * by [NativeAdSessionCore]; the coordinator threads it through admit /
+ * fail callbacks so a stale admit for a since-superseded slot is
+ * dropped at the session.
  *
- * TTL:
- * - Native ad TTL is 1 hour. On every public mutator the coordinator
- *   walks the record timestamp map and expires records past the TTL.
- * - Inactive session TTL is [NativeAdMemoryPolicy.inactiveSessionTtl]
- *   (default 30 minutes). The coordinator tracks the inactive set in
- *   insertion order (LinkedHashMap) so eviction is LRU.
- * - [NativeAdMemoryPolicy.maxSessionRecords] is the hard cap on live
- *   + inactive sessions; the 65th call to [session] throws.
+ * **Scheduling.** One [PlacementScheduler] per placement that has ever
+ * had demand. The scheduler reserves capacity via the governor (using
+ * the **granted** reservation count for the platform.load call, never
+ * the originally requested count), serialises per-placement work, and
+ * removes itself once it has no records, no reservations, no
+ * in-flight work, and no queued requests.
  *
- * Idle scheduler cleanup: a [PlacementScheduler] removes itself from
- * the coordinator once it has no records, no reservations, no
- * in-flight load, and no queued requests.
+ * **TTL.**
+ *  - 1-hour native ad TTL is enforced by [tickLocked] on every public
+ *    mutator. Expired records destroy their platform ad, retire the
+ *    governor accounting, and submit the [NativeAdSessionCore.expireSlot]
+ *    reload demand to the right scheduler.
+ *  - Inactive-session TTL is [NativeAdMemoryPolicy.inactiveSessionTtl]
+ *    (default 30 minutes). The coordinator tracks the inactive set in
+ *    insertion order (LinkedHashMap) so eviction is LRU.
+ *  - [NativeAdMemoryPolicy.maxSessionRecords] is the hard cap on
+ *    live + inactive sessions; the 65th call to [session] throws.
+ *
+ * **Locking.** One [FullScreenStateLock] per coordinator instance. The
+ * lock is held across every mutator; per-placement work is launched on
+ * [scope] so platform calls and `platform.destroy` happen outside the
+ * lock.
  */
 internal class NativeAdCoordinatorCore<A : Any>(
     private val memoryPolicy: NativeAdMemoryPolicy,
@@ -66,16 +77,15 @@ internal class NativeAdCoordinatorCore<A : Any>(
     private val lock = FullScreenStateLock()
     private val governor = NativeAdGovernor(memoryPolicy)
     private val sessions = mutableMapOf<String, SessionHolder>()
-    // Inactive session order, oldest first. LinkedHashMap preserves insertion
-    // order so iteration gives LRU eviction order.
     private val inactiveOrder = LinkedHashMap<String, Instant>()
     private val schedulers = mutableMapOf<String, PlacementScheduler>()
-    // recordId -> (sessionKey, slotKey, generation, loadedAt)
-    private val records = mutableMapOf<NativeAdRecordId, RecordMeta>()
+    // Sole record of every admitted platform ad. Destroyed exactly once.
+    private val records = mutableMapOf<NativeAdRecordId, RecordEntry>()
     // Test-only override for "now". Production uses the real clock.
     private var testNow: Instant? = null
 
-    private data class RecordMeta(
+    private inner class RecordEntry(
+        val ad: A,
         val sessionKey: String,
         val slotKey: String,
         val generation: Long,
@@ -88,30 +98,27 @@ internal class NativeAdCoordinatorCore<A : Any>(
         var active: Boolean = true,
     )
 
-    init {
-        // Validate policy up-front. The constructor fails if the policy
-        // is inconsistent (e.g. softLimit > hardLimit).
-        memoryPolicy.toString() // touch the field; explicit construction is the validation
-    }
-
     // -----------------------------------------------------------------------
     // Public surface
     // -----------------------------------------------------------------------
 
-    /**
-     * Returns the session for [key], creating it on first access. The
-     * [policy] is honoured only on creation; re-using a key returns the
-     * existing session.
-     *
-     * @throws IllegalStateException if the session registry already holds
-     *   [NativeAdMemoryPolicy.maxSessionRecords] live sessions.
-     */
     fun session(
         key: String,
         policy: NativeAdSessionPolicy = NativeAdSessionPolicy(),
     ): NativeAdSessionCore = lock.withLock {
+        require(key.isNotBlank()) { "session key must not be blank" }
         tickLocked()
         sessions[key]?.let { holder ->
+            // Policy mismatch is rejected (the original plan contract).
+            if (holder.core.policy != policy) {
+                throw IllegalStateException(
+                    "NativeAdCoordinatorCore: session '$key' already exists with " +
+                        "a different policy (maxRetainedAds=${holder.core.policy.maxRetainedAds}, " +
+                        "retainBehind=${holder.core.policy.retainBehind}, " +
+                        "prefetchAhead=${holder.core.policy.prefetchAhead}); " +
+                        "close the existing session before reusing the key with a new policy."
+                )
+            }
             holder.lastActive = nowLocked()
             if (!holder.active) {
                 holder.active = true
@@ -137,64 +144,43 @@ internal class NativeAdCoordinatorCore<A : Any>(
         tickLocked()
         val holder = sessions.remove(key) ?: return@withLock
         inactiveOrder.remove(key)
-        // Retiring the session closes the underlying slot map and retires
-        // every record; we still need to drop the in-flight loads for the
-        // retired records.
         val retired = holder.core.close()
-        for (recordId in retired) records.remove(recordId)
-        // Bump the placement generations for any placements that the
-        // session had live records for, so a late platform callback for
-        // any of those records is destroyed.
-        for (recordId in retired) {
-            val meta = records.remove(recordId) ?: continue
-            // Bump the placement generation for the slot's placement.
-            // The slot key is not tied to a single placement, but the
-            // session's slot map still maps to placements — for now we
-            // bump all placements whose current generation could be
-            // affected. A more precise accounting (per-slot placement
-            // tracking) is left for the platform-specific coordinator.
-            placementGenBumpAll()
-            break
-        }
-        // Cancel any in-flight placement work targeting this session's keys.
+        destroyAndForgetRecords(retired, holder.core.key)
+        // Bump every placement generation so a late platform callback for
+        // any of the retired records is destroyed at the scheduler.
+        placementGenBumpAll()
+        // Cancel queued batches targeting this session; in-flight loads
+        // for these slots are still drained (their late result is
+        // destroyed under the bumped generation).
         for (sched in schedulers.values) sched.cancelForSession(key)
     }
 
     fun clear() = lock.withLock {
         tickLocked()
-        // Bump placement generations so any in-flight load that completes
-        // after this call is recognized as stale and destroyed at the
-        // scheduler. We deliberately do NOT cancel the in-flight coroutines
-        // — their results still need to be drained so the platform
-        // can clean up its own state (destroyed ads, etc.).
         placementGenBumpAll()
+        // Destroy every owned platform ad and clear the records map before
+        // closing each session — close() will retire the governor
+        // accounting but the platform objects are owned here.
+        destroyAllRecordsLocked()
         for (holder in sessions.values) {
             val retired = holder.core.close()
-            for (recordId in retired) records.remove(recordId)
+            // records already cleared; nothing to do.
+            for (recordId in retired) { /* keep governor-side accounting tidy */ }
         }
         sessions.clear()
         inactiveOrder.clear()
-        records.clear()
     }
 
     fun onConsentRevoked() = lock.withLock {
         tickLocked()
         placementGenBumpAll()
-        for (holder in sessions.values) {
-            val retired = holder.core.close()
-            for (recordId in retired) records.remove(recordId)
-        }
+        destroyAllRecordsLocked()
+        for (holder in sessions.values) holder.core.close()
         sessions.clear()
         inactiveOrder.clear()
-        records.clear()
     }
 
-    /**
-     * Routes a viewport update from Compose into the session, then
-     * forwards the resulting slot demand to the right per-placement
-     * schedulers.
-     */
-    fun updateWindow(sessionKey: String, window: dev.avinya.ads.nativead.NativeAdWindow) = lock.withLock {
+    fun updateWindow(sessionKey: String, window: NativeAdWindow) = lock.withLock {
         tickLocked()
         val holder = sessions[sessionKey] ?: return@withLock
         holder.lastActive = nowLocked()
@@ -216,11 +202,6 @@ internal class NativeAdCoordinatorCore<A : Any>(
 
     fun schedulerCount(): Int = lock.withLock { schedulers.size }
 
-    /**
-     * Test-only: advance the coordinator's internal clock by [duration] and
-     * run the TTL + inactive-session reaper. Production code never calls
-     * this; it exists so race tests can fast-forward without `runBlocking`.
-     */
     fun tickForTest(duration: Duration) = lock.withLock {
         testNow = nowLocked() + duration
         tickLocked()
@@ -236,13 +217,13 @@ internal class NativeAdCoordinatorCore<A : Any>(
         val now = nowLocked()
 
         // Reap inactive sessions past the TTL.
-        val cutoff = now - memoryPolicy.inactiveSessionTtl
-        val toReap = inactiveOrder.entries.filter { it.value <= cutoff }.map { it.key }
+        val inactiveCutoff = now - memoryPolicy.inactiveSessionTtl
+        val toReap = inactiveOrder.entries.filter { it.value <= inactiveCutoff }.map { it.key }
         for (key in toReap) {
             val holder = sessions.remove(key) ?: continue
             inactiveOrder.remove(key)
             val retired = holder.core.close()
-            for (recordId in retired) records.remove(recordId)
+            destroyAndForgetRecords(retired, holder.core.key)
         }
         // Enforce the LRU cap on inactive sessions.
         while (inactiveOrder.size > memoryPolicy.maxInactiveSessions) {
@@ -250,7 +231,7 @@ internal class NativeAdCoordinatorCore<A : Any>(
             val holder = sessions.remove(oldest) ?: break
             inactiveOrder.remove(oldest)
             val retired = holder.core.close()
-            for (recordId in retired) records.remove(recordId)
+            destroyAndForgetRecords(retired, holder.core.key)
         }
 
         // Expire records past the 1-hour native-ad TTL.
@@ -260,17 +241,19 @@ internal class NativeAdCoordinatorCore<A : Any>(
             .map { (id, _) -> id }
             .toList()
         for (recordId in expiredRecordIds) {
-            val meta = records.remove(recordId) ?: continue
-            val holder = sessions[meta.sessionKey] ?: continue
-            holder.core.expireSlot(meta.slotKey)
-            // expireSlot retires the record with the governor; nothing else
-            // to do for the placement scheduler.
+            val entry = records.remove(recordId) ?: continue
+            val holder = sessions[entry.sessionKey] ?: continue
+            platform.destroy(entry.ad)
+            val demand = holder.core.expireSlot(entry.slotKey)
+            // The reload demand is submitted to the right placement
+            // scheduler so the platform call is reissued.
+            if (demand.slots.isNotEmpty()) {
+                submitDemand(holder, demand)
+            }
         }
     }
 
     private fun submitDemand(holder: SessionHolder, demand: SlotDemand) {
-        // Group entries by placement so each per-placement scheduler sees a
-        // single batch.
         if (demand.slots.isEmpty()) return
         val byPlacement = demand.slots.groupBy { it.placement.id }
         for ((placementId, entries) in byPlacement) {
@@ -283,6 +266,35 @@ internal class NativeAdCoordinatorCore<A : Any>(
         if (schedulers.isEmpty()) return
         for (placementId in schedulers.keys.toList()) {
             schedulers[placementId]?.bumpGeneration()
+        }
+    }
+
+    /**
+     * Destroy every record the holder currently owns, then remove the
+     * corresponding metadata. Called from [clear], [onConsentRevoked],
+     * and the inactive-session reap path in [tickLocked].
+     */
+    private fun destroyAllRecordsLocked() {
+        for (entry in records.values) platform.destroy(entry.ad)
+        records.clear()
+    }
+
+    /**
+     * Destroy and remove the records for [retiredRecordIds] belonging
+     * to [sessionKey]. Safe to call when the records are not present
+     * (e.g. an already-reaped record). Used by [closeSession] and the
+     * inactive-session reap path.
+     */
+    private fun destroyAndForgetRecords(retiredRecordIds: List<NativeAdRecordId>, sessionKey: String) {
+        for (recordId in retiredRecordIds) {
+            val entry = records.remove(recordId) ?: continue
+            if (entry.sessionKey == sessionKey) {
+                platform.destroy(entry.ad)
+            } else {
+                // Cross-session mismatch: the record belongs to another
+                // session. Put it back so its owner can clean it up.
+                records[recordId] = entry
+            }
         }
     }
 
@@ -306,8 +318,6 @@ internal class NativeAdCoordinatorCore<A : Any>(
             currentJob = null
             queue.clear()
             releaseReservationsLocked()
-            // We do not touch activeRecordIds here — close()/clear() on
-            // the coordinator retires them through the session.
         }
 
         fun cancelForSession(sessionKey: String) = lock.withLock {
@@ -326,19 +336,32 @@ internal class NativeAdCoordinatorCore<A : Any>(
 
         private fun startNextLocked() {
             val batch = queue.removeAt(0)
-            val count = batch.entries.size
             val priority = nativeAdPriorityFor(batch.entries.first().placement)
             val decision = governor.reserve(
                 demandClass = NativeAdDemandClass.Visible,
                 priority = priority,
-                count = count,
+                count = batch.entries.size,
                 allowPartial = true,
             )
+            // Consume both retired records and cancelled reservations
+            // from the decision — they are the platform objects /
+            // permits the prior call already accounted for.
+            for (recordId in decision.retiredRecordIds) {
+                val entry = records.remove(recordId)
+                if (entry != null) platform.destroy(entry.ad)
+            }
             activeReservations.addAll(decision.reservations)
             val genAtSubmit = generation
             val placement = batch.entries.first().placement
+            // Load the **granted** count, not the original demand. When
+            // the governor could only reserve some of the requested
+            // permits (visible demand at the hard cap with no eviction
+            // room), the platform only sees the granted size — never
+            // zero, because reserve with allowPartial=true still
+            // surfaces whatever fit.
+            val grantedCount = activeReservations.size
             currentJob = scope.launch {
-                val result = platform.load(placement, count, genAtSubmit)
+                val result = platform.load(placement, grantedCount, genAtSubmit)
                 handleResult(batch, genAtSubmit, result)
             }
         }
@@ -352,7 +375,6 @@ internal class NativeAdCoordinatorCore<A : Any>(
             val currentGen = generation
             val stale = submittedGen != currentGen
             if (stale) {
-                // Stale: drop reservations and destroy any returned ads.
                 if (result is AdAttemptResult.Success) {
                     result.value.forEach { platform.destroy(it) }
                 }
@@ -375,7 +397,8 @@ internal class NativeAdCoordinatorCore<A : Any>(
                 try {
                     val recordId = governor.admit(reservation)
                     activeRecordIds.add(recordId)
-                    records[recordId] = RecordMeta(
+                    records[recordId] = RecordEntry(
+                        ad = ads[i],
                         sessionKey = batch.holder.core.key,
                         slotKey = entry.key,
                         generation = entry.generation,
@@ -383,16 +406,14 @@ internal class NativeAdCoordinatorCore<A : Any>(
                     )
                     batch.holder.core.recordAdmitted(entry.key, recordId, entry.generation)
                 } catch (e: IllegalStateException) {
-                    // Reservation already resolved or stale; destroy the
-                    // returned ad so it does not leak.
                     platform.destroy(ads[i])
                 }
             }
-            // Surplus ads (platform returned more than the demand) are destroyed.
+            // Surplus ads (platform returned more than granted): destroy.
             for (i in n until ads.size) {
                 platform.destroy(ads[i])
             }
-            // Unused reservations (partial fill) are released.
+            // Unused reservations (granted > admitted): release.
             for (i in n until activeReservations.size) {
                 try {
                     governor.releaseReservation(activeReservations[i])
@@ -404,9 +425,7 @@ internal class NativeAdCoordinatorCore<A : Any>(
         }
 
         private fun handleFailure(batch: Batch, error: AdError) {
-            // Release every reservation for the failed batch.
             releaseReservationsLocked()
-            // Mark every requested slot as Failed.
             for (entry in batch.entries) {
                 batch.holder.core.recordFailed(entry.key, error, entry.generation)
             }
@@ -432,11 +451,9 @@ internal class NativeAdCoordinatorCore<A : Any>(
         }
 
         private fun nativeAdPriorityFor(placement: AdPlacement): NativeAdPriority {
-            // The coordinator uses the most common case (ready-ahead) as a
-            // default; the platform-specific coordinator (Task 5/6) will
-            // refine this for the platform's batching / position. The
-            // record-eviction priority is set by the session core as the
-            // slot moves between bands.
+            // The coordinator uses the most common case (ready-ahead) as
+            // a default; the platform-specific coordinator (Task 5/6)
+            // will refine this for the platform's batching / position.
             return NativeAdPriority.ActiveReadyAhead
         }
     }
