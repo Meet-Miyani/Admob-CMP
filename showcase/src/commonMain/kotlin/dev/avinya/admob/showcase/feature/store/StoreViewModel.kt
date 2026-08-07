@@ -15,6 +15,7 @@ import dev.avinya.admob.showcase.ui.ad.AppOpenSuppressor
 import dev.avinya.admob.showcase.ui.ad.RewardOutcome
 import dev.avinya.admob.showcase.ui.ad.suppressing
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -73,8 +74,8 @@ class StoreViewModel(
     }
 
     private fun unlock(article: PremiumArticle) {
-        if (article.isUnlocked) return
         viewModelScope.launch {
+            if (articles.isUnlocked(article.id).first()) return@launch
             // Suppressed for the whole transaction: an app-open ad appearing
             // mid-purchase is both a bad experience and a policy problem.
             suppressor.suppressing {
