@@ -6,6 +6,7 @@ import dev.avinya.ads.FullScreenAdController
 import dev.avinya.admob.showcase.data.repo.WalletRepository
 import dev.avinya.admob.showcase.domain.wallet.CreditResult
 import dev.avinya.admob.showcase.domain.wallet.coinsFor
+import kotlinx.coroutines.CancellationException
 
 sealed interface RewardOutcome {
     data class Earned(val coins: Int, val newBalance: Int) : RewardOutcome
@@ -41,6 +42,7 @@ suspend fun runRewarded(
     } catch (throwable: Throwable) {
         // A platform that throws instead of returning Failed must not kill the
         // caller's coroutine and freeze the screen.
+        if (throwable is CancellationException) throw throwable
         return RewardOutcome.Failed(throwable.message ?: "presentation failed")
     }
 
