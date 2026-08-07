@@ -329,18 +329,16 @@ cannot appear over a consent flow or a purchase.
 
 ### Format coverage
 
-Where each format is exercised in the showcase:
-
-| Format | Onboarding | Feed | Article | Store | Library | Settings |
-|---|---|---|---|---|---|---|
-| Banner (anchored adaptive) | (not used) | ✓ | (not used) | (not used) | (not used) | (not used) |
-| Banner (collapsible) | (not used) | (not used) | ✓ | (not used) | (not used) | (not used) |
-| Native (pool, paged) | (not used) | ✓ | (not used) | (not used) | (not used) | (not used) |
-| Native (inline) | (not used) | (not used) | ✓ | (not used) | (not used) | (not used) |
-| Interstitial (on close) | (not used) | (not used) | ✓ | (not used) | (not used) | (not used) |
-| Rewarded | (not used) | (not used) | (not used) | ✓ | (not used) | (not used) |
-| Rewarded interstitial (offer wall) | (not used) | (not used) | (not used) | ✓ | (not used) | (not used) |
-| App-open | (not used) | (not used) | (not used) | (not used) | (not used) | ✓ (process-wide) |
+| Format | Where | What it proves |
+|---|---|---|
+| Banner | Feed, anchored adaptive | sizing, `SdkManaged` refresh |
+| Banner | Article, collapsible | `CollapsiblePlacement`, `AdServerManaged` |
+| Native | Feed, paged | pool, key stability, `availableAds` recovery |
+| Native | Article, inline | layout DSL reuse in a different shape |
+| Interstitial | Article close | frequency capping, cache, suppression reasons |
+| Rewarded | Store | reward-callback correctness, persisted consequence |
+| RewardedInterstitial | Store premium entry | offer-wall pattern |
+| AppOpen | app-wide | `AppOpenAdCoordinator`, `isBlocked` during transactions |
 
 ### Run it
 
