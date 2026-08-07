@@ -16,6 +16,7 @@ import dev.avinya.admob.showcase.di.ProvideAdManager
 import dev.avinya.admob.showcase.di.rememberAppGraph
 import dev.avinya.admob.showcase.nav.ShowcaseNavHost
 import dev.avinya.admob.showcase.nav.ShowcaseNavKey
+import dev.avinya.admob.showcase.ui.ad.AppOpenHost
 import dev.avinya.admob.showcase.ui.ad.AppOpenSuppressor
 import dev.avinya.admob.showcase.ui.theme.ShowcaseTheme
 import dev.avinya.admob.showcase.ui.theme.ThemeMode
@@ -44,22 +45,24 @@ fun ShowcaseApp() {
         LocalAppOpenSuppressor provides suppressor,
     ) {
         ProvideAdManager {
-            ShowcaseTheme(themeMode = themeMode) {
-                // Hold the first screen until the preference resolves, otherwise
-                // a returning user briefly sees onboarding on every cold start.
-                when (onboardingComplete) {
-                    null -> Box(Modifier.fillMaxSize())
-                    else -> {
-                        val backStack = remember {
-                            mutableStateListOf<ShowcaseNavKey>(
-                                if (onboardingComplete == true) {
-                                    ShowcaseNavKey.Feed
-                                } else {
-                                    ShowcaseNavKey.Onboarding
-                                },
-                            )
+            AppOpenHost(suppressor = suppressor) {
+                ShowcaseTheme(themeMode = themeMode) {
+                    // Hold the first screen until the preference resolves, otherwise
+                    // a returning user briefly sees onboarding on every cold start.
+                    when (onboardingComplete) {
+                        null -> Box(Modifier.fillMaxSize())
+                        else -> {
+                            val backStack = remember {
+                                mutableStateListOf<ShowcaseNavKey>(
+                                    if (onboardingComplete == true) {
+                                        ShowcaseNavKey.Feed
+                                    } else {
+                                        ShowcaseNavKey.Onboarding
+                                    },
+                                )
+                            }
+                            ShowcaseNavHost(backStack = backStack)
                         }
-                        ShowcaseNavHost(backStack = backStack)
                     }
                 }
             }

@@ -8,13 +8,16 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
-import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 
+import dev.avinya.admob.showcase.di.LocalAppOpenSuppressor
 import dev.avinya.admob.showcase.feature.onboarding.OnboardingScreen
 import dev.avinya.admob.showcase.feature.feed.FeedScreen
 import dev.avinya.admob.showcase.feature.article.ArticleScreen
@@ -32,6 +35,7 @@ import dev.avinya.admob.showcase.feature.library.LibraryScreen
 @Composable
 fun ShowcaseNavHost(backStack: SnapshotStateList<ShowcaseNavKey>) {
     val current = backStack.lastOrNull() ?: ShowcaseNavKey.Feed
+    val suppressor = LocalAppOpenSuppressor.current
 
     Scaffold(
         bottomBar = {
@@ -58,6 +62,12 @@ fun ShowcaseNavHost(backStack: SnapshotStateList<ShowcaseNavKey>) {
             entryDecorators = listOf(rememberViewModelStoreNavEntryDecorator()),
             entryProvider = entryProvider {
                 entry<ShowcaseNavKey.Onboarding> {
+                    // Hold suppression for the whole entry lifetime. onFinished
+                    // clears the back stack and pushes Feed, which disposes this
+                    // entry, so the suppression ends naturally without manual
+                    // bookkeeping.
+                    LaunchedEffect(Unit) { suppressor.enter() }
+                    DisposableEffect(Unit) { onDispose { suppressor.exit() } }
                     OnboardingScreen(
                         onFinished = {
                             backStack.clear()

@@ -10,7 +10,8 @@ import androidx.compose.runtime.setValue
  * Depth-counted rather than boolean: two overlapping flows must not
  * un-suppress each other on the way out.
  *
- * Phase 6 binds [isBlocked] to `AppOpenAdCoordinator.isBlocked`.
+ * `AppOpenHost` binds [isBlocked] to `AppOpenAdCoordinator.isBlocked` for the
+ * whole composition.
  */
 class AppOpenSuppressor {
     private var depth by mutableStateOf(0)

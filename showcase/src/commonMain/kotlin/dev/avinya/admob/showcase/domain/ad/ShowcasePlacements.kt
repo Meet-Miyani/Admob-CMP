@@ -102,4 +102,11 @@ object ShowcasePlacements {
         ),
         strictTestMode = true,
     )
+
+    val appOpen: AdPlacement = AdPlacement(
+        id = "app_open",
+        format = AdFormat.AppOpen,
+        adUnitIds = AdUnitIds(android = TestAdIds.ANDROID_APP_OPEN, ios = TestAdIds.IOS_APP_OPEN),
+        strictTestMode = true,
+    )
 }
