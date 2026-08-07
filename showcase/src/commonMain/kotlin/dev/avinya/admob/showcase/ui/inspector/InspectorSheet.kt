@@ -13,16 +13,23 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -77,7 +84,13 @@ fun InspectorSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        dragHandle = {
+            BottomSheetDefaults.DragHandle(
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+            )
+        },
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             // Status Badge Pills Header
@@ -86,15 +99,34 @@ fun InspectorSheet(
                 consentStatus = consentStatus,
             )
 
-            SecondaryTabRow(selectedTabIndex = tab) {
+            SecondaryTabRow(
+                selectedTabIndex = tab,
+                containerColor = Color.Transparent,
+                contentColor = EmeraldPrimary,
+                indicator = {
+                    TabRowDefaults.SecondaryIndicator(
+                        modifier = Modifier.tabIndicatorOffset(tab),
+                        color = EmeraldPrimary,
+                    )
+                },
+                divider = {
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+                    )
+                },
+            ) {
                 TABS.forEachIndexed { index, title ->
                     Tab(
                         selected = tab == index,
                         onClick = { tab = index },
+                        selectedContentColor = EmeraldPrimary,
+                        unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         text = {
                             Text(
                                 text = title,
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = if (tab == index) FontWeight.Bold else FontWeight.Medium,
+                                ),
                             )
                         },
                     )
@@ -198,7 +230,9 @@ private fun ConsentStateTab(manager: AdManager, modifier: Modifier = Modifier) {
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
@@ -216,7 +250,9 @@ private fun ConsentStateTab(manager: AdManager, modifier: Modifier = Modifier) {
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
@@ -236,18 +272,27 @@ private fun ConsentStateTab(manager: AdManager, modifier: Modifier = Modifier) {
                 OutlinedButton(
                     onClick = { scope.launch { manager.consent.showPrivacyOptions() } },
                     modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = EmeraldPrimary),
                 ) {
                     Text("Show Privacy Form")
                 }
                 OutlinedButton(
                     onClick = { scope.launch { manager.consent.resetConsentForDebug() } },
                     modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = EmeraldPrimary),
                 ) {
                     Text("Reset Consent (Debug)")
                 }
                 OutlinedButton(
                     onClick = { scope.launch { manager.diagnostics.openAdInspector() } },
                     modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = EmeraldPrimary),
                 ) {
                     Text("Open Google Ad Inspector")
                 }
@@ -277,11 +322,37 @@ private fun TelemetryLogsTab(
                 selected = selectedLogType == 0,
                 onClick = { selectedLogType = 0 },
                 label = { Text("Ad Events (${adEvents.size + policyDecisions.size})") },
+                shape = RoundedCornerShape(8.dp),
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = EmeraldPrimary.copy(alpha = 0.15f),
+                    selectedLabelColor = EmeraldPrimary,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+                border = FilterChipDefaults.filterChipBorder(
+                    enabled = true,
+                    selected = selectedLogType == 0,
+                    borderColor = MaterialTheme.colorScheme.outline,
+                    selectedBorderColor = EmeraldPrimary.copy(alpha = 0.6f),
+                ),
             )
             FilterChip(
                 selected = selectedLogType == 1,
                 onClick = { selectedLogType = 1 },
                 label = { Text("Revenue / eCPM (${paidEvents.size})") },
+                shape = RoundedCornerShape(8.dp),
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = EmeraldPrimary.copy(alpha = 0.15f),
+                    selectedLabelColor = EmeraldPrimary,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+                border = FilterChipDefaults.filterChipBorder(
+                    enabled = true,
+                    selected = selectedLogType == 1,
+                    borderColor = MaterialTheme.colorScheme.outline,
+                    selectedBorderColor = EmeraldPrimary.copy(alpha = 0.6f),
+                ),
             )
         }
 
@@ -342,4 +413,5 @@ private const val INDEX_PLACEMENTS = 0
 private const val INDEX_CONSENT = 1
 private const val INDEX_TELEMETRY = 2
 private val TABS = listOf("Placements", "Consent State", "Telemetry Logs")
+
 

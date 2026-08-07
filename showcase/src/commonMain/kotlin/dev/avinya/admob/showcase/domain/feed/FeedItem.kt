@@ -23,6 +23,8 @@ sealed interface FeedItem {
         val readTimeMin: Int,
         val isPremium: Boolean,
         val feedOrdinal: Int,
+        val snippet: String = "",
+        val publishedAt: Long = 0L,
     ) : FeedItem {
         override val key: String get() = "article_$id"
     }

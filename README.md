@@ -256,8 +256,10 @@ exercises every ad format the SDK supports in realistic placements — a
 reading app with a paged feed, article detail, a coin economy and a
 per-screen ad Inspector.
 
-It is a **consumer** of `admob-cmp`, never a reason to change it. Design:
-[docs/superpowers/specs/2026-08-06-showcase-app-design.md](docs/superpowers/specs/2026-08-06-showcase-app-design.md).
+It is a **consumer** of `admob-cmp`; reusable ad lifecycle behavior belongs
+in the SDK rather than in sample-only workarounds. The approved next work is
+defined by the [native-ad session architecture](docs/superpowers/plans/2026-08-07-native-ad-session-architecture.md)
+and the dependent [Fieldnotes Showcase redesign](docs/superpowers/plans/2026-08-07-showcase-fieldnotes-redesign.md).
 
 ### Screens
 

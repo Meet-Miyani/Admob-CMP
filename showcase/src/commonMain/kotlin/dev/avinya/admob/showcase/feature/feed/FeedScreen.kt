@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -15,13 +16,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Bookmark
+import androidx.compose.material.icons.rounded.BookmarkBorder
 import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -32,17 +33,16 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
-import dev.avinya.ads.LocalAdManager
-import dev.avinya.ads.ui.BannerAdView
-import dev.avinya.ads.ui.NativeAdView
 import dev.avinya.admob.showcase.di.LocalAppGraph
 import dev.avinya.admob.showcase.domain.ad.ShowcasePlacements
 import dev.avinya.admob.showcase.domain.feed.FeedItem
@@ -50,6 +50,11 @@ import dev.avinya.admob.showcase.ui.ad.feedNativeAdLayout
 import dev.avinya.admob.showcase.ui.inspector.InspectorEntryPoint
 import dev.avinya.admob.showcase.ui.inspector.InspectorSheet
 import dev.avinya.admob.showcase.ui.inspector.LocalInspectorPlacements
+import dev.avinya.admob.showcase.ui.theme.EmeraldPrimary
+import dev.avinya.ads.LocalAdManager
+import dev.avinya.ads.ui.BannerAdView
+import dev.avinya.ads.ui.NativeAdView
+import kotlinx.coroutines.launch
 
 @Composable
 fun FeedScreen(onArticleClick: (String) -> Unit) {
@@ -66,8 +71,14 @@ fun FeedScreen(onArticleClick: (String) -> Unit) {
         listOf(ShowcasePlacements.feedBanner, ShowcasePlacements.feedNative)
     }
 
-    val categories = remember { listOf("All", "Tech", "Design", "SDK News") }
+    val categories = remember {
+        listOf("All", "Kotlin", "Compose", "Multiplatform", "Android", "iOS", "Tooling")
+    }
     var selectedCategory by remember { mutableStateOf("All") }
+
+    val bookmarkedArticles by graph.articles.bookmarkedArticles().collectAsState(initial = emptyList())
+    val bookmarkedIds = remember(bookmarkedArticles) { bookmarkedArticles.map { it.id }.toSet() }
+    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(viewModel) {
         viewModel.effects.collect { effect ->
@@ -85,32 +96,19 @@ fun FeedScreen(onArticleClick: (String) -> Unit) {
                 onOpen = { showInspector = true },
             )
 
-            // Category Filter Chips
+            // Category Filter Pills
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 categories.forEach { category ->
-                    FilterChip(
+                    CategoryPill(
+                        label = category,
                         selected = selectedCategory == category,
                         onClick = { selectedCategory = category },
-                        label = { Text(category) },
-                        shape = RoundedCornerShape(20.dp),
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primary,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        ),
-                        border = FilterChipDefaults.filterChipBorder(
-                            enabled = true,
-                            selected = selectedCategory == category,
-                            borderColor = MaterialTheme.colorScheme.outline,
-                            selectedBorderColor = MaterialTheme.colorScheme.primary,
-                        ),
                     )
                 }
             }
@@ -127,26 +125,21 @@ fun FeedScreen(onArticleClick: (String) -> Unit) {
                     when (val item = items[index]) {
                         is FeedItem.Article -> {
                             if (matchesCategory(item.section, selectedCategory)) {
+                                val isBookmarked = item.id in bookmarkedIds
                                 ArticleCard(
                                     item = item,
+                                    isBookmarked = isBookmarked,
+                                    onBookmarkToggle = {
+                                        coroutineScope.launch {
+                                            graph.articles.setBookmarked(item.id, !isBookmarked)
+                                        }
+                                    },
                                     onClick = { viewModel.onIntent(FeedIntent.OpenArticle(item.id)) },
                                 )
                             }
                         }
                         is FeedItem.NativeAdSlot -> {
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(16.dp),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.4f)),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                            ) {
-                                NativeAdView(
-                                    placement = ShowcasePlacements.feedNative,
-                                    itemKey = item.slotKey,
-                                    layout = feedNativeAdLayout,
-                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                                )
-                            }
+                            NativeAdCard(slotKey = item.slotKey)
                         }
                         null -> Unit
                     }
@@ -155,10 +148,23 @@ fun FeedScreen(onArticleClick: (String) -> Unit) {
 
             val state by viewModel.state.collectAsState()
             if (state.adsEnabled && state.sdkReady) {
-                BannerAdView(
-                    placement = ShowcasePlacements.feedBanner,
+                Surface(
                     modifier = Modifier.fillMaxWidth(),
-                )
+                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        BannerAdView(
+                            placement = ShowcasePlacements.feedBanner,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
             }
         }
     }
@@ -168,74 +174,140 @@ fun FeedScreen(onArticleClick: (String) -> Unit) {
     }
 }
 
+@Composable
+private fun CategoryPill(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(20.dp),
+        color = if (selected) EmeraldPrimary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surface,
+        border = BorderStroke(
+            1.dp,
+            if (selected) EmeraldPrimary else MaterialTheme.colorScheme.outlineVariant,
+        ),
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            color = if (selected) EmeraldPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
 private fun matchesCategory(section: String, category: String): Boolean {
     if (category == "All") return true
-    if (category == "Tech") {
-        return section in listOf("Kotlin", "Compose", "Android", "iOS", "Multiplatform", "Tooling", "Tech")
-    }
-    return section.contains(category, ignoreCase = true)
+    return section.equals(category, ignoreCase = true) || section.contains(category, ignoreCase = true)
 }
 
 @Composable
-private fun ArticleCard(item: FeedItem.Article, onClick: () -> Unit) {
+private fun ArticleCard(
+    item: FeedItem.Article,
+    isBookmarked: Boolean,
+    onBookmarkToggle: () -> Unit,
+    onClick: () -> Unit,
+) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            // Header: Section/Category badge + read time + bookmark toggle
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                    contentColor = MaterialTheme.colorScheme.primary,
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        text = item.section.uppercase(),
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-
-                if (item.isPremium) {
                     Surface(
                         shape = RoundedCornerShape(50),
-                        color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f),
-                        contentColor = MaterialTheme.colorScheme.tertiary,
+                        color = EmeraldPrimary.copy(alpha = 0.15f),
+                        contentColor = EmeraldPrimary,
                     ) {
                         Text(
-                            text = "PREMIUM",
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                            text = item.section.uppercase(),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                         )
                     }
+
+                    if (item.isPremium) {
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f),
+                            contentColor = MaterialTheme.colorScheme.tertiary,
+                        ) {
+                            Text(
+                                text = "PREMIUM",
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "${item.readTimeMin} MIN READ",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                IconButton(
+                    onClick = onBookmarkToggle,
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        imageVector = if (isBookmarked) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
+                        contentDescription = if (isBookmarked) "Remove bookmark" else "Bookmark article",
+                        tint = if (isBookmarked) EmeraldPrimary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier.size(20.dp),
+                    )
                 }
             }
 
+            // Title: Bold titleMedium
             Text(
                 text = item.title,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
             )
 
+            // Snippet: bodyMedium with onSurfaceVariant color
+            val snippet = item.snippet.ifBlank {
+                "Explore essential concepts, architectural patterns, and practical insights for ${item.section} development."
+            }
+            Text(
+                text = snippet,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+
+            // Footer: Author info and published date
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
@@ -247,28 +319,44 @@ private fun ArticleCard(item: FeedItem.Article, onClick: () -> Unit) {
                     Text(
                         text = item.author,
                         style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
 
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Schedule,
-                        contentDescription = "Read time",
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = "${item.readTimeMin} min read",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                Text(
+                    text = formatRelativeDate(item.feedOrdinal),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                )
             }
         }
     }
 }
 
+@Composable
+private fun NativeAdCard(
+    slotKey: String,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        NativeAdView(
+            placement = ShowcasePlacements.feedNative,
+            itemKey = slotKey,
+            layout = feedNativeAdLayout,
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+        )
+    }
+}
+
+private fun formatRelativeDate(feedOrdinal: Int): String {
+    if (feedOrdinal == 0) return "Just now"
+    if (feedOrdinal < 24) return "${feedOrdinal}h ago"
+    val days = feedOrdinal / 24
+    return if (days == 1) "1 day ago" else "$days days ago"
+}

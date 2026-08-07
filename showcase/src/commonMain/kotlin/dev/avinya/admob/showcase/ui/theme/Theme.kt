@@ -32,8 +32,9 @@ internal fun ShowcaseTheme(
     content: @Composable () -> Unit,
 ) {
     val dark = themeMode.isDark(systemInDark = isSystemInDarkTheme())
+    val colors = if (dark) ShowcaseDarkColors else ShowcaseLightColors
     MaterialTheme(
-        colorScheme = if (dark) ShowcaseDarkColors else ShowcaseLightColors,
+        colorScheme = colors,
         typography = ShowcaseTypography,
         content = content,
     )

@@ -63,7 +63,7 @@ fun InspectorEntryPoint(
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
     ) {
         Row(

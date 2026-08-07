@@ -1,8 +1,9 @@
 package dev.avinya.admob.showcase.feature.settings
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,11 +37,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -55,6 +58,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.avinya.admob.showcase.di.LocalAppGraph
@@ -160,6 +164,10 @@ fun SettingsScreen() {
                             enabled = !state.busy,
                             onClick = { viewModel.onIntent(SettingsIntent.ResetConsent) },
                             shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = EmeraldPrimary,
+                            ),
                         ) { Text("Reset consent state") }
                     }
                 }
@@ -214,7 +222,7 @@ private fun SdkStatusCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -275,7 +283,7 @@ private fun ThemeSelectorCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -283,69 +291,86 @@ private fun ThemeSelectorCard(
         ) {
             Text("Appearance Theme", style = MaterialTheme.typography.titleMedium)
 
-            Row(
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                ThemeChip(
-                    label = "System",
-                    icon = Icons.Rounded.PhoneAndroid,
-                    selected = selectedMode == ThemeMode.System,
-                    onClick = { onSelectMode(ThemeMode.System) },
-                    modifier = Modifier.weight(1f),
-                )
-                ThemeChip(
-                    label = "Light",
-                    icon = Icons.Rounded.WbSunny,
-                    selected = selectedMode == ThemeMode.Light,
-                    onClick = { onSelectMode(ThemeMode.Light) },
-                    modifier = Modifier.weight(1f),
-                )
-                ThemeChip(
-                    label = "Dark",
-                    icon = Icons.Rounded.NightsStay,
-                    selected = selectedMode == ThemeMode.Dark,
-                    onClick = { onSelectMode(ThemeMode.Dark) },
-                    modifier = Modifier.weight(1f),
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    ThemeSegmentPill(
+                        label = "System",
+                        icon = Icons.Rounded.PhoneAndroid,
+                        selected = selectedMode == ThemeMode.System,
+                        onClick = { onSelectMode(ThemeMode.System) },
+                        modifier = Modifier.weight(1f),
+                    )
+                    ThemeSegmentPill(
+                        label = "Light",
+                        icon = Icons.Rounded.WbSunny,
+                        selected = selectedMode == ThemeMode.Light,
+                        onClick = { onSelectMode(ThemeMode.Light) },
+                        modifier = Modifier.weight(1f),
+                    )
+                    ThemeSegmentPill(
+                        label = "Dark",
+                        icon = Icons.Rounded.NightsStay,
+                        selected = selectedMode == ThemeMode.Dark,
+                        onClick = { onSelectMode(ThemeMode.Dark) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun ThemeChip(
+private fun ThemeSegmentPill(
     label: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val backgroundColor by animateColorAsState(
+        targetValue = if (selected) EmeraldPrimary else Color.Transparent,
+        animationSpec = tween(durationMillis = 200),
+        label = "themePillBg",
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) Color.Black else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = tween(durationMillis = 200),
+        label = "themePillContent",
+    )
+
     Surface(
         onClick = onClick,
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
-        color = if (selected) EmeraldPrimary else MaterialTheme.colorScheme.surface,
-        border = BorderStroke(
-            1.dp,
-            if (selected) EmeraldPrimary else MaterialTheme.colorScheme.outline,
-        ),
+        shape = RoundedCornerShape(10.dp),
+        color = backgroundColor,
     ) {
-        Column(
-            modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+        Row(
+            modifier = Modifier.padding(vertical = 10.dp, horizontal = 8.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = if (selected) Color.Black else MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(20.dp),
+                tint = contentColor,
+                modifier = Modifier.size(18.dp),
             )
+            Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = if (selected) Color.Black else MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                ),
+                color = contentColor,
             )
         }
     }
@@ -364,7 +389,7 @@ private fun InspectorToggleCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -391,6 +416,14 @@ private fun InspectorToggleCard(
                 Switch(
                     checked = inspectorEnabled,
                     onCheckedChange = onInspectorToggle,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = EmeraldPrimary,
+                        checkedTrackColor = EmeraldPrimary.copy(alpha = 0.3f),
+                        checkedBorderColor = EmeraldPrimary,
+                        uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        uncheckedBorderColor = MaterialTheme.colorScheme.outline,
+                    ),
                 )
             }
 
@@ -413,6 +446,10 @@ private fun InspectorToggleCard(
                 onClick = onOpenAdInspector,
                 shape = RoundedCornerShape(8.dp),
                 modifier = Modifier.fillMaxWidth(),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = EmeraldPrimary,
+                ),
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -440,7 +477,7 @@ private fun SettingsSection(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -505,6 +542,10 @@ private fun RadioRow(
         RadioButton(
             selected = selected,
             onClick = null,
+            colors = RadioButtonDefaults.colors(
+                selectedColor = EmeraldPrimary,
+                unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            ),
         )
         Text(
             text = label,
@@ -529,7 +570,16 @@ private fun SwitchRow(
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = EmeraldPrimary,
+                checkedTrackColor = EmeraldPrimary.copy(alpha = 0.3f),
+                checkedBorderColor = EmeraldPrimary,
+                uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                uncheckedBorderColor = MaterialTheme.colorScheme.outline,
+            ),
         )
     }
 }
+
 

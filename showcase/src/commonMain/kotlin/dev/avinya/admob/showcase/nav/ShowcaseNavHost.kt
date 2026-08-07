@@ -1,7 +1,13 @@
 package dev.avinya.admob.showcase.nav
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -15,6 +21,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -31,12 +38,13 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 
 import dev.avinya.admob.showcase.di.LocalAppOpenSuppressor
-import dev.avinya.admob.showcase.feature.onboarding.OnboardingScreen
-import dev.avinya.admob.showcase.feature.feed.FeedScreen
 import dev.avinya.admob.showcase.feature.article.ArticleScreen
+import dev.avinya.admob.showcase.feature.feed.FeedScreen
+import dev.avinya.admob.showcase.feature.library.LibraryScreen
+import dev.avinya.admob.showcase.feature.onboarding.OnboardingScreen
 import dev.avinya.admob.showcase.feature.settings.SettingsScreen
 import dev.avinya.admob.showcase.feature.store.StoreScreen
-import dev.avinya.admob.showcase.feature.library.LibraryScreen
+import dev.avinya.admob.showcase.ui.theme.EmeraldPrimary
 
 /**
  * The app's navigation shell.
@@ -61,11 +69,13 @@ fun ShowcaseNavHost(backStack: SnapshotStateList<ShowcaseNavKey>) {
                 ) {
                     Surface(
                         shape = RoundedCornerShape(28.dp),
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                     ) {
                         NavigationBar(
                             containerColor = Color.Transparent,
+                            tonalElevation = 0.dp,
+                            windowInsets = WindowInsets(0.dp),
                         ) {
                             TOP_LEVEL_KEYS.forEach { key ->
                                 val selected = current == key
@@ -83,14 +93,16 @@ fun ShowcaseNavHost(backStack: SnapshotStateList<ShowcaseNavKey>) {
                                         Icon(
                                             imageVector = icon,
                                             contentDescription = key.label,
-                                            tint = if (selected) {
-                                                MaterialTheme.colorScheme.primary
-                                            } else {
-                                                MaterialTheme.colorScheme.onSurfaceVariant
-                                            },
                                         )
                                     },
                                     label = { Text(key.label) },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        selectedIconColor = EmeraldPrimary,
+                                        selectedTextColor = EmeraldPrimary,
+                                        indicatorColor = EmeraldPrimary.copy(alpha = 0.14f),
+                                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    ),
                                 )
                             }
                         }
@@ -104,6 +116,18 @@ fun ShowcaseNavHost(backStack: SnapshotStateList<ShowcaseNavKey>) {
             modifier = Modifier.fillMaxSize().padding(padding),
             onBack = { if (backStack.size > 1) backStack.removeLast() },
             entryDecorators = listOf(rememberViewModelStoreNavEntryDecorator()),
+            transitionSpec = {
+                ContentTransform(
+                    fadeIn(animationSpec = tween(220)),
+                    fadeOut(animationSpec = tween(220)),
+                )
+            },
+            popTransitionSpec = {
+                ContentTransform(
+                    fadeIn(animationSpec = tween(220)),
+                    fadeOut(animationSpec = tween(220)),
+                )
+            },
             entryProvider = entryProvider {
                 entry<ShowcaseNavKey.Onboarding> {
                     // Hold suppression for the whole entry lifetime. onFinished
@@ -130,6 +154,9 @@ fun ShowcaseNavHost(backStack: SnapshotStateList<ShowcaseNavKey>) {
                     LibraryScreen(
                         onArticleClick = { articleId ->
                             backStack.add(ShowcaseNavKey.ArticleDetail(articleId))
+                        },
+                        onExploreFeedClick = {
+                            switchTopLevel(backStack, ShowcaseNavKey.Feed)
                         },
                     )
                 }

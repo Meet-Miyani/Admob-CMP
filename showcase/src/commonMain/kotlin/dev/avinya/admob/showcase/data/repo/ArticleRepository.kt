@@ -61,6 +61,8 @@ class ArticleRepository(
 
     fun isBookmarked(articleId: String): Flow<Boolean> = articleDao.isBookmarked(articleId)
 
+    fun bookmarkedArticles(): Flow<List<ArticleEntity>> = articleDao.bookmarkedArticles()
+
     suspend fun setBookmarked(articleId: String, bookmarked: Boolean) {
         if (bookmarked) {
             articleDao.addBookmark(BookmarkEntity(articleId = articleId, createdAt = clock.nowMillis()))
@@ -117,6 +119,8 @@ private fun ArticleEntity.toFeedArticle(): FeedItem.Article = FeedItem.Article(
     readTimeMin = readTimeMin,
     isPremium = isPremium,
     feedOrdinal = feedOrdinal,
+    snippet = body.substringBefore("\n\n").take(140),
+    publishedAt = publishedAt,
 )
 
 data class PremiumArticle(
