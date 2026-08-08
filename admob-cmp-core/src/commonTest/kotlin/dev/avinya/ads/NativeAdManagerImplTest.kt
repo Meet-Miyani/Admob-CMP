@@ -3,9 +3,12 @@ package dev.avinya.ads
 import dev.avinya.ads.internal.NativeAdManagerImpl
 import dev.avinya.ads.internal.NativeAdPlatform
 import dev.avinya.ads.internal.NativeAdPlatformBatch
+import dev.avinya.ads.internal.NativeAdRecordId
+import dev.avinya.ads.internal.NativeAdRenderLeaseProvider
 import dev.avinya.ads.nativead.NativeAdMemoryPolicy
 import dev.avinya.ads.nativead.NativeAdSessionPolicy
 import dev.avinya.ads.nativead.NativeAdSlot
+import dev.avinya.ads.nativead.NativeAdSlotState
 import dev.avinya.ads.nativead.NativeAdWindow
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.runCurrent
@@ -15,6 +18,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 class NativeAdManagerImplTest {
     @Test
@@ -46,6 +50,123 @@ class NativeAdManagerImplTest {
         manager.configure(policy)
         assertFailsWith<IllegalStateException> {
             manager.configure(NativeAdMemoryPolicy(softLimit = 1, hardLimit = 2))
+        }
+    }
+
+    @Test
+    fun `session before configure returns an inert handle instead of throwing`() {
+        val manager = NativeAdManagerImpl<String>(policy = null, platform = EmptyNativePlatform)
+        val session = manager.session("feed")
+        assertEquals(NativeAdMemoryPolicy(), manager.policy)
+        assertFalse(session.state.value.active)
+        assertTrue(session.state.value.slots.isEmpty())
+
+        session.updateWindow(NativeAdWindow(listOf(NativeAdSlot("slot", testNativePlacement()))))
+        session.deactivate()
+        session.close()
+        assertFalse(session.state.value.active)
+    }
+
+    @Test
+    fun `dormant session reuses one handle per key and rejects a conflicting policy`() {
+        val manager = NativeAdManagerImpl<String>(policy = null, platform = EmptyNativePlatform)
+        val first = manager.session("feed")
+        val again = manager.session("feed")
+
+        assertSame(first, again)
+        assertSame(first.state, again.state)
+
+        assertFailsWith<IllegalStateException> {
+            manager.session("feed", NativeAdSessionPolicy(maxRetainedAds = 2, retainBehind = 0, prefetchAhead = 0))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            manager.session("")
+        }
+    }
+
+    @Test
+    fun `configure materialises a dormant session and replays its last window`() {
+        val manager = NativeAdManagerImpl<String>(policy = null, platform = EmptyNativePlatform)
+        val session = manager.session("feed")
+        val placement = testNativePlacement()
+        session.updateWindow(NativeAdWindow(listOf(NativeAdSlot("slot", placement))))
+
+        manager.configure(NativeAdMemoryPolicy())
+
+        assertTrue(session.state.value.active)
+        assertEquals(NativeAdSlotState.Loading, session.state.value.slots["slot"])
+    }
+
+    @Test
+    fun `a dormant session closed before configure is never materialised`() {
+        val manager = NativeAdManagerImpl<String>(policy = null, platform = EmptyNativePlatform)
+        val session = manager.session("feed")
+        session.close()
+        manager.configure(NativeAdMemoryPolicy())
+
+        assertFalse(session.state.value.active)
+    }
+
+    @Test
+    fun `a dormant session deactivated before configure materialises inactive`() {
+        val manager = NativeAdManagerImpl<String>(policy = null, platform = EmptyNativePlatform)
+        val session = manager.session("feed")
+        val placement = testNativePlacement()
+        session.updateWindow(NativeAdWindow(listOf(NativeAdSlot("slot", placement))))
+        session.deactivate()
+
+        manager.configure(NativeAdMemoryPolicy())
+        assertFalse(session.state.value.active)
+
+        session.updateWindow(NativeAdWindow(listOf(NativeAdSlot("slot", placement))))
+        assertTrue(session.state.value.active)
+    }
+
+    @Test
+    fun `acquireRender on a dormant session returns null`() {
+        val manager = NativeAdManagerImpl<String>(policy = null, platform = EmptyNativePlatform)
+        val session = manager.session("feed")
+        val placement = testNativePlacement()
+
+        val provider = manager as NativeAdRenderLeaseProvider<String>
+        val render = provider.acquireRender("slot", placement, "renderer-1", session)
+        assertEquals(null, render)
+
+        provider.releaseRender("slot", placement, "renderer-1", NativeAdRecordId(1), session)
+    }
+
+    @Test
+    fun `closeSession removes a dormant entry`() {
+        val manager = NativeAdManagerImpl<String>(policy = null, platform = EmptyNativePlatform)
+        val session = manager.session("feed")
+        val placement = testNativePlacement()
+        session.updateWindow(NativeAdWindow(listOf(NativeAdSlot("slot", placement))))
+        manager.closeSession("feed")
+
+        manager.configure(NativeAdMemoryPolicy())
+        assertFalse(session.state.value.active)
+    }
+
+    @Test
+    fun `clear does not remove a dormant entry`() {
+        val manager = NativeAdManagerImpl<String>(policy = null, platform = EmptyNativePlatform)
+        val session = manager.session("feed")
+        val placement = testNativePlacement()
+        session.updateWindow(NativeAdWindow(listOf(NativeAdSlot("slot", placement))))
+        manager.clear()
+
+        manager.configure(NativeAdMemoryPolicy())
+        assertTrue(session.state.value.active)
+    }
+
+    @Test
+    fun `dormant registry rejects more than maxSessionRecords keys`() {
+        val manager = NativeAdManagerImpl<String>(policy = null, platform = EmptyNativePlatform)
+        repeat(64) { i ->
+            manager.session("feed-$i")
+        }
+        assertFailsWith<IllegalStateException> {
+            manager.session("feed-overflow")
         }
     }
 

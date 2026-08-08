@@ -51,6 +51,8 @@ internal class NativeAdSessionCore(
     val key: String,
     val policy: NativeAdSessionPolicy,
     private val inactiveRetentionLimit: Int,
+    private val published: MutableStateFlow<NativeAdSessionState> =
+        MutableStateFlow(NativeAdSessionState(active = false, slots = emptyMap())),
 ) {
     private class SlotEntry(val placement: AdPlacement) {
         var band = NativeAdBand.Out
@@ -70,8 +72,13 @@ internal class NativeAdSessionCore(
     private var closed = false
     private var nextGeneration = 1L
     private var nextAccess = 1L
-    private val _state = MutableStateFlow(NativeAdSessionState(active = false, slots = emptyMap()))
-    val state: StateFlow<NativeAdSessionState> = _state.asStateFlow()
+    val state: StateFlow<NativeAdSessionState> = published.asStateFlow()
+
+    init {
+        publish()
+    }
+
+    internal fun publishesInto(flow: MutableStateFlow<NativeAdSessionState>): Boolean = published === flow
 
     fun updateWindow(window: NativeAdWindow): NativeAdSessionMutation {
         if (closed) return NativeAdSessionMutation()
@@ -261,7 +268,7 @@ internal class NativeAdSessionCore(
     private fun touch(entry: SlotEntry) { entry.lastAccess = nextAccess++ }
     private fun demandFor(band: NativeAdBand) = if (band == NativeAdBand.Visible) NativeAdDemandClass.Visible else NativeAdDemandClass.Speculative
     private fun priorityFor(band: NativeAdBand) = when (band) { NativeAdBand.Visible -> NativeAdPriority.ActiveReadyAhead; NativeAdBand.PrefetchAhead -> NativeAdPriority.Speculative; NativeAdBand.RetainBehind -> NativeAdPriority.ActiveRetainedBehind; NativeAdBand.Out -> NativeAdPriority.InactiveAnchor }
-    private fun publish() { _state.value = NativeAdSessionState(active, slots.mapValues { (_, entry) -> stateFor(entry) }) }
+    private fun publish() { published.value = NativeAdSessionState(active, slots.mapValues { (_, entry) -> stateFor(entry) }) }
     private fun stateFor(entry: SlotEntry): NativeAdSlotState = when {
         entry.lastError != null -> NativeAdSlotState.Failed(entry.lastError!!)
         entry.inFlight != null -> NativeAdSlotState.Loading

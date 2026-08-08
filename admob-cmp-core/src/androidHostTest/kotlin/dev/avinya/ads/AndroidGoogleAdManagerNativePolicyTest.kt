@@ -35,7 +35,7 @@ class AndroidGoogleAdManagerNativePolicyTest {
         )
 
         assertEquals(0, manager.nativeAds.state.value.loadedAds)
-        assertFailsWith<IllegalStateException> { manager.nativeAds.policy }
+        assertEquals(NativeAdMemoryPolicy(), manager.nativeAds.policy)
 
         manager.configureNativeAdsAfterAcceptedInitialization(config)
         manager.configureNativeAdsAfterAcceptedInitialization(config)

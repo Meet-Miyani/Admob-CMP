@@ -219,4 +219,23 @@ class NativeAdSessionCoreTest {
         }
         assertTrue(core.state.value.slots.size <= 3, "found ${core.state.value.slots.size} retained entries")
     }
+
+    @Test fun `session core publishes into a supplied flow`() {
+        val externalFlow = kotlinx.coroutines.flow.MutableStateFlow(
+            dev.avinya.ads.nativead.NativeAdSessionState(active = true, slots = mapOf("stale" to NativeAdSlotState.Loading)),
+        )
+        val core = NativeAdSessionCore(
+            key = "feed",
+            policy = NativeAdSessionPolicy(maxRetainedAds = 3, retainBehind = 0, prefetchAhead = 0),
+            inactiveRetentionLimit = 1,
+            published = externalFlow,
+        )
+        assertTrue(core.publishesInto(externalFlow))
+        assertFalse(externalFlow.value.active)
+        assertTrue(externalFlow.value.slots.isEmpty())
+
+        core.updateWindow(window("a"))
+        assertTrue(externalFlow.value.active)
+        assertEquals(NativeAdSlotState.Loading, externalFlow.value.slots["a"])
+    }
 }

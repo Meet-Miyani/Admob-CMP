@@ -20,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Clock
@@ -154,42 +155,47 @@ internal class NativeAdCoordinatorCore<A : Any>(
     fun session(
         key: String,
         policy: NativeAdSessionPolicy = NativeAdSessionPolicy(),
+        published: MutableStateFlow<NativeAdSessionState>? = null,
     ): NativeAdSessionCore {
         val (core, effects) = lock.withLock {
             val effects = Effects()
-        require(key.isNotBlank()) { "session key must not be blank" }
-        tickLocked(effects)
-        sessions[key]?.let { holder ->
-            // Policy mismatch is rejected (the original plan contract).
-            if (holder.core.policy != policy) {
+            require(key.isNotBlank()) { "session key must not be blank" }
+            tickLocked(effects)
+            sessions[key]?.let { holder ->
+                // Policy mismatch is rejected (the original plan contract).
+                if (holder.core.policy != policy) {
+                    throw IllegalStateException(
+                        "NativeAdCoordinatorCore: session '$key' already exists with " +
+                            "a different policy (maxRetainedAds=${holder.core.policy.maxRetainedAds}, " +
+                            "retainBehind=${holder.core.policy.retainBehind}, " +
+                            "prefetchAhead=${holder.core.policy.prefetchAhead}); " +
+                            "close the existing session before reusing the key with a new policy."
+                    )
+                }
+                holder.lastActive = nowLocked()
+                if (!holder.active) {
+                    holder.active = true
+                    inactiveOrder.remove(key)
+                }
+                return@withLock holder.core to effects
+            }
+            if (sessions.size >= memoryPolicy.maxSessionRecords) {
                 throw IllegalStateException(
-                    "NativeAdCoordinatorCore: session '$key' already exists with " +
-                        "a different policy (maxRetainedAds=${holder.core.policy.maxRetainedAds}, " +
-                        "retainBehind=${holder.core.policy.retainBehind}, " +
-                        "prefetchAhead=${holder.core.policy.prefetchAhead}); " +
-                        "close the existing session before reusing the key with a new policy."
+                    "NativeAdCoordinatorCore: maxSessionRecords (${memoryPolicy.maxSessionRecords}) " +
+                        "reached; cannot create session '$key'."
                 )
             }
-            holder.lastActive = nowLocked()
-            if (!holder.active) {
-                holder.active = true
-                inactiveOrder.remove(key)
-            }
-            return@withLock holder.core to effects
-        }
-        if (sessions.size >= memoryPolicy.maxSessionRecords) {
-            throw IllegalStateException(
-                "NativeAdCoordinatorCore: maxSessionRecords (${memoryPolicy.maxSessionRecords}) " +
-                    "reached; cannot create session '$key'."
+            val holder = SessionHolder(
+                core = if (published != null) {
+                    NativeAdSessionCore(key, policy, memoryPolicy.inactiveSessionLimit, published)
+                } else {
+                    NativeAdSessionCore(key, policy, memoryPolicy.inactiveSessionLimit)
+                },
+                generation = nextSessionGeneration++,
+                lastActive = nowLocked(),
             )
-        }
-        val holder = SessionHolder(
-            core = NativeAdSessionCore(key, policy, memoryPolicy.inactiveSessionLimit),
-            generation = nextSessionGeneration++,
-            lastActive = nowLocked(),
-        )
-        sessions[key] = holder
-        holder.core to effects
+            sessions[key] = holder
+            holder.core to effects
         }
         effects.run()
         return core

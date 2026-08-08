@@ -227,7 +227,10 @@ public interface NativeAdSession {
  * owns; the consumer is responsible for re-priming their feeds.
  */
 public interface NativeAdManager {
-    /** Memory policy the manager is operating under. */
+    /**
+     * Memory policy the manager is operating under. Before initialization
+     * succeeds, reports the default [NativeAdMemoryPolicy].
+     */
     public val policy: NativeAdMemoryPolicy
 
     /** Live process-wide state snapshot. */
@@ -235,6 +238,10 @@ public interface NativeAdManager {
 
     /**
      * Returns the session for [key], creating it on first access.
+     *
+     * Before [dev.avinya.ads.AdManager.initialize] succeeds, returns an inert handle
+     * that records its viewport window and materialises once initialization
+     * completes.
      *
      * Re-using a key returns the existing session. The [policy] argument is
      * verified on every call: if a session already exists for [key] and the
