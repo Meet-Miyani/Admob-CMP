@@ -60,8 +60,8 @@ export const formats: readonly LandingFormat[] = [
     slug: 'native',
     name: 'Native',
     href: '/formats/native/',
-    blurb: 'Compose-rendered ad built from a typed layout DSL and pooled across screens.',
-    api: 'NativeAdView(placement, itemKey, layout)',
+    blurb: 'Compose-rendered ad built from a typed layout DSL and a bounded feed session.',
+    api: 'NativeAdView(session, slotKey, placement)',
     dimension: 'sized by your layout',
   },
 ];
@@ -105,7 +105,7 @@ export const originStory = {
   paragraphs: [
     'Integrating Google Mobile Ads into a Compose Multiplatform application traditionally required writing platform-specific glue and managing consent flows separately on Android and iOS.',
     'This library provides composable surfaces, suspend functions, and StateFlow lifecycle handling designed for Compose Multiplatform codebases, with UMP consent integration structured into initialization.',
-    'Extracted from real application production requirements, it provides native ad pooling, cache and retry policies, and pre-initialization hooks for ordering ATT and UMP consent on iOS.',
+    'Extracted from real application production requirements, it provides bounded native-ad sessions, cache and retry policies, and pre-initialization hooks for ordering ATT and UMP consent on iOS.',
   ],
 } as const;
 

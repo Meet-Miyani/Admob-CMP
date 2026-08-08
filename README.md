@@ -41,7 +41,7 @@ All six formats, on both platforms, from one `commonMain` API.
 | Rewarded | `AdFormat.Rewarded` | `rewarded(placement)` | — | `ANDROID_REWARDED` / `IOS_REWARDED` |
 | Rewarded interstitial | `AdFormat.RewardedInterstitial` | `rewardedInterstitial(placement)` | — | `ANDROID_REWARDED_INTERSTITIAL` / `IOS_REWARDED_INTERSTITIAL` |
 | App-open | `AdFormat.AppOpen` | `appOpen(placement)` + `AppOpenAdCoordinator` | — | `ANDROID_APP_OPEN` / `IOS_APP_OPEN` |
-| Native | `AdFormat.Native` | `nativeAd(placement)` (a pool) | `NativeAdView(placement, itemKey, layout)` | `ANDROID_NATIVE` / `IOS_NATIVE` |
+| Native | `AdFormat.Native` | `nativeAds.session(key, policy)` | `NativeAdView(session, slotKey, placement, layout)` | `ANDROID_NATIVE` / `IOS_NATIVE` |
 
 ## 30-second quickstart
 
@@ -99,7 +99,7 @@ BannerAdView(
 )
 ```
 
-Native ads are laid out with a declarative DSL and served from a pool, so a feed reuses one placement id across every row and the pool serves a distinct ad per `itemKey`:
+Native ads are laid out with a declarative DSL and served by a bounded session. A feed reuses one placement id, keeps stable model-owned slot keys, and lets the session own native platform objects:
 
 ```kotlin
 val nativePlacement = remember {
@@ -108,7 +108,6 @@ val nativePlacement = remember {
         format = AdFormat.Native,
         androidAdUnitId = TestAdIds.ANDROID_NATIVE,
         iosAdUnitId = TestAdIds.IOS_NATIVE,
-        maxCacheSize = 3
     )
 }
 
@@ -124,14 +123,20 @@ val layout = remember {
     }
 }
 
-NativeAdView(placement = nativePlacement, itemKey = "feed_3", layout = layout)
+val session = rememberNativeAdFeedSession(
+    sessionKey = "feed",
+    listState = listState,
+    itemCount = feed.size,
+    slotAt = { index -> (feed[index] as? FeedItem.NativeSlot)?.let { NativeAdSlot(it.key, nativePlacement) } },
+)
+NativeAdView(session = session, slotKey = "after-article-3", placement = nativePlacement, layout = layout)
 ```
 
-Use a static, finite placement id. Never generate one per row (`"feed_item_$index"`) — controllers are cached per id for the manager's lifetime.
+Use a static, finite placement id and stable model-owned slot keys. Never generate either from a row index. The default active session retains three records; the process-wide governor bounds loaded plus reserved ads at soft 4 / hard 6. A temporary tab exit deactivates the session and retains one anchor; permanently discarded destinations close it. Per-placement native TTL remains one hour by default.
 
 ## Why AdMob CMP
 
-- **Six formats, not four.** Native ads and app-open ads are supported on both platforms, with a layout DSL and a real pool.
+- **Six formats, not four.** Native ads and app-open ads are supported on both platforms, with a layout DSL and bounded, viewport-aware sessions.
 - **Consent is part of initialization.** UMP modes, the privacy options form, and `canRequestAds` are first-class, and the iOS consent → ATT → initialize ordering is enforced rather than documented and hoped for.
 - **The iOS test link actually works.** The `dev.avinya.ads.admob-cmp` Gradle plugin links Google Mobile Ads and UMP into Kotlin/Native test executables, which is the difference between `:iosSimulatorArm64Test` passing and failing with `Undefined symbols … _OBJC_CLASS_$_GAD*`.
 - **Revenue and mediation are exposed.** Paid events carry `AdValue` and `ResponseInfo`; mediation adapters get initialization hooks.
@@ -189,7 +194,7 @@ This repository is the SDK plus a Kotlin Multiplatform demo that exercises it.
 | Module | What it is |
 |---|---|
 | `admob-cmp/` | The published facade artifact — depends on core and compose |
-| `admob-cmp-core/` | Compose-free Kotlin Multiplatform core: `AdManager`, consent, full-screen orchestration, banner and native pools, iOS cinterop bindings |
+| `admob-cmp-core/` | Compose-free Kotlin Multiplatform core: `AdManager`, consent, full-screen orchestration, banner and native-session coordination, iOS cinterop bindings |
 | `admob-cmp-compose/` | Compose Multiplatform UI: `BannerAdView`, `NativeAdView`, the native-ad layout DSL, the debug console, `rememberAdManager` |
 | `admob-cmp-gradle-plugin/` | Links Google Mobile Ads and UMP into Kotlin/Native test executables |
 | `shared/`, `androidApp/`, `iosApp/`, `desktopApp/`, `webApp/` | The demo application. Ads render on the Android and iOS targets; desktop and web build without the ad surface. |
@@ -270,8 +275,8 @@ and the dependent [Fieldnotes Showcase redesign](docs/superpowers/plans/2026-08-
   states.
 - **Feed** — a Paging3-backed list of articles. A native ad slot is
   interleaved after every sixth article using `insertSeparators`; the slot
-  `itemKey` is derived from the preceding article's id, so refreshing or
-  prepending pages does not thrash the pool. An anchored adaptive banner
+  slot key is derived from the preceding article's id, so refreshing or
+  prepending pages does not discard a stable native session record. An anchored adaptive banner
   pins above the bottom bar.
 - **Article** — the detail screen. An inline native ad is inserted after the
   third paragraph using a different `AdLayout` than the feed's, proving the
@@ -304,8 +309,7 @@ navigation:
 
 - **Placements** — for the current screen: the `AdPlacement` config as
   rendered fields (id, format, ad unit per platform, size, refresh and cache
-  policy), live `AdLoadState`, cache depth, and `pool.availableAds` against
-  `maxSize`.
+  policy), native session slot states, and global loaded/reserved capacity.
 - **Events** — the rolling `ad_events` log interleaved with
   `policy_decisions`, newest first. Suppression reasons are rendered
   verbatim, so the tab answers "why did no ad appear", not just "what
@@ -335,7 +339,7 @@ cannot appear over a consent flow or a purchase.
 |---|---|---|
 | Banner | Feed, anchored adaptive | sizing, `SdkManaged` refresh |
 | Banner | Article, collapsible | `CollapsiblePlacement`, `AdServerManaged` |
-| Native | Feed, paged | pool, key stability, `availableAds` recovery |
+| Native | Feed, paged | bounded session, stable slot keys, viewport retention |
 | Native | Article, inline | layout DSL reuse in a different shape |
 | Interstitial | Article close | frequency capping, cache, suppression reasons |
 | Rewarded | Store | reward-callback correctness, persisted consequence |

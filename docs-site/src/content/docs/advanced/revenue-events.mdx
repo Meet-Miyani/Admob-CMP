@@ -11,7 +11,7 @@ import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 There are two collection points. `adManager.events` is a global
 `SharedFlow<AdEvent>` covering every placement, while each
-controller and pool exposes its own `events` for a single
+controller and native session publishes events for a single
 placement. Every `AdEvent` carries a `placementId`, which is what
 makes the global stream usable.
 
@@ -35,8 +35,8 @@ The full sealed set, once so readers stop guessing: `Loaded`,
 `LoadFailed`, `ShowFailed`, `Impression`, `Clicked`,
 `OpenedFullScreen`, `ClosedFullScreen`, `RewardEarned`, `Paid`,
 and the iOS-only `VideoStarted`, `VideoPlayed`, `VideoPaused`,
-`VideoEnded`, `VideoMuted`. Note that `Impression`, `Clicked` and
-`Paid` also carry an optional `adInstanceId`, which is what lets
+`VideoEnded`, `VideoMuted`. Native `Impression`, `Clicked`, `Paid`, and
+video events carry an optional `adInstanceId`, which is what lets
 a paid event be joined to the impression it belongs to.
 
 A common pattern that does not work: collecting from a

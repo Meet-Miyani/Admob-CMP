@@ -1,33 +1,30 @@
 ---
 title: "Native ads in Compose Multiplatform"
-description: "Compose Multiplatform native ads — the adLayout DSL, ad pooling, availableAds recovery, maxSize accounting, media info, and the Android video-event gap."
+description: "Compose Multiplatform native ads with bounded viewport sessions, stable slots, render leases, and native layouts."
 sidebar:
   label: "Native"
 ---
 
-import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
-import NativePoolLifecycle from '../../../components/diagrams/NativePoolLifecycle.astro';
+import { Aside } from '@astrojs/starlight/components';
+import NativeSessionLifecycle from '../../../components/diagrams/NativeSessionLifecycle.astro';
 
-## Native ads overview
+## Native ads are session-owned
 
-Native ads deliver ad assets — headline, body, icon, media, call to
-action, advertiser, star rating, price, store — without a fixed
-creative, so the app composes them into its own design. For a feed
-this is the difference between a banner-shaped ad that breaks the
-visual rhythm and an ad row that looks like every other row.
+Native ads supply assets—headline, media, icon, body, advertiser, call to action—and the SDK
+binds those assets to real platform native-ad views for impression and click tracking. In a feed,
+the app owns stable *model* slots while AdMob CMP owns native platform objects, capacity, loading,
+and the one renderer lease for each live ad. There is no consumer-managed inventory or platform
+handle.
 
-The mechanism behind it: `adLayout { … }` is a declarative description
-that the SDK turns into **platform-native views** with every asset
-registered for click and impression tracking, rather than Compose
-surfaces layered over an invisible ad view. That distinction is the
-reason clicks and impressions are attributed correctly. A native ad
-that is *rendered* correctly but not *registered* correctly will
-appear in the app without ever being billed.
+Use one named session for each logical feed owner. Keep that owner above individual rows: a row
+may leave composition during recycling or a tab switch without implying that its native record
+must be destroyed.
 
-Native ads are also supported natively across platforms in AdMob CMP,
-giving Compose Multiplatform applications a first-class feed ad integration.
+## A LazyColumn feed
 
-## Rendering native ads in Compose Multiplatform
+Put a stable ad-slot key in the feed model—derived from neighbouring content identity, never from
+the list index, page number, or a loaded ad. The viewport adapter scans the measured list and
+reports visible, behind, and ahead slots to the session.
 
 ```kotlin
 val placement = remember {
@@ -36,330 +33,132 @@ val placement = remember {
         format = AdFormat.Native,
         androidAdUnitId = TestAdIds.ANDROID_NATIVE,
         iosAdUnitId = TestAdIds.IOS_NATIVE,
-        maxCacheSize = 5,
+        // nativeTtl remains per-placement; it defaults to one hour.
     )
 }
+val listState = rememberLazyListState()
+val session = rememberNativeAdFeedSession(
+    sessionKey = "home-feed",
+    listState = listState,
+    itemCount = feed.size,
+    slotAt = { index -> (feed[index] as? FeedItem.NativeSlot)?.let { NativeAdSlot(it.key, placement) } },
+)
 
-val feedAdLayout = remember {
+LazyColumn(state = listState) {
+    items(feed, key = { it.stableKey }) { item ->
+        when (item) {
+            is FeedItem.NativeSlot -> NativeAdView(
+                session = session,
+                slotKey = item.key,
+                placement = placement,
+                layout = AdTemplates.feedCard,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp),
+                loading = { NativeAdLoadingPlaceholder(Modifier.fillMaxWidth().height(180.dp)) },
+                failure = { NativeAdLoadingPlaceholder(Modifier.fillMaxWidth().height(180.dp)) },
+            )
+            is FeedItem.Content -> ContentRow(item)
+        }
+    }
+}
+```
+
+Keep an empty, loading, or failed ad row at the same minimum footprint as a loaded row. Removing
+it and adding it later moves the reader's scroll position. `NativeAdSession.state` reports each
+slot as `Empty`, `Loading`, `Ready`, `Mounted`, `Retained`, or `Failed`; the composable does not
+start loads and it never exposes a platform ad.
+
+## Inline article placement
+
+An inline article placement is a distinct session, but still shares the application's global
+governor with feed sessions. This is appropriate when the article has one stable native location
+rather than a scrolling set of slots.
+
+```kotlin
+val inlineSlot = remember(article.id) {
+    NativeAdSlot("inline-after-paragraph-3:${article.id}", articleNativePlacement)
+}
+val session = rememberNativeAdSlotSession(
+    sessionKey = "article:${article.id}",
+    slot = inlineSlot,
+)
+
+NativeAdView(
+    session = session,
+    slotKey = inlineSlot.key,
+    placement = articleNativePlacement,
+    layout = AdTemplates.medium,
+)
+```
+
+`rememberNativeAdFeedSession` and `rememberNativeAdSlotSession` deactivate their session when
+their composable host leaves composition. That is correct for a temporary tab exit: the default
+inactive policy retains one anchor. When a logical destination is permanently discarded, call
+`session.close()` (or `adManager.nativeAds.closeSession(key)`) from its owner. Do not put a
+session or native platform object in saved state, a serializable ViewModel field, or navigation
+arguments. ViewTube-style feeds should retain their stable feed and ad-slot models; the SDK
+session owns the non-serializable platform objects.
+
+## Capacity, retention, and requests
+
+The default active session retains three records: one behind, the current visible slot, and one
+ahead. The process-wide governor has a soft limit of four and a hard limit of six **loaded plus
+reserved** ads. Visible demand may use hard-limit headroom; speculative work cannot pass the soft
+limit. An inactive session retains at most one anchor, and inactive session metadata expires after
+30 minutes. Memory pressure trims non-mounted records; mounted ads are never selected as victims.
+
+`AdCachePolicy.maxSize` and `reloadAfterShow` do not control native-session capacity. Configure
+the per-placement `cachePolicy.expirationPolicy.nativeTtl` instead; its default is one hour. A
+reload after eviction, TTL expiry, consent invalidation, clear, or memory pressure is expected.
+A reload merely because a row recycled or a tab temporarily detached is not: verify stable session
+and slot keys first.
+
+`NativeAdOptions.batching` controls request shape, not retention. `Sequential` is the default and
+the only safe option for mediated or unknown inventory. `GoogleOnly` is an explicit assertion of
+direct Google inventory and can request multiple ads, capped by Google at five. Five is a request
+cap, not a memory target; a request may partially fill, and the governor still admits only bounded
+demand.
+
+<NativeSessionLifecycle />
+
+## Layout DSL and media
+
+Build custom layouts once with `remember`; DSL nodes are functions with named arguments, and
+`adBadge()` is policy-required.
+
+```kotlin
+val layout = remember {
     adLayout {
         column(modifier = AdModifier.fillMaxWidth()) {
-            media(
-                modifier = AdModifier
-                    .fillMaxWidth()
-                    .aspectRatio(16f / 9f)
-                    .clipRounded(8.dp)
-            )
-            spacer(modifier = AdModifier.height(8.dp))
+            media(modifier = AdModifier.fillMaxWidth().aspectRatio(16f / 9f))
             headline(maxLines = 2)
             body(maxLines = 3)
-            row(spacing = 8.dp) {
-                icon(modifier = AdModifier.size(24.dp))
-                advertiser()
-                adBadge()
-            }
+            row(spacing = 8.dp) { icon(modifier = AdModifier.size(24.dp)); advertiser(); adBadge() }
             callToAction(modifier = AdModifier.fillMaxWidth())
         }
     }
 }
-
-NativeAdView(
-    placement = placement,
-    itemKey = "feed_slot_1",
-    layout = feedAdLayout,
-    modifier = Modifier.fillMaxWidth(),
-    onEvent = { event -> /* Loaded, Impression, Clicked, Paid, Video* */ },
-)
 ```
 
-Two rules a reader will otherwise learn the hard way. First,
-`itemKey` must be **stable per slot** — it is what drives pool
-acquire and release, so it should identify the position in the list,
-not the ad. Second, the placement `id` must be static and finite:
-controllers are cached per id for the manager's lifetime and are
-never auto-evicted, so generating `"feed_item_$index"` leaks a
-controller per row. For a feed, reuse one placement id and let the
-pool serve per-item ads.
-
-The `maxCacheSize` parameter on the placement sets the pool's
-budget, not the layout's content. It is the upper bound on
-available-plus-in-use ads, so a value of 5 means the feed can
-have at most five live ad rows at any moment. The default of 1
-is rarely right for a feed; the recommended value is "the number
-of ad rows that can be on screen at once, plus one", which gives
-the pool enough headroom to refill while the user is scrolling
-without inflating memory use.
-
-`NativeAdView` is a thin wrapper over the pool: it acquires on
-attach, releases on dispose, and re-runs the acquisition on
-`availableAds` changes. The pool's accounting is what the
-composable enforces, so a misuse of `itemKey` (a key that changes
-on every recomposition, for example) shows up as a slow leak of
-ads rather than a crash. The [troubleshooting
-guide](/reference/troubleshooting/) has the symptom table.
-
-## The adLayout DSL
-
-Three properties. Each `adLayout { … }` construction recursively
-validates the tree and computes a structural identity string, so it
-is not free; retain custom layouts with
-`remember { adLayout { … } }`, or
-`remember(variant) { adLayout { … } }` for dynamic variants, to avoid
-revalidating and rebuilding platform views on every recomposition.
-
-Nodes are **functions with named arguments** (`headline(maxLines = 2)`),
-not property-assignment blocks — a detail worth stating explicitly
-because the shape looks like Compose but is not. And every node takes
-an `AdModifier`, a separate modifier type from Compose's `Modifier`,
-because the tree is serialised down to native views.
-
-The structural identity is the validator's input. Two layouts that
-*look* identical but differ in tree shape — one inlining an
-`advertiser()` call where the other uses a `row { advertiser() }` —
-have different identity strings and are treated as different layouts.
-That matters for caching: the validator does not re-run when a
-layout's identity string matches a previously-validated one, and the
-platform-side view construction can be reused.
-
-## Available layout nodes
-
-| Node | Asset | Notes |
-|---|---|---|
-| `headline()` | Headline | The only required asset |
-| `body()`, `advertiser()`, `price()`, `store()` | Text assets | Hidden or collapsed per `visibilityPolicy` when missing |
-| `starRating()` | Star rating | Text asset; no `maxLines` parameter |
-| `icon()` | App icon | |
-| `media()` | Image or video media view | Use `mediaInfo()` for the real aspect ratio |
-| `callToAction()` | Call-to-action button | |
-| `adBadge()` | The "Ad" label | Required by AdMob policy; the validator warns if absent |
-| `adChoices()` | AdChoices icon | |
-| `row()`, `column()`, `box()`, `spacer()`, `text()` | Containers and statics | `row` and `column` take a `spacing` argument |
-
-The `AdModifier` paragraph: sizing (`fillMaxWidth`, `size`, `height`,
-`width`, `weight`, `sizeIn`, `aspectRatio`), spacing (`padding`,
-`margin`), decoration (`background`, `border`, `cornerRadius`,
-`clipRounded`, `clipCircle`, `elevation`, `alpha`), and visibility
-(`visible`, `invisible`, `gone`).
-
-Two modifiers that are easy to misuse. `aspectRatio(16f / 9f)`
-forces a fixed ratio on the media view, which is the right choice
-when the ad unit is configured to serve a known creative shape and
-the wrong choice when the unit mixes orientations. The native
-media view will letterbox or pillarbox to fit, which is rarely what
-the app wants for a feed. The right answer for a feed is to
-query `mediaInfo(token).aspectRatio` and use the actual creative
-ratio at render time. `cornerRadius` and `clipRounded` are
-similar — the former is a generic value, the latter is a
-shape-aware alternative that maps to `CALayer.cornerRadius` on iOS
-and to a `Shape` drawable on Android.
-
-## Built-in templates and custom layouts
-
-No. `AdTemplates` ships four ready-made layouts: `AdTemplates.mediaCard`
-(the `NativeAdView` default), `AdTemplates.feedCard`,
-`AdTemplates.medium` and `AdTemplates.compact`. The shortest
-possible integration:
-
-```kotlin
-NativeAdView(
-    placement = placement,
-    itemKey = "feed_slot_1",
-    layout = AdTemplates.compact,
-)
-```
-
-Custom layouts are for cases where the templates do not match the
-app's visual language. The DSL is small enough that a custom
-layout rarely takes more than a screen of code, and the validator
-catches the structural mistakes a custom layout is most likely to
-make.
-
-A note on `AdTemplates` reuse: the templates are `val`s, not
-factories. They can be used as-is across the whole app without
-revalidation, and that is the recommended pattern for the common
-case. A custom layout that needs to vary by feed context — a
-"compact" mode for one section and a "media-heavy" mode for
-another — is a different shape: build each variant in its own
-`remember { adLayout { … } }` and select the right one at the
-call site, rather than parameterising a single layout.
-
-## Native ad pool lifecycle
-
-Native ads are single-use, so a native placement is served by a
-**pool** rather than a single controller. `NativeAdView` acquires
-and releases automatically via `itemKey`. Manual control looks like
-this:
-
-```kotlin
-val pool = adManager.nativeAd(placement)
-
-scope.launch { pool.preload(count = 5) }
-
-val token = pool.acquire() ?: return
-try {
-    val info = pool.mediaInfo(token)   // aspectRatio, hasVideoContent, durationSeconds
-    // render using `token`
-} finally {
-    pool.release(token)                // every acquired token MUST be released
-}
-```
-
-<NativePoolLifecycle />
-
-The accounting the diagram shows:
-
-- `AdCachePolicy.maxSize` budgets **available + in-use** ads together,
-  not just cached ones.
-- `release()` **destroys** the ad, because native ads are single-use.
-  It therefore frees a `maxSize` slot **without** incrementing
-  `availableAds`.
-- `clear()` drains available inventory only. Ads currently leased
-  stay alive until their `release()`, because a live view is still
-  rendering them. A consequence worth stating plainly: clearing a
-  fully-leased pool frees no capacity until those views dispose.
-- Pooled ads expire per `AdExpirationPolicy.nativeTtl`, one hour by
-  default, and are evicted on access.
-
-<Aside type="note">
-The public pool surface: `preload(count, requestOptions, nativeOptions)`,
-`acquire()`, `release(token)`, `mediaInfo(token)`, `availableCount()`,
-`clear()`, `availableAds: StateFlow<Int>`, `loadState`, `events`,
-`placement`.
-</Aside>
-
-A subtle point on `requestOptions` and `nativeOptions`. The
-`requestOptions` parameter is the same `AdRequestOptions` shape used
-by every other controller — it carries custom targeting, publisher-
-provided ids, and category exclusions. The `nativeOptions` parameter
-is native-specific: it carries `AdChoicesPosition`, `MediaAspectRatio`,
-and `VideoOptions` for the platform SDK's native ad options object.
-The two options are layered — request options apply to the network
-request, native options apply to the creative rendering — and
-neither is required. The defaults are conservative: AdChoices at
-top-right, media at the platform default aspect ratio, video
-options set by GMA.
-
-## Pool recovery when acquire() returns null
-
-Set up the failure exactly: with `maxSize = 1` and one row holding
-the ad, `preload()` returns early and `acquire()` returns `null` for
-every other row — deterministically, not as a race. `acquire()`
-returning `null` used to be silent and terminal for that composition,
-leaving those rows blank forever.
-
-`pool.availableAds` is the signal that lets a view recover. Key the
-acquisition effect on it:
-
-```kotlin
-val availableAds by pool.availableAds.collectAsState()
-
-LaunchedEffect(pool, itemKey, availableAds) {
-    pool.preload(count = 1)
-    val token = pool.acquire()
-    // …render, then release on dispose
-}
-```
-
-The sentence that makes it correct rather than merely plausible:
-**re-run `preload`, not just `acquire`.** Because `release()`
-destroys the ad, it frees a `maxSize` slot without incrementing
-`availableAds`, so an effect that only retries `acquire()` waits for
-a signal that will never arrive. The built-in `NativeAdView`
-composables already do this, which is why the manual path is the
-one that needs the warning.
-
-Size `maxSize` to the number of ad slots that can be **on screen at
-once**, plus one, not to the number of rows in the feed.
-
-A feed that scrolls infinitely and shows ad rows at intervals
-should size `maxSize` to "the number of ad rows the user is likely
-to see in a single screen" plus one. A short feed with three
-visible rows should size it to four. A paged carousel with one ad
-per page should size it to one, with `reloadAfterShow` enabled so
-the next page has warm inventory. The wrong size — too small —
-shows blank rows; the wrong size — too large — wastes memory and
-inflates the time-to-first-ad.
-
-## Querying NativeMediaInfo and video content
-
-```kotlin
-val info = pool.mediaInfo(token)
-if (info?.hasVideoContent == true) {
-    println("video, ${info.durationSeconds}s, ratio ${info.aspectRatio}")
-}
-```
-
-`NativeMediaInfo` has exactly three fields: `aspectRatio: Float?`,
-`hasVideoContent: Boolean`, `durationSeconds: Double?`. The
-practical use is to reserve layout height from `aspectRatio` rather
-than hardcoding 16:9, so a portrait creative does not letterbox.
-
-`mediaInfo(token)` is the *only* way to query these fields. There
-is no batch query — each call hits the platform's native-ad
-metadata for that specific token, and the result is stable for
-the lifetime of the token. A common pattern is to read `mediaInfo`
-once after `acquire()` and use the values to drive the layout's
-measured height, so the row does not jump when the image first
-loads.
-
-## Platform differences in native video events
+The `Ready`, `Mounted`, and `Retained` states carry `NativeMediaInfo` when available, allowing a
+row to reserve the creative's aspect ratio before attaching a renderer. Events are attached to a
+specific admitted ad generation: stale callbacks and stale renderer releases cannot affect a
+replacement record.
 
 <Aside type="caution">
-**Platform gap — native video events on Android.** iOS emits five
-video events — `AdEvent.VideoStarted`, `VideoPlayed`, `VideoPaused`,
-`VideoEnded` and `VideoMuted` — via `GADVideoControllerDelegate`. The
-Android Google Mobile Ads Next-Gen SDK exposes no equivalent callback
-surface on `NativeAd`, so Android emits none. Do not rely on native
-video events for cross-platform logic. This is an upstream SDK gap,
-not an AdMob CMP omission.
+Android GMA Next-Gen has no native-video callback surface. iOS emits native video events through
+`GADVideoControllerDelegate`; do not use those events for cross-platform product logic.
 </Aside>
 
-`mediaInfo(token).hasVideoContent` **is** cross-platform, so "does
-this ad have video" is answerable everywhere even though "has the
-video started" is not. The two answers diverge on Android: an
-Android native ad with video content exists, the media view plays
-it, but no event is emitted. Cross-platform telemetry should query
-`hasVideoContent` for inventory purposes and skip the video-event
-stream on Android.
+## Migration from the retired API
 
-## AdMob policy requirements for native layouts
+| Retired ownership | Session replacement |
+|---|---|
+| Retired per-placement native controller | `AdManager.nativeAds.session(sessionKey, policy)` |
+| Manual preload | `NativeAdSession.updateWindow(window)`; the SDK derives demand |
+| Manual acquire/release | Stable `NativeAdSlot.key`; `NativeAdView` gets an internal renderer lease |
+| Token or platform lookup | No consumer handle; the coordinator owns the platform object |
+| Retired available-inventory count and native cache capacity | Session state plus global/session policies |
+| `NativeAdView(placement, itemKey, layout)` | `NativeAdView(session, slotKey, placement, layout)` |
 
-Three rules, all enforced by `AdLayoutValidator`:
-
-- `adBadge()` is required by AdMob policy and the validator warns
-  when it is missing. The badge is the visual attribution the user
-  needs to recognise the row as an ad, and its absence can
-  invalidate a publisher's AdMob account.
-- Every registered asset must stay fully inside the platform
-  native-ad root, and ad attribution must appear at the top. The
-  built-in templates enforce this on both platforms; custom
-  layouts should keep the badge at the top and avoid offsets that
-  push registered assets outside the root bounds.
-- On debug builds Google may display its own Native Ad Validator
-  overlay. The overlay is informational and only shows on debug
-  builds, so it is safe to leave enabled.
-
-How to read the validation report:
-
-```kotlin
-val layout = remember { adLayout { /* … */ } }
-
-LaunchedEffect(layout) {
-    layout.validation.warnings.forEach { issue ->
-        println("${issue.code} at ${issue.nodePath}: ${issue.message}")
-    }
-}
-```
-
-`AdLayout.validation` is an `AdLayoutValidationReport` with
-`isValid`, `hasWarnings`, `errors` and `warnings`, and each
-`AdLayoutValidationIssue` carries `code`, `nodePath` and `message`.
-A `warning` is informational; an `error` means the layout will not
-behave correctly. The validator never throws — it produces a
-report, and the caller decides what to do with the warnings.
-
-The `nodePath` is a stable identifier for the offending node: it
-is the same identifier the structural identity string uses, so a
-report and a code change can be correlated directly. The `code` is
-a stable string identifier suitable for filtering — for example, a
-linter rule could fail CI on `ad_badge_missing` while allowing
-`media_placeholder_default_aspect`.
+The migration is intentionally not source-compatible. Do not build a compatibility wrapper that
+recreates manual ownership: it would undermine bounded global admission and exact retirement.

@@ -7,7 +7,7 @@ const COMPONENTS: Record<string, string> = {
   'module-map': 'ModuleMap.astro',
   'init-sequence': 'InitSequence.astro',
   'full-screen-lifecycle': 'FullScreenLifecycle.astro',
-  'native-pool-lifecycle': 'NativePoolLifecycle.astro',
+  'native-session-lifecycle': 'NativeSessionLifecycle.astro',
   'banner-geometry': 'BannerGeometry.astro',
   'consent-decision-tree': 'ConsentDecisionTree.astro',
   'retry-timeline': 'RetryTimeline.astro',
