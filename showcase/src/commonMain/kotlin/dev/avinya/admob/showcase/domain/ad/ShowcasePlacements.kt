@@ -10,6 +10,8 @@ import dev.avinya.ads.CollapsiblePlacement
 import dev.avinya.ads.FullScreenAdOptions
 import dev.avinya.ads.ServerSideVerificationOptions
 import dev.avinya.ads.TestAdIds
+import dev.avinya.ads.nativead.NativeAdBatching
+import dev.avinya.ads.nativead.NativeAdOptions
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -38,10 +40,8 @@ object ShowcasePlacements {
         id = "feed_native",
         format = AdFormat.Native,
         adUnitIds = AdUnitIds(android = TestAdIds.ANDROID_NATIVE, ios = TestAdIds.IOS_NATIVE),
-        // maxSize budgets available + in-use ads together. Five covers the rows
-        // visible at once plus prefetch; too low and acquire() returns null for
-        // every row beyond the budget.
         cachePolicy = AdCachePolicy(maxSize = 5, reloadAfterShow = true),
+        nativeOptions = NativeAdOptions(batching = NativeAdBatching.GoogleOnly),
         strictTestMode = true,
     )
 

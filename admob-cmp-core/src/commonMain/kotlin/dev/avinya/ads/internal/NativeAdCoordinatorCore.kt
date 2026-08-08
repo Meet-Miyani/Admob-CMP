@@ -4,7 +4,12 @@ package dev.avinya.ads.internal
 
 import dev.avinya.ads.AdAttemptResult
 import dev.avinya.ads.AdError
+import dev.avinya.ads.AdEvent
 import dev.avinya.ads.AdPlacement
+import dev.avinya.ads.INTERNAL_LOAD_ERROR_CODE
+import dev.avinya.ads.isRetryableLoadFailure
+import dev.avinya.ads.retryAdLoad
+import dev.avinya.ads.nativead.NativeAdBatching
 import dev.avinya.ads.nativead.NativeAdMemoryPolicy
 import dev.avinya.ads.nativead.NativeAdSessionPolicy
 import dev.avinya.ads.nativead.NativeAdSessionState
@@ -14,10 +19,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Clock
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
 
 
@@ -73,6 +79,8 @@ internal class NativeAdCoordinatorCore<A : Any>(
     private val platform: NativeAdPlatform<A>,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     private val clock: () -> Instant = { Clock.System.now() },
+    private val canRequestAds: () -> Boolean = { true },
+    private val eventSink: (AdEvent) -> Unit = {},
 ) {
     private val lock = FullScreenStateLock()
     private val governor = NativeAdGovernor(memoryPolicy)
@@ -81,33 +89,76 @@ internal class NativeAdCoordinatorCore<A : Any>(
     private val schedulers = mutableMapOf<String, PlacementScheduler>()
     // Sole record of every admitted platform ad. Destroyed exactly once.
     private val records = mutableMapOf<NativeAdRecordId, RecordEntry>()
+    private val reservationOwners = mutableMapOf<NativeAdRecordId, ReservationOwner>()
+    private var nextSessionGeneration = 1L
     // Test-only override for "now". Production uses the real clock.
     private var testNow: Instant? = null
+    private var stateListener: () -> Unit = {}
 
     private inner class RecordEntry(
         val ad: A,
+        val placementId: String,
         val sessionKey: String,
         val slotKey: String,
         val generation: Long,
+        val placement: AdPlacement,
+        val mediaInfo: dev.avinya.ads.nativead.NativeMediaInfo?,
+        val adInstanceId: String,
         val loadedAt: Instant,
+        var rendererId: String? = null,
     )
 
     private inner class SessionHolder(
         val core: NativeAdSessionCore,
+        val generation: Long,
         var lastActive: Instant,
         var active: Boolean = true,
     )
+
+    private inner class ReservationOwner(
+        val placementId: String,
+        val sessionKey: String,
+        val slotKey: String,
+        val slotGeneration: Long,
+        val reservation: NativeAdLoadReservation,
+    )
+
+    /** A launched platform load's immutable reservation-to-slot association. */
+    private inner class ReservationSlotPair(
+        val reservation: NativeAdLoadReservation,
+        val entry: SlotDemandEntry,
+    )
+
+    private inner class Effects {
+        val destroy = mutableListOf<A>()
+        val cancel = mutableListOf<Job>()
+        fun run() {
+            cancel.distinct().forEach { it.cancel() }
+            destroy.distinct().forEach(platform::destroy)
+            // Platform loads settle asynchronously. Notify only after all work that
+            // escaped the coordinator lock, so observers can safely obtain the
+            // authoritative governor/session snapshot without lock recursion.
+            stateListener()
+        }
+    }
 
     // -----------------------------------------------------------------------
     // Public surface
     // -----------------------------------------------------------------------
 
+    /** Installed once by the public facade; always invoked outside [lock]. */
+    fun setStateListener(listener: () -> Unit) {
+        stateListener = listener
+    }
+
     fun session(
         key: String,
         policy: NativeAdSessionPolicy = NativeAdSessionPolicy(),
-    ): NativeAdSessionCore = lock.withLock {
+    ): NativeAdSessionCore {
+        val (core, effects) = lock.withLock {
+            val effects = Effects()
         require(key.isNotBlank()) { "session key must not be blank" }
-        tickLocked()
+        tickLocked(effects)
         sessions[key]?.let { holder ->
             // Policy mismatch is rejected (the original plan contract).
             if (holder.core.policy != policy) {
@@ -124,7 +175,7 @@ internal class NativeAdCoordinatorCore<A : Any>(
                 holder.active = true
                 inactiveOrder.remove(key)
             }
-            return@withLock holder.core
+            return@withLock holder.core to effects
         }
         if (sessions.size >= memoryPolicy.maxSessionRecords) {
             throw IllegalStateException(
@@ -133,78 +184,235 @@ internal class NativeAdCoordinatorCore<A : Any>(
             )
         }
         val holder = SessionHolder(
-            core = NativeAdSessionCore(key, policy, memoryPolicy, governor),
+            core = NativeAdSessionCore(key, policy, memoryPolicy.inactiveSessionLimit),
+            generation = nextSessionGeneration++,
             lastActive = nowLocked(),
         )
         sessions[key] = holder
-        holder.core
-    }
-
-    fun closeSession(key: String) = lock.withLock {
-        tickLocked()
-        val holder = sessions.remove(key) ?: return@withLock
-        inactiveOrder.remove(key)
-        val retired = holder.core.close()
-        destroyAndForgetRecords(retired, holder.core.key)
-        // Bump every placement generation so a late platform callback for
-        // any of the retired records is destroyed at the scheduler.
-        placementGenBumpAll()
-        // Cancel queued batches targeting this session; in-flight loads
-        // for these slots are still drained (their late result is
-        // destroyed under the bumped generation).
-        for (sched in schedulers.values) sched.cancelForSession(key)
-    }
-
-    fun clear() = lock.withLock {
-        tickLocked()
-        placementGenBumpAll()
-        // Destroy every owned platform ad and clear the records map before
-        // closing each session — close() will retire the governor
-        // accounting but the platform objects are owned here.
-        destroyAllRecordsLocked()
-        for (holder in sessions.values) {
-            val retired = holder.core.close()
-            // records already cleared; nothing to do.
-            for (recordId in retired) { /* keep governor-side accounting tidy */ }
+        holder.core to effects
         }
-        sessions.clear()
-        inactiveOrder.clear()
+        effects.run()
+        return core
     }
 
-    fun onConsentRevoked() = lock.withLock {
-        tickLocked()
+    /** Coordinator-issued identity for session-scoped operations. */
+    fun sessionGeneration(key: String): Long? = lock.withLock { sessions[key]?.generation }
+
+    private fun currentHolderLocked(key: String, generation: Long): SessionHolder? =
+        sessions[key]?.takeIf { it.generation == generation }
+
+    fun closeSession(key: String) {
+        val effects = lock.withLock {
+            val effects = Effects()
+            tickLocked(effects)
+            val holder = sessions.remove(key) ?: return@withLock effects
+            inactiveOrder.remove(key)
+            applySessionMutationLocked(holder, holder.core.close(), effects)
+            schedulers.values.toList().forEach { it.cancelForSessionLocked(key, effects) }
+            cleanupSchedulersLocked()
+            effects
+        }
+        effects.run()
+    }
+
+    fun closeSession(key: String, sessionGeneration: Long) {
+        if (lock.withLock { currentHolderLocked(key, sessionGeneration) == null }) return
+        closeSession(key)
+    }
+
+    fun clear() {
+        val effects = lock.withLock {
+        val effects = Effects()
+        tickLocked(effects)
         placementGenBumpAll()
-        destroyAllRecordsLocked()
+        // Destroy inventory but retain live session definitions. A following
+        // window update is fresh demand on the same generation.
+        destroyAllRecordsLocked(effects)
+        for (holder in sessions.values) {
+            holder.core.clear()
+        }
+        schedulers.values.toList().forEach { it.clearQueuedLocked() }
+        cleanupSchedulersLocked()
+        effects
+        }
+        effects.run()
+    }
+
+    fun onConsentRevoked() {
+        val effects = lock.withLock {
+        val effects = Effects()
+        tickLocked(effects)
+        placementGenBumpAll()
+        destroyAllRecordsLocked(effects)
         for (holder in sessions.values) holder.core.close()
         sessions.clear()
         inactiveOrder.clear()
-    }
-
-    fun updateWindow(sessionKey: String, window: NativeAdWindow) = lock.withLock {
-        tickLocked()
-        val holder = sessions[sessionKey] ?: return@withLock
-        holder.lastActive = nowLocked()
-        if (!holder.active) {
-            holder.active = true
-            inactiveOrder.remove(sessionKey)
+        schedulers.values.toList().forEach { it.clearQueuedLocked() }
+        cleanupSchedulersLocked()
+        effects
         }
-        val demand = holder.core.updateWindow(window)
-        submitDemand(holder, demand)
+        effects.run()
     }
 
-    fun setMounted(sessionKey: String, slotKey: String, mounted: Boolean) = lock.withLock {
-        tickLocked()
-        sessions[sessionKey]?.let { holder ->
-            holder.core.setMounted(slotKey, mounted)
+    fun updateWindow(sessionKey: String, window: NativeAdWindow) {
+        val effects = lock.withLock {
+            val effects = Effects()
+            tickLocked(effects)
+            val holder = sessions[sessionKey] ?: return@withLock effects
             holder.lastActive = nowLocked()
+            if (!holder.active) {
+                holder.active = true
+                inactiveOrder.remove(sessionKey)
+            }
+            applySessionMutationLocked(holder, holder.core.updateWindow(window), effects)
+            effects
         }
+        effects.run()
+    }
+
+    fun updateWindow(sessionKey: String, sessionGeneration: Long, window: NativeAdWindow) {
+        val effects = lock.withLock {
+            val effects = Effects()
+            tickLocked(effects)
+            val holder = currentHolderLocked(sessionKey, sessionGeneration) ?: return@withLock effects
+            holder.lastActive = nowLocked()
+            if (!holder.active) {
+                holder.active = true
+                inactiveOrder.remove(sessionKey)
+            }
+            applySessionMutationLocked(holder, holder.core.updateWindow(window), effects)
+            effects
+        }
+        effects.run()
+    }
+
+    fun setMounted(sessionKey: String, slotKey: String, mounted: Boolean) {
+        val effects = lock.withLock {
+            val effects = Effects()
+            tickLocked(effects)
+            sessions[sessionKey]?.let { holder ->
+                holder.core.recordIdFor(slotKey)?.let { recordId ->
+                    applySessionMutationLocked(holder, holder.core.setMounted(slotKey, recordId, mounted), effects)
+                    governor.setMounted(recordId, mounted)
+                }
+                holder.lastActive = nowLocked()
+            }
+            effects
+        }
+        effects.run()
+    }
+
+    fun deactivateSession(sessionKey: String) {
+        val effects = lock.withLock {
+            val effects = Effects()
+            tickLocked(effects)
+            sessions[sessionKey]?.let { holder ->
+                applySessionMutationLocked(holder, holder.core.deactivate(), effects)
+                holder.active = false
+                inactiveOrder.remove(sessionKey)
+                inactiveOrder[sessionKey] = nowLocked()
+                tickLocked(effects)
+            }
+            effects
+        }
+        effects.run()
+    }
+
+    fun deactivateSession(sessionKey: String, sessionGeneration: Long) {
+        val effects = lock.withLock {
+            val effects = Effects()
+            tickLocked(effects)
+            currentHolderLocked(sessionKey, sessionGeneration)?.let { holder ->
+                applySessionMutationLocked(holder, holder.core.deactivate(), effects)
+                holder.active = false
+                inactiveOrder.remove(sessionKey)
+                inactiveOrder[sessionKey] = nowLocked()
+                tickLocked(effects)
+            }
+            effects
+        }
+        effects.run()
+    }
+
+    fun acquireForRender(
+        sessionKey: String,
+        sessionGeneration: Long,
+        slotKey: String,
+        placement: AdPlacement,
+        rendererId: String,
+    ): NativeAdRenderRecord<A>? = lock.withLock {
+        val holder = currentHolderLocked(sessionKey, sessionGeneration) ?: return@withLock null
+        val recordId = holder.core.recordIdFor(slotKey) ?: return@withLock null
+        val entry = records[recordId] ?: return@withLock null
+        if (entry.sessionKey != sessionKey || entry.slotKey != slotKey || entry.generation != holder.core.slotGenerationFor(slotKey) || entry.placement != placement) return@withLock null
+        if (entry.rendererId != null && entry.rendererId != rendererId) return@withLock null
+        entry.rendererId = rendererId
+        applySessionMutationLocked(holder, holder.core.setMounted(slotKey, recordId, true), Effects())
+        governor.setMounted(recordId, true)
+        NativeAdRenderRecord(recordId, entry.adInstanceId, entry.ad, entry.mediaInfo)
+    }
+
+    fun releaseRenderer(
+        sessionKey: String,
+        sessionGeneration: Long,
+        slotKey: String,
+        placement: AdPlacement,
+        recordId: NativeAdRecordId,
+        rendererId: String,
+    ) {
+        val effects = lock.withLock {
+            val effects = Effects()
+            val holder = currentHolderLocked(sessionKey, sessionGeneration) ?: return@withLock effects
+            val entry = records[recordId] ?: return@withLock effects
+            if (entry.sessionKey != sessionKey || entry.slotKey != slotKey || entry.placement != placement || entry.rendererId != rendererId) return@withLock effects
+            entry.rendererId = null
+            applySessionMutationLocked(holder, holder.core.setMounted(slotKey, recordId, false), effects)
+            governor.setMounted(recordId, false)
+            effects
+        }
+        effects.run()
+    }
+
+    fun onMemoryPressure(pressure: NativeMemoryPressure) {
+        val effects = lock.withLock {
+            val effects = Effects()
+            val result = governor.trim(pressure)
+            result.cancelledReservations.forEach { reservation ->
+                reservationOwners.remove(reservation.id)?.let { owner ->
+                    schedulers[owner.placementId]?.cancelSlotLocked(
+                        owner.sessionKey,
+                        SlotGeneration(owner.slotKey, owner.slotGeneration),
+                        effects,
+                    )
+                }
+            }
+            result.retiredRecordIds.forEach { removeRecordLocked(it, effects) }
+            effects
+        }
+        effects.run()
     }
 
     fun schedulerCount(): Int = lock.withLock { schedulers.size }
 
-    fun tickForTest(duration: Duration) = lock.withLock {
-        testNow = nowLocked() + duration
-        tickLocked()
+    fun tickForTest(duration: Duration) {
+        val effects = lock.withLock {
+            val effects = Effects()
+            testNow = nowLocked() + duration
+            tickLocked(effects)
+            effects
+        }
+        effects.run()
+    }
+
+    fun managerState(): dev.avinya.ads.nativead.NativeAdManagerState = lock.withLock {
+        val governorState = governor.state()
+        dev.avinya.ads.nativead.NativeAdManagerState(
+            loadedAds = governorState.loadedRecords,
+            reservedLoads = governorState.reservedLoads,
+            activeSessions = sessions.values.count { it.active },
+            inactiveSessions = sessions.values.count { !it.active },
+            hardLimit = governorState.hardLimit,
+        )
     }
 
     // -----------------------------------------------------------------------
@@ -213,7 +421,7 @@ internal class NativeAdCoordinatorCore<A : Any>(
 
     private fun nowLocked(): Instant = testNow ?: clock()
 
-    private fun tickLocked() {
+    private fun tickLocked(effects: Effects = Effects()) {
         val now = nowLocked()
 
         // Reap inactive sessions past the TTL.
@@ -222,43 +430,57 @@ internal class NativeAdCoordinatorCore<A : Any>(
         for (key in toReap) {
             val holder = sessions.remove(key) ?: continue
             inactiveOrder.remove(key)
-            val retired = holder.core.close()
-            destroyAndForgetRecords(retired, holder.core.key)
+            applySessionMutationLocked(holder, holder.core.close(), effects)
+            schedulers.values.toList().forEach { it.cancelForSessionLocked(key, effects) }
         }
         // Enforce the LRU cap on inactive sessions.
         while (inactiveOrder.size > memoryPolicy.maxInactiveSessions) {
             val oldest = inactiveOrder.entries.firstOrNull()?.key ?: break
             val holder = sessions.remove(oldest) ?: break
             inactiveOrder.remove(oldest)
-            val retired = holder.core.close()
-            destroyAndForgetRecords(retired, holder.core.key)
+            applySessionMutationLocked(holder, holder.core.close(), effects)
+            schedulers.values.toList().forEach { it.cancelForSessionLocked(oldest, effects) }
         }
 
         // Expire records past the 1-hour native-ad TTL.
-        val nativeCutoff = now - 1.hours
         val expiredRecordIds = records.entries
-            .filter { (_, meta) -> meta.loadedAt <= nativeCutoff }
+            .filter { (_, meta) -> meta.loadedAt <= now - meta.placement.cachePolicy.expirationPolicy.nativeTtl }
             .map { (id, _) -> id }
             .toList()
         for (recordId in expiredRecordIds) {
-            val entry = records.remove(recordId) ?: continue
-            val holder = sessions[entry.sessionKey] ?: continue
-            platform.destroy(entry.ad)
-            val demand = holder.core.expireSlot(entry.slotKey)
+            val entry = records[recordId] ?: continue
+            val holder = sessions[entry.sessionKey]
+            val demand = holder?.core?.expireSlot(entry.slotKey)
+            removeRecordLocked(recordId, effects)
             // The reload demand is submitted to the right placement
             // scheduler so the platform call is reissued.
-            if (demand.slots.isNotEmpty()) {
-                submitDemand(holder, demand)
+            if (holder != null && demand != null && demand.demands.isNotEmpty()) {
+                applySessionMutationLocked(holder, demand, effects)
             }
         }
     }
 
-    private fun submitDemand(holder: SessionHolder, demand: SlotDemand) {
-        if (demand.slots.isEmpty()) return
-        val byPlacement = demand.slots.groupBy { it.placement.id }
+    private fun applySessionMutationLocked(
+        holder: SessionHolder,
+        mutation: NativeAdSessionMutation,
+        effects: Effects,
+    ) {
+        mutation.invalidateLoads.forEach { invalidation ->
+            schedulers.values.forEach { scheduler ->
+                scheduler.cancelSlotLocked(holder.core.key, invalidation, effects)
+            }
+        }
+        mutation.reclassifications.forEach { governor.reclassify(it.recordId, it.priority) }
+        mutation.retireRecordIds.forEach { removeRecordLocked(it, effects) }
+        submitDemand(holder, mutation, effects)
+    }
+
+    private fun submitDemand(holder: SessionHolder, demand: NativeAdSessionMutation, effects: Effects) {
+        if (demand.demands.isEmpty()) return
+        val byPlacement = demand.demands.groupBy { it.placement.id }
         for ((placementId, entries) in byPlacement) {
             val scheduler = schedulers.getOrPut(placementId) { PlacementScheduler(placementId) }
-            scheduler.submit(holder, entries)
+            scheduler.submit(holder, entries, effects)
         }
     }
 
@@ -274,9 +496,8 @@ internal class NativeAdCoordinatorCore<A : Any>(
      * corresponding metadata. Called from [clear], [onConsentRevoked],
      * and the inactive-session reap path in [tickLocked].
      */
-    private fun destroyAllRecordsLocked() {
-        for (entry in records.values) platform.destroy(entry.ad)
-        records.clear()
+    private fun destroyAllRecordsLocked(effects: Effects) {
+        records.keys.toList().forEach { removeRecordLocked(it, effects) }
     }
 
     /**
@@ -285,154 +506,348 @@ internal class NativeAdCoordinatorCore<A : Any>(
      * (e.g. an already-reaped record). Used by [closeSession] and the
      * inactive-session reap path.
      */
-    private fun destroyAndForgetRecords(retiredRecordIds: List<NativeAdRecordId>, sessionKey: String) {
-        for (recordId in retiredRecordIds) {
-            val entry = records.remove(recordId) ?: continue
-            if (entry.sessionKey == sessionKey) {
-                platform.destroy(entry.ad)
-            } else {
-                // Cross-session mismatch: the record belongs to another
-                // session. Put it back so its owner can clean it up.
-                records[recordId] = entry
-            }
-        }
+    private fun removeRecordLocked(recordId: NativeAdRecordId, effects: Effects) {
+        val entry = records.remove(recordId) ?: return
+        entry.rendererId = null
+        sessions[entry.sessionKey]?.core?.recordEvicted(entry.slotKey, recordId)
+        schedulers[entry.placementId]?.activeRecordIds?.remove(recordId)
+        governor.retire(recordId)
+        effects.destroy += entry.ad
+        cleanupSchedulersLocked()
+    }
+
+    private fun cleanupSchedulersLocked() {
+        schedulers.entries.removeAll { (_, scheduler) -> scheduler.isIdleLocked() }
+    }
+
+    /** Platform callbacks are accepted only while their owned record is current. */
+    private fun routeEvent(recordId: NativeAdRecordId, instanceId: String, event: AdEvent) {
+        val current = lock.withLock { records.containsKey(recordId) && recordId.value.toString() == instanceId }
+        if (current) eventSink(event)
     }
 
     private inner class PlacementScheduler(val placementId: String) {
-        private val lock = FullScreenStateLock()
         private val queue = mutableListOf<Batch>()
         private var currentJob: Job? = null
-        private val activeRecordIds = mutableSetOf<NativeAdRecordId>()
-        private val activeReservations = mutableListOf<NativeAdLoadReservation>()
+        val activeRecordIds = mutableSetOf<NativeAdRecordId>()
+        private val activeReservations = mutableListOf<ReservationSlotPair>()
         private var generation: Long = 0L
 
         private inner class Batch(val holder: SessionHolder, val entries: List<SlotDemandEntry>)
 
-        fun submit(holder: SessionHolder, entries: List<SlotDemandEntry>) = lock.withLock {
+        fun submit(holder: SessionHolder, entries: List<SlotDemandEntry>, effects: Effects) {
             queue.add(Batch(holder, entries))
-            if (currentJob == null) startNextLocked()
+            if (currentJob == null) startNextLocked(effects)
         }
 
-        fun cancel() = lock.withLock {
-            currentJob?.cancel()
+        fun cancelLocked(effects: Effects) {
+            currentJob?.let(effects.cancel::add)
             currentJob = null
             queue.clear()
             releaseReservationsLocked()
         }
 
-        fun cancelForSession(sessionKey: String) = lock.withLock {
+        fun clearQueuedLocked() {
+            queue.clear()
+            releaseReservationsLocked()
+        }
+
+        fun cancelForSessionLocked(sessionKey: String, effects: Effects) {
             val it = queue.iterator()
             while (it.hasNext()) {
                 if (it.next().holder.core.key == sessionKey) it.remove()
             }
             // We do not cancel an in-flight load here: the late result is
             // still subject to the generation check.
-            processNextOrCleanupLocked()
+            processNextOrCleanupLocked(effects)
         }
 
-        fun bumpGeneration() = lock.withLock {
+        fun bumpGeneration() {
             generation++
         }
 
-        private fun startNextLocked() {
-            val batch = queue.removeAt(0)
-            val priority = nativeAdPriorityFor(batch.entries.first().placement)
-            val decision = governor.reserve(
-                demandClass = NativeAdDemandClass.Visible,
-                priority = priority,
-                count = batch.entries.size,
-                allowPartial = true,
-            )
+        fun cancelSlotLocked(sessionKey: String, invalidation: SlotGeneration, effects: Effects) {
+            queue.forEach { batch ->
+                batch.entries.filter { it.key == invalidation.slotKey && it.generation == invalidation.generation }
+                    .forEach { batch.holder.core.recordDeferred(it.key, it.generation) }
+            }
+            queue.removeAll { batch -> batch.holder.core.key == sessionKey && batch.entries.all { it.key == invalidation.slotKey && it.generation == invalidation.generation } }
+            val owners = reservationOwners.values.filter {
+                it.sessionKey == sessionKey && it.slotKey == invalidation.slotKey && it.slotGeneration == invalidation.generation
+            }
+            owners.forEach { owner ->
+                reservationOwners.remove(owner.reservation.id)
+                activeReservations.removeAll { it.reservation === owner.reservation }
+                governor.releaseReservation(owner.reservation)
+            }
+            if (owners.isNotEmpty()) currentJob?.let(effects.cancel::add)
+            processNextOrCleanupLocked(effects)
+        }
+
+        private fun startNextLocked(effects: Effects) {
+            val requested = queue.removeAt(0)
+            val maxChunk = if (requested.entries.first().placement.nativeOptions.batching == NativeAdBatching.GoogleOnly) 5 else requested.entries.size
+            val candidateEntries = requested.entries.take(maxChunk)
+            if (candidateEntries.size < requested.entries.size) {
+                queue.add(0, Batch(requested.holder, requested.entries.drop(candidateEntries.size)))
+            }
+            val grantedEntries = mutableListOf<SlotDemandEntry>()
+            candidateEntries.forEach { entry ->
+                val decision = governor.reserve(
+                    demandClass = entry.demandClass,
+                    priority = entry.admittedPriority,
+                    count = 1,
+                    allowPartial = false,
+                )
             // Consume both retired records and cancelled reservations
             // from the decision — they are the platform objects /
             // permits the prior call already accounted for.
-            for (recordId in decision.retiredRecordIds) {
-                val entry = records.remove(recordId)
-                if (entry != null) platform.destroy(entry.ad)
+                decision.retiredRecordIds.forEach { removeRecordLocked(it, effects) }
+                decision.cancelledReservations.forEach { reservation ->
+                    reservationOwners.remove(reservation.id)?.let { owner ->
+                        schedulers[owner.placementId]?.activeReservations?.removeAll {
+                            it.reservation === reservation
+                        }
+                        sessions[owner.sessionKey]?.core?.recordDeferred(owner.slotKey, owner.slotGeneration)
+                    }
+                }
+                val reservation = decision.reservations.singleOrNull()
+                if (reservation == null) {
+                    requested.holder.core.recordDeferred(entry.key, entry.generation)
+                } else {
+                    val pair = ReservationSlotPair(reservation, entry)
+                    activeReservations += pair
+                    grantedEntries += entry
+                    reservationOwners[reservation.id] = ReservationOwner(placementId, requested.holder.core.key, entry.key, entry.generation, reservation)
+                }
             }
-            activeReservations.addAll(decision.reservations)
             val genAtSubmit = generation
-            val placement = batch.entries.first().placement
+            val placement = candidateEntries.first().placement
             // Load the **granted** count, not the original demand. When
             // the governor could only reserve some of the requested
             // permits (visible demand at the hard cap with no eviction
             // room), the platform only sees the granted size — never
             // zero, because reserve with allowPartial=true still
             // surfaces whatever fit.
-            val grantedCount = activeReservations.size
+            val grantedCount = grantedEntries.size
+            if (grantedCount == 0) {
+                processNextOrCleanupLocked(effects)
+                return
+            }
+            val launchedPairs = activeReservations.toList()
             currentJob = scope.launch {
-                val result = platform.load(placement, grantedCount, genAtSubmit)
-                handleResult(batch, genAtSubmit, result)
+                try {
+                    var attempted = false
+                    val result = withTimeoutOrNull(placement.timeoutPolicy.loadTimeout) {
+                        retryAdLoad(placement.retryPolicy, { it.isRetryableLoadFailure() }) {
+                            if (!canRequestAds()) AdAttemptResult.Failure(AdError.consentRequired())
+                            else if (attempted && !isGenerationCurrent(genAtSubmit)) AdAttemptResult.Failure(AdError.message("Native ad load was invalidated."))
+                            else {
+                                attempted = true
+                                try {
+                                    platform.load(placement, grantedCount, genAtSubmit)
+                                } catch (cancelled: CancellationException) {
+                                    throw cancelled
+                                } catch (failure: Throwable) {
+                                    AdAttemptResult.Failure(
+                                        AdError.message(
+                                            failure.message ?: "Native ad platform load failed unexpectedly.",
+                                        ),
+                                    )
+                                }
+                            }
+                        }
+                    } ?: AdAttemptResult.Failure(AdError.message("Native ad load timed out after ${placement.timeoutPolicy.loadTimeout}."))
+                    if (result is AdAttemptResult.Success) {
+                        try {
+                            val liveAtBinding = lock.withLock {
+                                launchedPairs.map(::isPairLiveLocked)
+                            }
+                            launchedPairs.forEachIndexed { index, pair ->
+                                val ad = result.value.ads.getOrNull(index) ?: return@forEachIndexed
+                                if (!liveAtBinding[index]) return@forEachIndexed
+                                val recordId = pair.reservation.id
+                                val instanceId = recordId.value.toString()
+                                platform.bindEvents(ad, instanceId) { event -> routeEvent(recordId, instanceId, event) }
+                            }
+                        } catch (failure: Throwable) {
+                            handleBindingFailure(launchedPairs, genAtSubmit, result.value.ads, failure)
+                            return@launch
+                        }
+                    }
+                    handleResult(launchedPairs, genAtSubmit, result)
+                } catch (cancelled: CancellationException) {
+                    handleCancelled(launchedPairs, genAtSubmit)
+                    throw cancelled
+                }
             }
         }
 
+        private fun isGenerationCurrent(submittedGen: Long): Boolean = lock.withLock {
+            generation == submittedGen && schedulers[placementId] === this
+        }
+
         private fun handleResult(
-            batch: Batch,
+            launchedPairs: List<ReservationSlotPair>,
             submittedGen: Long,
-            result: AdAttemptResult<List<A>>,
-        ) = lock.withLock {
+            result: AdAttemptResult<NativeAdPlatformBatch<A>>,
+        ) {
+            val effects = lock.withLock {
+                val effects = Effects()
             currentJob = null
             val currentGen = generation
             val stale = submittedGen != currentGen
             if (stale) {
                 if (result is AdAttemptResult.Success) {
-                    result.value.forEach { platform.destroy(it) }
+                    effects.destroy += result.value.ads
                 }
                 releaseReservationsLocked()
-                processNextOrCleanupLocked()
-                return@withLock
+                processNextOrCleanupLocked(effects)
+                return@withLock effects
             }
             when (result) {
-                is AdAttemptResult.Success -> handleSuccess(batch, result.value)
-                is AdAttemptResult.Failure -> handleFailure(batch, result.error)
+                is AdAttemptResult.Success -> handleSuccess(launchedPairs, result.value, effects)
+                is AdAttemptResult.Failure -> handleFailure(launchedPairs, result.error)
             }
-            processNextOrCleanupLocked()
+            processNextOrCleanupLocked(effects)
+            effects
+            }
+            effects.run()
         }
 
-        private fun handleSuccess(batch: Batch, ads: List<A>) {
-            val n = minOf(ads.size, batch.entries.size)
-            for (i in 0 until n) {
-                val reservation = activeReservations[i]
-                val entry = batch.entries[i]
+        private fun handleCancelled(launchedPairs: List<ReservationSlotPair>, submittedGen: Long) {
+            val effects = lock.withLock {
+                val effects = Effects()
+                if (generation == submittedGen) {
+                    livePairs(launchedPairs).forEach { pair ->
+                        reservationOwners[pair.reservation.id]?.let { owner ->
+                            sessions[owner.sessionKey]?.core?.recordDeferred(owner.slotKey, owner.slotGeneration)
+                        }
+                    }
+                }
+                currentJob = null
+                releaseReservationsLocked()
+                processNextOrCleanupLocked(effects)
+                effects
+            }
+            effects.run()
+        }
+
+        private fun handleBindingFailure(launchedPairs: List<ReservationSlotPair>, submittedGen: Long, ads: List<A>, failure: Throwable) {
+            val effects = lock.withLock {
+                val effects = Effects()
+                if (generation == submittedGen) {
+                    livePairs(launchedPairs).forEach { pair ->
+                        pair.entry.let { entry ->
+                            reservationOwners[pair.reservation.id]?.let { owner ->
+                                sessions[owner.sessionKey]?.core?.recordFailed(
+                                    owner.slotKey,
+                                    AdError.message(failure.message ?: "Native ad event binding failed."),
+                                    entry.generation,
+                                )
+                            }
+                        }
+                    }
+                }
+                effects.destroy += ads
+                currentJob = null
+                releaseReservationsLocked()
+                processNextOrCleanupLocked(effects)
+                effects
+            }
+            effects.run()
+        }
+
+        private fun handleSuccess(launchedPairs: List<ReservationSlotPair>, result: NativeAdPlatformBatch<A>, effects: Effects) {
+            val ads = result.ads
+            launchedPairs.forEachIndexed { index, pair ->
+                val ad = ads.getOrNull(index)
+                if (ad == null) {
+                    settleUnfilledPair(pair, result.unfilledError, effects)
+                    return@forEachIndexed
+                }
+                if (!isPairLiveLocked(pair)) {
+                    effects.destroy += ad
+                    return@forEachIndexed
+                }
+                val reservation = pair.reservation
+                val entry = pair.entry
+                val owner = reservationOwners.remove(reservation.id)
                 try {
                     val recordId = governor.admit(reservation)
                     activeRecordIds.add(recordId)
+                    val admittedOwner = owner?.takeIf {
+                        it.reservation === reservation && it.slotGeneration == entry.generation
+                    }
+                    val admitted = admittedOwner?.let {
+                        sessions[it.sessionKey]?.core?.recordAdmitted(
+                            it.slotKey,
+                            recordId,
+                            platform.mediaInfo(ad),
+                            entry.generation,
+                        )
+                    } == true
+                    if (!admitted) {
+                        governor.retire(recordId)
+                        effects.destroy += ad
+                        return@forEachIndexed
+                    }
                     records[recordId] = RecordEntry(
-                        ad = ads[i],
-                        sessionKey = batch.holder.core.key,
+                        ad = ad,
+                        placementId = placementId,
+                        sessionKey = requireNotNull(admittedOwner).sessionKey,
                         slotKey = entry.key,
                         generation = entry.generation,
+                        placement = entry.placement,
+                        mediaInfo = platform.mediaInfo(ad),
+                        adInstanceId = recordId.value.toString(),
                         loadedAt = nowLocked(),
                     )
-                    batch.holder.core.recordAdmitted(entry.key, recordId, entry.generation)
                 } catch (e: IllegalStateException) {
-                    platform.destroy(ads[i])
+                    reservationOwners.remove(reservation.id)
+                    effects.destroy += ad
                 }
             }
-            // Surplus ads (platform returned more than granted): destroy.
-            for (i in n until ads.size) {
-                platform.destroy(ads[i])
-            }
-            // Unused reservations (granted > admitted): release.
-            for (i in n until activeReservations.size) {
-                try {
-                    governor.releaseReservation(activeReservations[i])
-                } catch (_: IllegalStateException) {
-                    // Already gone; ignore.
-                }
-            }
-            activeReservations.clear()
+            ads.drop(launchedPairs.size).forEach { effects.destroy += it }
+            activeReservations.removeAll { active -> launchedPairs.any { it.reservation === active.reservation } }
         }
 
-        private fun handleFailure(batch: Batch, error: AdError) {
-            releaseReservationsLocked()
-            for (entry in batch.entries) {
-                batch.holder.core.recordFailed(entry.key, error, entry.generation)
+        private fun settleUnfilledPair(
+            pair: ReservationSlotPair,
+            suppliedError: AdError?,
+            effects: Effects,
+        ) {
+            if (!isPairLiveLocked(pair)) return
+            val reservation = pair.reservation
+            val owner = reservationOwners[reservation.id]
+            val error = suppliedError ?: AdError(
+                code = INTERNAL_LOAD_ERROR_CODE,
+                message = "Native ad batch completed without filling every reserved slot.",
+            )
+            if (owner?.reservation === reservation && owner.slotGeneration == pair.entry.generation) {
+                sessions[owner.sessionKey]?.core?.recordFailed(owner.slotKey, error, pair.entry.generation)
             }
+            reservationOwners.remove(reservation.id)
+            try {
+                governor.releaseReservation(reservation)
+            } catch (_: IllegalStateException) {
+                // The governor already settled this exact token.
+            }
+        }
+
+        private fun handleFailure(launchedPairs: List<ReservationSlotPair>, error: AdError) {
+            livePairs(launchedPairs).forEach { pair ->
+                reservationOwners[pair.reservation.id]?.let { owner ->
+                    sessions[owner.sessionKey]?.core?.recordFailed(owner.slotKey, error, pair.entry.generation)
+                }
+            }
+            releaseReservationsLocked()
         }
 
         private fun releaseReservationsLocked() {
-            for (res in activeReservations) {
+            for (pair in activeReservations) {
+                val res = pair.reservation
+                reservationOwners.remove(res.id)
                 try {
                     governor.releaseReservation(res)
                 } catch (_: IllegalStateException) {
@@ -442,19 +857,23 @@ internal class NativeAdCoordinatorCore<A : Any>(
             activeReservations.clear()
         }
 
-        private fun processNextOrCleanupLocked() {
-            if (queue.isNotEmpty()) {
-                startNextLocked()
+        /** Only the token identity originally granted to this launched slot may settle it. */
+        private fun livePairs(launchedPairs: List<ReservationSlotPair>): List<ReservationSlotPair> =
+            launchedPairs.filter(::isPairLiveLocked)
+
+        private fun isPairLiveLocked(pair: ReservationSlotPair): Boolean =
+            reservationOwners[pair.reservation.id]?.reservation === pair.reservation &&
+                activeReservations.any { it.reservation === pair.reservation }
+
+        private fun processNextOrCleanupLocked(effects: Effects) {
+            if (queue.isNotEmpty() && currentJob == null) {
+                startNextLocked(effects)
             } else if (activeRecordIds.isEmpty() && activeReservations.isEmpty() && currentJob == null) {
                 schedulers.remove(placementId)
             }
         }
 
-        private fun nativeAdPriorityFor(placement: AdPlacement): NativeAdPriority {
-            // The coordinator uses the most common case (ready-ahead) as
-            // a default; the platform-specific coordinator (Task 5/6)
-            // will refine this for the platform's batching / position.
-            return NativeAdPriority.ActiveReadyAhead
-        }
+        fun isIdleLocked(): Boolean =
+            queue.isEmpty() && activeRecordIds.isEmpty() && activeReservations.isEmpty() && currentJob == null
     }
 }

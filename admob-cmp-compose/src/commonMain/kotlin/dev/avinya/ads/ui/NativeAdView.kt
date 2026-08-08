@@ -1,33 +1,34 @@
 package dev.avinya.ads.ui
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import dev.avinya.ads.AdError
 import dev.avinya.ads.AdEvent
 import dev.avinya.ads.AdPlacement
+import dev.avinya.ads.nativead.NativeAdSession
 import dev.avinya.ads.nativead.layout.AdLayout
 import dev.avinya.ads.nativead.layout.AdTemplates
 
 /**
- * Composable that renders a native ad from the pool for the given
- * [placement]. Acquires a [NativeAdToken] from the pool and releases it
- * on dispose automatically. Each [itemKey] gets its own distinct ad,
- * enabling stable list reuse.
- *
- * Each [AdLayout] construction computes validation and structural identity. Callers defining
- * custom layouts in Compose should retain them across recomposition using `remember { adLayout { ... } }`
- * (or `remember(key) { adLayout { ... } }` for keyed reconstruction of dynamic layout variants).
- *
- * @param placement The native ad placement configuration.
- * @param itemKey Stable key for list reuse — distinct ads per unique key.
- * @param layout The native ad layout (defaults to [AdTemplates.mediaCard]).
- * @param modifier Modifier for the native ad container.
- * @param onEvent Callback for native ad lifecycle events.
+ * Renders one session-owned native-ad slot. The session, not composition, creates demand and
+ * owns the platform ad. A platform implementation may acquire a renderer lease only when the
+ * exact [slotKey]/[placement] pair is ready; empty and failed states never load from this view.
  */
 @Composable
 public expect fun NativeAdView(
+    session: NativeAdSession,
+    slotKey: String,
     placement: AdPlacement,
-    itemKey: String,
     layout: AdLayout = AdTemplates.mediaCard,
     modifier: Modifier = Modifier,
-    onEvent: (AdEvent) -> Unit = {}
+    loading: @Composable () -> Unit = { NativeAdLoadingPlaceholder() },
+    failure: @Composable (AdError) -> Unit = {},
+    onEvent: (AdEvent) -> Unit = {},
 )
+
+/** Stable empty content used until a platform renderer is available for a session slot. */
+@Composable
+public fun NativeAdLoadingPlaceholder(modifier: Modifier = Modifier) {
+    Box(modifier = modifier)
+}

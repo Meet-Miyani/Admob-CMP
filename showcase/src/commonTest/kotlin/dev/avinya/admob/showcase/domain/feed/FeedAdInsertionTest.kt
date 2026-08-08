@@ -1,5 +1,7 @@
 package dev.avinya.admob.showcase.domain.feed
 
+import dev.avinya.admob.showcase.domain.ad.ShowcasePlacements
+import dev.avinya.ads.nativead.NativeAdBatching
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -50,6 +52,22 @@ class FeedAdInsertionTest {
         val keys = (0 until 200).map { FeedAdInserter.slotKeyAfter("article-$it") }
 
         assertEquals(keys.size, keys.toSet().size)
+    }
+
+    @Test
+    fun nativeSlotMapsItsStableModelKeyToTheFeedPlacement() {
+        val model = FeedItem.NativeAdSlot(FeedAdInserter.slotKeyAfter("article-011"))
+
+        val slot = model.sessionSlot(ShowcasePlacements.feedNative)
+
+        assertEquals("feed_native_after_article-011", slot.key)
+        assertEquals(ShowcasePlacements.feedNative, slot.placement)
+    }
+
+    @Test
+    fun onlyTheFeedTestPlacementOptsIntoGoogleBatching() {
+        assertEquals(NativeAdBatching.GoogleOnly, ShowcasePlacements.feedNative.nativeOptions.batching)
+        assertEquals(NativeAdBatching.Sequential, ShowcasePlacements.articleNative.nativeOptions.batching)
     }
 
     @Test

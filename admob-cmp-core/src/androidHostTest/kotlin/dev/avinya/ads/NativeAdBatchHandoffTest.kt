@@ -8,11 +8,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Models the batch-handoff invariant in `AndroidNativeAdPool`'s loader callbacks.
+ * Models the terminal-callback ownership invariant in `AndroidNativeAdPlatform`.
  *
- * The real pool calls into GMA's static `NativeAdLoader`, so the callback closure
- * cannot be driven from a host test without reshaping production code purely for
- * testability. What is worth pinning is the concurrency rule the fix established:
+ * The adapter calls GMA through a façade, but this focused race test pins the
+ * platform-independent ownership rule directly:
  * the completion callback claims the batch under the SAME lock that snapshots it,
  * so a cancellation racing completion cannot leave an ad owned by nobody.
  *
@@ -35,7 +34,7 @@ class NativeAdBatchHandoffTest {
      * Mirrors the fixed callback structure: cancellation and completion contend for
      * the same `pending` list, and exactly one of them takes ownership of the batch.
      */
-    private class BatchHandoff {
+    private class TerminalCallbackHandoff {
         private val pending = mutableListOf<FakeAd>()
         private var cancelled = false
         var deliveredBatch: List<FakeAd>? = null
@@ -79,7 +78,7 @@ class NativeAdBatchHandoffTest {
         // Many trials so the two threads interleave across the whole window rather
         // than settling into one scheduling pattern.
         repeat(2_000) {
-            val handoff = BatchHandoff()
+            val handoff = TerminalCallbackHandoff()
             val ads = List(4) { FakeAd() }
             ads.forEach(handoff::add)
 
@@ -113,7 +112,7 @@ class NativeAdBatchHandoffTest {
 
     @Test
     fun `ads arriving after cancellation are destroyed immediately`() {
-        val handoff = BatchHandoff()
+        val handoff = TerminalCallbackHandoff()
         handoff.cancel()
 
         val late = FakeAd()
@@ -124,7 +123,7 @@ class NativeAdBatchHandoffTest {
 
     @Test
     fun `completion without cancellation delivers the whole batch intact`() {
-        val handoff = BatchHandoff()
+        val handoff = TerminalCallbackHandoff()
         val ads = List(3) { FakeAd() }
         ads.forEach(handoff::add)
 

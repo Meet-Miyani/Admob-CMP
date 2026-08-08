@@ -8,6 +8,8 @@ import dev.avinya.ads.AdUnitIds
 import dev.avinya.ads.BannerRefreshPolicy
 import dev.avinya.ads.CollapsiblePlacement
 import dev.avinya.ads.TestAdIds
+import dev.avinya.ads.nativead.NativeAdBatching
+import dev.avinya.ads.nativead.NativeAdOptions
 import dev.avinya.ads.nativead.layout.AdLayout
 import dev.avinya.ads.nativead.layout.AdTemplates
 import kotlin.time.Duration.Companion.seconds
@@ -60,9 +62,11 @@ public class AdDebugCatalog(
             native = AdPlacement(
                 id = "debug_native",
                 format = AdFormat.Native,
-                androidAdUnitId = TestAdIds.ANDROID_NATIVE,
-                iosAdUnitId = TestAdIds.IOS_NATIVE,
-                maxCacheSize = 2,
+                adUnitIds = AdUnitIds(
+                    android = TestAdIds.ANDROID_NATIVE,
+                    ios = TestAdIds.IOS_NATIVE,
+                ),
+                nativeOptions = NativeAdOptions(batching = NativeAdBatching.GoogleOnly),
                 strictTestMode = true,
             ),
             interstitial = AdPlacement(

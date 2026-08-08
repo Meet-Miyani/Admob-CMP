@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,6 +36,9 @@ import dev.avinya.ads.debug.ui.DebugType
 import dev.avinya.ads.debug.ui.ResponseInfoView
 import dev.avinya.ads.debug.ui.StatusStyle
 import dev.avinya.ads.nativead.layout.AdTemplates
+import dev.avinya.ads.nativead.NativeAdSessionPolicy
+import dev.avinya.ads.nativead.NativeAdSlot
+import dev.avinya.ads.nativead.NativeAdWindow
 import dev.avinya.ads.ui.BannerAdView
 import dev.avinya.ads.ui.NativeAdView
 import kotlinx.coroutines.launch
@@ -107,25 +112,42 @@ private fun BannerCard(title: String, description: String, placement: AdPlacemen
 
 @Composable
 private fun NativeCard(catalog: AdDebugCatalog, manager: AdManager) {
-    val pool = remember { manager.nativeAd(catalog.native) }
-    val available by pool.availableAds.collectAsState()
-    val loadState by pool.loadState.collectAsState()
-    val scope = rememberCoroutineScope()
+    val policy = remember {
+        NativeAdSessionPolicy(maxRetainedAds = 1, retainBehind = 0, prefetchAhead = 0)
+    }
+    val session = remember(manager, policy) { manager.nativeAds.session("debug-native", policy) }
+    val slot = remember(catalog.native) { NativeAdSlot("debug_native_0", catalog.native) }
+    val state by session.state.collectAsState()
+    val managerState by manager.nativeAds.state.collectAsState()
+    LaunchedEffect(session, slot) { session.updateWindow(NativeAdWindow(visible = listOf(slot))) }
+    DisposableEffect(session) { onDispose(session::deactivate) }
 
     DebugCard {
-        CardHeader("Native") { DebugPill(loadState.status()) }
-        DebugMono("pool available $available")
+        CardHeader("Native")
+        DebugMono("session ${if (state.active) "active" else "inactive"} · visible: ${slot.key}")
+        DebugMono("slot: ${state.slots[slot.key].label()} · manager loaded ${managerState.loadedAds}, reserved ${managerState.reservedLoads}")
         NativeAdView(
+            session = session,
+            slotKey = slot.key,
             placement = catalog.native,
-            itemKey = "debug_native_0",
             layout = AdTemplates.medium,
             modifier = Modifier.fillMaxWidth(),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(DebugTokens.SpaceSm)) {
-            DebugButton("Preload", onClick = { scope.launch { pool.preload() } }, modifier = Modifier.weight(1f))
-            DebugButton("Clear", onClick = { pool.clear() }, modifier = Modifier.weight(1f))
+            DebugButton("Deactivate", onClick = session::deactivate, modifier = Modifier.weight(1f))
+            DebugButton("Close", onClick = session::close, modifier = Modifier.weight(1f))
+            DebugButton("Clear all", onClick = manager.nativeAds::clear, modifier = Modifier.weight(1f))
         }
     }
+}
+
+private fun dev.avinya.ads.nativead.NativeAdSlotState?.label(): String = when (this) {
+    null, dev.avinya.ads.nativead.NativeAdSlotState.Empty -> "Empty"
+    dev.avinya.ads.nativead.NativeAdSlotState.Loading -> "Loading"
+    is dev.avinya.ads.nativead.NativeAdSlotState.Ready -> "Ready"
+    is dev.avinya.ads.nativead.NativeAdSlotState.Mounted -> "Mounted"
+    is dev.avinya.ads.nativead.NativeAdSlotState.Retained -> "Retained"
+    is dev.avinya.ads.nativead.NativeAdSlotState.Failed -> "Failed"
 }
 
 @Composable

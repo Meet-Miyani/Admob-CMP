@@ -29,6 +29,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -52,7 +54,10 @@ import dev.avinya.ads.AdPlacement
 import dev.avinya.ads.AdSizePolicy
 import dev.avinya.ads.BannerRefreshPolicy
 import dev.avinya.ads.LocalAdManager
-import dev.avinya.ads.NativeAdPool
+import dev.avinya.ads.nativead.NativeAdSessionPolicy
+import dev.avinya.ads.nativead.NativeAdSlot
+import dev.avinya.ads.nativead.NativeAdSlotState
+import dev.avinya.ads.nativead.NativeAdWindow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 
@@ -84,10 +89,6 @@ fun PlacementsTab(placements: List<AdPlacement>, modifier: Modifier = Modifier) 
 
 @Composable
 private fun PlacementsCard(placement: AdPlacement, manager: AdManager) {
-    val loadStateFlow = rememberLoadState(placement, manager)
-    val pool = rememberNativePool(placement, manager)
-    val loadState by loadStateFlow.collectAsState()
-
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -128,12 +129,12 @@ private fun PlacementsCard(placement: AdPlacement, manager: AdManager) {
                 modifier = Modifier.padding(vertical = 2.dp),
             )
 
-            LiveSection(
-                placement = placement,
-                loadState = loadState,
-                poolDepth = pool?.availableAds?.collectAsState()?.value,
-                maxSize = if (placement.format == AdFormat.Native) placement.cachePolicy.maxSize else null,
-            )
+            if (placement.format == AdFormat.Native) {
+                NativeSessionLiveSection(placement, manager)
+            } else {
+                val loadState by rememberLoadState(placement, manager).collectAsState()
+                LiveSection(placement = placement, loadState = loadState)
+            }
         }
     }
 }
@@ -148,9 +149,7 @@ private fun ConfigSection(placement: AdPlacement) {
             LabelledValue("Size", placement.bannerSizePolicy.label())
             LabelledValue("Refresh", placement.bannerRefreshPolicy.label())
         }
-        AdFormat.Native -> {
-            LabelledValue("Cache maxSize", placement.cachePolicy.maxSize.toString())
-        }
+        AdFormat.Native -> LabelledValue("Batching", placement.nativeOptions.batching.name)
         AdFormat.Interstitial,
         AdFormat.Rewarded,
         AdFormat.RewardedInterstitial,
@@ -163,8 +162,6 @@ private fun ConfigSection(placement: AdPlacement) {
 private fun LiveSection(
     placement: AdPlacement,
     loadState: AdLoadState,
-    poolDepth: Int?,
-    maxSize: Int?,
 ) {
     SectionLabel("Live State")
     Row(
@@ -187,11 +184,39 @@ private fun LiveSection(
         )
     }
 
-    if (placement.format == AdFormat.Native) {
-        val depth = poolDepth?.toString() ?: "?"
-        val cap = maxSize?.toString() ?: "?"
-        LabelledValue("Native Pool Cache", "$depth / $cap")
+}
+
+@Composable
+private fun NativeSessionLiveSection(placement: AdPlacement, manager: AdManager) {
+    val sessionKey = remember(placement.id) { "inspector-native:${placement.id}" }
+    val slot = remember(placement) { NativeAdSlot("inspector-slot:${placement.id}", placement) }
+    val policy = remember { NativeAdSessionPolicy(maxRetainedAds = 1, retainBehind = 0, prefetchAhead = 0) }
+    val session = remember(manager, sessionKey, policy) { manager.nativeAds.session(sessionKey, policy) }
+    val sessionState by session.state.collectAsState()
+    val managerState by manager.nativeAds.state.collectAsState()
+
+    LaunchedEffect(session, slot) { session.updateWindow(NativeAdWindow(visible = listOf(slot))) }
+    DisposableEffect(session) { onDispose(session::deactivate) }
+
+    SectionLabel("Native session")
+    LabelledValue("Session", if (sessionState.active) "active" else "inactive")
+    LabelledValue("Window", "visible: ${slot.key}")
+    LabelledValue("Slot", sessionState.slots[slot.key].label())
+    LabelledValue("Manager", "loaded ${managerState.loadedAds}, reserved ${managerState.reservedLoads}")
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        TextButton(onClick = session::deactivate, modifier = Modifier.weight(1f)) { Text("Deactivate") }
+        TextButton(onClick = session::close, modifier = Modifier.weight(1f)) { Text("Close") }
+        TextButton(onClick = manager.nativeAds::clear, modifier = Modifier.weight(1f)) { Text("Clear all") }
     }
+}
+
+private fun NativeAdSlotState?.label(): String = when (this) {
+    null, NativeAdSlotState.Empty -> "Empty"
+    NativeAdSlotState.Loading -> "Loading"
+    is NativeAdSlotState.Ready -> "Ready"
+    is NativeAdSlotState.Mounted -> "Mounted"
+    is NativeAdSlotState.Retained -> "Retained"
+    is NativeAdSlotState.Failed -> "Failed"
 }
 
 @Composable
@@ -339,18 +364,12 @@ private fun rememberLoadState(placement: AdPlacement, manager: AdManager): State
     remember(placement.id, manager) {
         when (placement.format) {
             AdFormat.Banner -> manager.banner(placement).loadState
-            AdFormat.Native -> manager.nativeAd(placement).loadState
+            AdFormat.Native -> error("Native placements use NativeSessionLiveSection.")
             AdFormat.Interstitial -> manager.interstitial(placement).loadState
             AdFormat.Rewarded -> manager.rewarded(placement).loadState
             AdFormat.RewardedInterstitial -> manager.rewardedInterstitial(placement).loadState
             AdFormat.AppOpen -> manager.appOpen(placement).loadState
         }
-    }
-
-@Composable
-private fun rememberNativePool(placement: AdPlacement, manager: AdManager): NativeAdPool? =
-    remember(placement.id, manager) {
-        if (placement.format == AdFormat.Native) manager.nativeAd(placement) else null
     }
 
 private fun AdSizePolicy.label(): String = when (this) {
@@ -367,4 +386,3 @@ private fun BannerRefreshPolicy.label(): String = when (this) {
     is BannerRefreshPolicy.SdkManaged -> "SdkManaged (${interval.inWholeSeconds}s)"
     is BannerRefreshPolicy.Manual -> "Manual"
 }
-

@@ -102,7 +102,7 @@ public sealed interface AdEvent {
     /**
      * An ad impression was recorded.
      *
-     * @property adInstanceId For [NativeAdPool] events only: the [NativeAdToken.tokenId] of
+     * @property adInstanceId For native-ad events, the coordinator-created identity of
      *   the specific leased ad this impression belongs to, or `null` if it cannot be resolved
      *   (the ad was already released, or this event came from a format with only one ad per
      *   controller, where attribution is unambiguous without an id). A `NativeAdView` bound
@@ -147,12 +147,25 @@ public sealed interface AdEvent {
      * Next-Gen GMA SDK does not yet expose video lifecycle callbacks; Android support
      * will be added when that API ships.
      */
-    public data class VideoStarted(override val placementId: String) : AdEvent
-    public data class VideoPlayed(override val placementId: String) : AdEvent
-    public data class VideoPaused(override val placementId: String) : AdEvent
-    public data class VideoEnded(override val placementId: String) : AdEvent
+    public data class VideoStarted(
+        override val placementId: String,
+        val adInstanceId: String? = null,
+    ) : AdEvent
+    public data class VideoPlayed(
+        override val placementId: String,
+        val adInstanceId: String? = null,
+    ) : AdEvent
+    public data class VideoPaused(
+        override val placementId: String,
+        val adInstanceId: String? = null,
+    ) : AdEvent
+    public data class VideoEnded(
+        override val placementId: String,
+        val adInstanceId: String? = null,
+    ) : AdEvent
     public data class VideoMuted(
         override val placementId: String,
-        val muted: Boolean
+        val muted: Boolean,
+        val adInstanceId: String? = null,
     ) : AdEvent
 }

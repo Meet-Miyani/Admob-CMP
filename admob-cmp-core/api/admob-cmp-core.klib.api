@@ -23,6 +23,17 @@ final enum class dev.avinya.ads.nativead/AdChoicesPlacement : kotlin/Enum<dev.av
     final fun values(): kotlin/Array<dev.avinya.ads.nativead/AdChoicesPlacement> // dev.avinya.ads.nativead/AdChoicesPlacement.values|values#static(){}[0]
 }
 
+final enum class dev.avinya.ads.nativead/NativeAdBatching : kotlin/Enum<dev.avinya.ads.nativead/NativeAdBatching> { // dev.avinya.ads.nativead/NativeAdBatching|null[0]
+    enum entry GoogleOnly // dev.avinya.ads.nativead/NativeAdBatching.GoogleOnly|null[0]
+    enum entry Sequential // dev.avinya.ads.nativead/NativeAdBatching.Sequential|null[0]
+
+    final val entries // dev.avinya.ads.nativead/NativeAdBatching.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<dev.avinya.ads.nativead/NativeAdBatching> // dev.avinya.ads.nativead/NativeAdBatching.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): dev.avinya.ads.nativead/NativeAdBatching // dev.avinya.ads.nativead/NativeAdBatching.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<dev.avinya.ads.nativead/NativeAdBatching> // dev.avinya.ads.nativead/NativeAdBatching.values|values#static(){}[0]
+}
+
 final enum class dev.avinya.ads.nativead/NativeMediaAspectRatio : kotlin/Enum<dev.avinya.ads.nativead/NativeMediaAspectRatio> { // dev.avinya.ads.nativead/NativeMediaAspectRatio|null[0]
     enum entry Any // dev.avinya.ads.nativead/NativeMediaAspectRatio.Any|null[0]
     enum entry Landscape // dev.avinya.ads.nativead/NativeMediaAspectRatio.Landscape|null[0]
@@ -200,6 +211,39 @@ final enum class dev.avinya.ads/PublisherPrivacyPersonalizationState : kotlin/En
     final fun values(): kotlin/Array<dev.avinya.ads/PublisherPrivacyPersonalizationState> // dev.avinya.ads/PublisherPrivacyPersonalizationState.values|values#static(){}[0]
 }
 
+abstract interface dev.avinya.ads.nativead/IosNativeAdRenderLease { // dev.avinya.ads.nativead/IosNativeAdRenderLease|null[0]
+    abstract val ad // dev.avinya.ads.nativead/IosNativeAdRenderLease.ad|{}ad[0]
+        abstract fun <get-ad>(): GoogleMobileAds/GADNativeAd // dev.avinya.ads.nativead/IosNativeAdRenderLease.ad.<get-ad>|<get-ad>(){}[0]
+    abstract val adInstanceId // dev.avinya.ads.nativead/IosNativeAdRenderLease.adInstanceId|{}adInstanceId[0]
+        abstract fun <get-adInstanceId>(): kotlin/String // dev.avinya.ads.nativead/IosNativeAdRenderLease.adInstanceId.<get-adInstanceId>|<get-adInstanceId>(){}[0]
+
+    abstract fun release() // dev.avinya.ads.nativead/IosNativeAdRenderLease.release|release(){}[0]
+}
+
+abstract interface dev.avinya.ads.nativead/NativeAdManager { // dev.avinya.ads.nativead/NativeAdManager|null[0]
+    abstract val policy // dev.avinya.ads.nativead/NativeAdManager.policy|{}policy[0]
+        abstract fun <get-policy>(): dev.avinya.ads.nativead/NativeAdMemoryPolicy // dev.avinya.ads.nativead/NativeAdManager.policy.<get-policy>|<get-policy>(){}[0]
+    abstract val state // dev.avinya.ads.nativead/NativeAdManager.state|{}state[0]
+        abstract fun <get-state>(): kotlinx.coroutines.flow/StateFlow<dev.avinya.ads.nativead/NativeAdManagerState> // dev.avinya.ads.nativead/NativeAdManager.state.<get-state>|<get-state>(){}[0]
+
+    abstract fun clear() // dev.avinya.ads.nativead/NativeAdManager.clear|clear(){}[0]
+    abstract fun closeSession(kotlin/String) // dev.avinya.ads.nativead/NativeAdManager.closeSession|closeSession(kotlin.String){}[0]
+    abstract fun session(kotlin/String, dev.avinya.ads.nativead/NativeAdSessionPolicy = ...): dev.avinya.ads.nativead/NativeAdSession // dev.avinya.ads.nativead/NativeAdManager.session|session(kotlin.String;dev.avinya.ads.nativead.NativeAdSessionPolicy){}[0]
+}
+
+abstract interface dev.avinya.ads.nativead/NativeAdSession { // dev.avinya.ads.nativead/NativeAdSession|null[0]
+    abstract val key // dev.avinya.ads.nativead/NativeAdSession.key|{}key[0]
+        abstract fun <get-key>(): kotlin/String // dev.avinya.ads.nativead/NativeAdSession.key.<get-key>|<get-key>(){}[0]
+    abstract val policy // dev.avinya.ads.nativead/NativeAdSession.policy|{}policy[0]
+        abstract fun <get-policy>(): dev.avinya.ads.nativead/NativeAdSessionPolicy // dev.avinya.ads.nativead/NativeAdSession.policy.<get-policy>|<get-policy>(){}[0]
+    abstract val state // dev.avinya.ads.nativead/NativeAdSession.state|{}state[0]
+        abstract fun <get-state>(): kotlinx.coroutines.flow/StateFlow<dev.avinya.ads.nativead/NativeAdSessionState> // dev.avinya.ads.nativead/NativeAdSession.state.<get-state>|<get-state>(){}[0]
+
+    abstract fun close() // dev.avinya.ads.nativead/NativeAdSession.close|close(){}[0]
+    abstract fun deactivate() // dev.avinya.ads.nativead/NativeAdSession.deactivate|deactivate(){}[0]
+    abstract fun updateWindow(dev.avinya.ads.nativead/NativeAdWindow) // dev.avinya.ads.nativead/NativeAdSession.updateWindow|updateWindow(dev.avinya.ads.nativead.NativeAdWindow){}[0]
+}
+
 abstract interface dev.avinya.ads/AdDiagnostics { // dev.avinya.ads/AdDiagnostics|null[0]
     abstract fun adapterStatuses(): kotlin.collections/List<dev.avinya.ads/AdapterInitializationStatus> // dev.avinya.ads/AdDiagnostics.adapterStatuses|adapterStatuses(){}[0]
     abstract fun sdkVersion(): kotlin/String? // dev.avinya.ads/AdDiagnostics.sdkVersion|sdkVersion(){}[0]
@@ -218,6 +262,8 @@ abstract interface dev.avinya.ads/AdManager { // dev.avinya.ads/AdManager|null[0
         abstract fun <get-diagnostics>(): dev.avinya.ads/AdDiagnostics // dev.avinya.ads/AdManager.diagnostics.<get-diagnostics>|<get-diagnostics>(){}[0]
     abstract val events // dev.avinya.ads/AdManager.events|{}events[0]
         abstract fun <get-events>(): kotlinx.coroutines.flow/SharedFlow<dev.avinya.ads/AdEvent> // dev.avinya.ads/AdManager.events.<get-events>|<get-events>(){}[0]
+    abstract val nativeAds // dev.avinya.ads/AdManager.nativeAds|{}nativeAds[0]
+        abstract fun <get-nativeAds>(): dev.avinya.ads.nativead/NativeAdManager // dev.avinya.ads/AdManager.nativeAds.<get-nativeAds>|<get-nativeAds>(){}[0]
     abstract val status // dev.avinya.ads/AdManager.status|{}status[0]
         abstract fun <get-status>(): kotlinx.coroutines.flow/StateFlow<dev.avinya.ads/AdManagerStatus> // dev.avinya.ads/AdManager.status.<get-status>|<get-status>(){}[0]
     abstract val tracking // dev.avinya.ads/AdManager.tracking|{}tracking[0]
@@ -226,7 +272,6 @@ abstract interface dev.avinya.ads/AdManager { // dev.avinya.ads/AdManager|null[0
     abstract fun appOpen(dev.avinya.ads/AdPlacement): dev.avinya.ads/AppOpenAdController // dev.avinya.ads/AdManager.appOpen|appOpen(dev.avinya.ads.AdPlacement){}[0]
     abstract fun banner(dev.avinya.ads/AdPlacement): dev.avinya.ads/BannerAdController // dev.avinya.ads/AdManager.banner|banner(dev.avinya.ads.AdPlacement){}[0]
     abstract fun interstitial(dev.avinya.ads/AdPlacement): dev.avinya.ads/InterstitialAdController // dev.avinya.ads/AdManager.interstitial|interstitial(dev.avinya.ads.AdPlacement){}[0]
-    abstract fun nativeAd(dev.avinya.ads/AdPlacement): dev.avinya.ads/NativeAdPool // dev.avinya.ads/AdManager.nativeAd|nativeAd(dev.avinya.ads.AdPlacement){}[0]
     abstract fun rewarded(dev.avinya.ads/AdPlacement): dev.avinya.ads/RewardedAdController // dev.avinya.ads/AdManager.rewarded|rewarded(dev.avinya.ads.AdPlacement){}[0]
     abstract fun rewardedInterstitial(dev.avinya.ads/AdPlacement): dev.avinya.ads/RewardedInterstitialAdController // dev.avinya.ads/AdManager.rewardedInterstitial|rewardedInterstitial(dev.avinya.ads.AdPlacement){}[0]
     abstract suspend fun initialize(dev.avinya.ads/AdConfig, dev.avinya.ads/ConsentMode = ...): dev.avinya.ads/AdManagerStatus // dev.avinya.ads/AdManager.initialize|initialize(dev.avinya.ads.AdConfig;dev.avinya.ads.ConsentMode){}[0]
@@ -286,30 +331,78 @@ abstract interface dev.avinya.ads/FullScreenAdController { // dev.avinya.ads/Ful
 
 abstract interface dev.avinya.ads/InterstitialAdController : dev.avinya.ads/FullScreenAdController // dev.avinya.ads/InterstitialAdController|null[0]
 
-abstract interface dev.avinya.ads/NativeAdPool { // dev.avinya.ads/NativeAdPool|null[0]
-    abstract val availableAds // dev.avinya.ads/NativeAdPool.availableAds|{}availableAds[0]
-        abstract fun <get-availableAds>(): kotlinx.coroutines.flow/StateFlow<kotlin/Int> // dev.avinya.ads/NativeAdPool.availableAds.<get-availableAds>|<get-availableAds>(){}[0]
-    abstract val events // dev.avinya.ads/NativeAdPool.events|{}events[0]
-        abstract fun <get-events>(): kotlinx.coroutines.flow/SharedFlow<dev.avinya.ads/AdEvent> // dev.avinya.ads/NativeAdPool.events.<get-events>|<get-events>(){}[0]
-    abstract val loadState // dev.avinya.ads/NativeAdPool.loadState|{}loadState[0]
-        abstract fun <get-loadState>(): kotlinx.coroutines.flow/StateFlow<dev.avinya.ads/AdLoadState> // dev.avinya.ads/NativeAdPool.loadState.<get-loadState>|<get-loadState>(){}[0]
-    abstract val placement // dev.avinya.ads/NativeAdPool.placement|{}placement[0]
-        abstract fun <get-placement>(): dev.avinya.ads/AdPlacement // dev.avinya.ads/NativeAdPool.placement.<get-placement>|<get-placement>(){}[0]
-
-    abstract fun acquire(): dev.avinya.ads.nativead/NativeAdToken? // dev.avinya.ads/NativeAdPool.acquire|acquire(){}[0]
-    abstract fun availableCount(): kotlin/Int // dev.avinya.ads/NativeAdPool.availableCount|availableCount(){}[0]
-    abstract fun clear() // dev.avinya.ads/NativeAdPool.clear|clear(){}[0]
-    abstract fun mediaInfo(dev.avinya.ads.nativead/NativeAdToken): dev.avinya.ads.nativead/NativeMediaInfo? // dev.avinya.ads/NativeAdPool.mediaInfo|mediaInfo(dev.avinya.ads.nativead.NativeAdToken){}[0]
-    abstract fun release(dev.avinya.ads.nativead/NativeAdToken) // dev.avinya.ads/NativeAdPool.release|release(dev.avinya.ads.nativead.NativeAdToken){}[0]
-    abstract suspend fun preload(kotlin/Int = ..., dev.avinya.ads/AdRequestOptions = ..., dev.avinya.ads.nativead/NativeAdOptions = ...): dev.avinya.ads/AdLoadState // dev.avinya.ads/NativeAdPool.preload|preload(kotlin.Int;dev.avinya.ads.AdRequestOptions;dev.avinya.ads.nativead.NativeAdOptions){}[0]
-}
-
 abstract interface dev.avinya.ads/RewardedAdController : dev.avinya.ads/FullScreenAdController { // dev.avinya.ads/RewardedAdController|null[0]
     abstract suspend fun show(dev.avinya.ads/FullScreenAdOptions = ..., kotlin/Function1<dev.avinya.ads/AdReward, kotlin/Unit>): dev.avinya.ads/AdShowResult // dev.avinya.ads/RewardedAdController.show|show(dev.avinya.ads.FullScreenAdOptions;kotlin.Function1<dev.avinya.ads.AdReward,kotlin.Unit>){}[0]
 }
 
 abstract interface dev.avinya.ads/RewardedInterstitialAdController : dev.avinya.ads/FullScreenAdController { // dev.avinya.ads/RewardedInterstitialAdController|null[0]
     abstract suspend fun show(dev.avinya.ads/FullScreenAdOptions = ..., kotlin/Function1<dev.avinya.ads/AdReward, kotlin/Unit>): dev.avinya.ads/AdShowResult // dev.avinya.ads/RewardedInterstitialAdController.show|show(dev.avinya.ads.FullScreenAdOptions;kotlin.Function1<dev.avinya.ads.AdReward,kotlin.Unit>){}[0]
+}
+
+sealed interface dev.avinya.ads.nativead/NativeAdSlotState { // dev.avinya.ads.nativead/NativeAdSlotState|null[0]
+    final class Failed : dev.avinya.ads.nativead/NativeAdSlotState { // dev.avinya.ads.nativead/NativeAdSlotState.Failed|null[0]
+        constructor <init>(dev.avinya.ads/AdError) // dev.avinya.ads.nativead/NativeAdSlotState.Failed.<init>|<init>(dev.avinya.ads.AdError){}[0]
+
+        final val error // dev.avinya.ads.nativead/NativeAdSlotState.Failed.error|{}error[0]
+            final fun <get-error>(): dev.avinya.ads/AdError // dev.avinya.ads.nativead/NativeAdSlotState.Failed.error.<get-error>|<get-error>(){}[0]
+
+        final fun component1(): dev.avinya.ads/AdError // dev.avinya.ads.nativead/NativeAdSlotState.Failed.component1|component1(){}[0]
+        final fun copy(dev.avinya.ads/AdError = ...): dev.avinya.ads.nativead/NativeAdSlotState.Failed // dev.avinya.ads.nativead/NativeAdSlotState.Failed.copy|copy(dev.avinya.ads.AdError){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.avinya.ads.nativead/NativeAdSlotState.Failed.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.avinya.ads.nativead/NativeAdSlotState.Failed.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.avinya.ads.nativead/NativeAdSlotState.Failed.toString|toString(){}[0]
+    }
+
+    final class Mounted : dev.avinya.ads.nativead/NativeAdSlotState { // dev.avinya.ads.nativead/NativeAdSlotState.Mounted|null[0]
+        constructor <init>(dev.avinya.ads.nativead/NativeMediaInfo?) // dev.avinya.ads.nativead/NativeAdSlotState.Mounted.<init>|<init>(dev.avinya.ads.nativead.NativeMediaInfo?){}[0]
+
+        final val mediaInfo // dev.avinya.ads.nativead/NativeAdSlotState.Mounted.mediaInfo|{}mediaInfo[0]
+            final fun <get-mediaInfo>(): dev.avinya.ads.nativead/NativeMediaInfo? // dev.avinya.ads.nativead/NativeAdSlotState.Mounted.mediaInfo.<get-mediaInfo>|<get-mediaInfo>(){}[0]
+
+        final fun component1(): dev.avinya.ads.nativead/NativeMediaInfo? // dev.avinya.ads.nativead/NativeAdSlotState.Mounted.component1|component1(){}[0]
+        final fun copy(dev.avinya.ads.nativead/NativeMediaInfo? = ...): dev.avinya.ads.nativead/NativeAdSlotState.Mounted // dev.avinya.ads.nativead/NativeAdSlotState.Mounted.copy|copy(dev.avinya.ads.nativead.NativeMediaInfo?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.avinya.ads.nativead/NativeAdSlotState.Mounted.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.avinya.ads.nativead/NativeAdSlotState.Mounted.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.avinya.ads.nativead/NativeAdSlotState.Mounted.toString|toString(){}[0]
+    }
+
+    final class Ready : dev.avinya.ads.nativead/NativeAdSlotState { // dev.avinya.ads.nativead/NativeAdSlotState.Ready|null[0]
+        constructor <init>(dev.avinya.ads.nativead/NativeMediaInfo?) // dev.avinya.ads.nativead/NativeAdSlotState.Ready.<init>|<init>(dev.avinya.ads.nativead.NativeMediaInfo?){}[0]
+
+        final val mediaInfo // dev.avinya.ads.nativead/NativeAdSlotState.Ready.mediaInfo|{}mediaInfo[0]
+            final fun <get-mediaInfo>(): dev.avinya.ads.nativead/NativeMediaInfo? // dev.avinya.ads.nativead/NativeAdSlotState.Ready.mediaInfo.<get-mediaInfo>|<get-mediaInfo>(){}[0]
+
+        final fun component1(): dev.avinya.ads.nativead/NativeMediaInfo? // dev.avinya.ads.nativead/NativeAdSlotState.Ready.component1|component1(){}[0]
+        final fun copy(dev.avinya.ads.nativead/NativeMediaInfo? = ...): dev.avinya.ads.nativead/NativeAdSlotState.Ready // dev.avinya.ads.nativead/NativeAdSlotState.Ready.copy|copy(dev.avinya.ads.nativead.NativeMediaInfo?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.avinya.ads.nativead/NativeAdSlotState.Ready.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.avinya.ads.nativead/NativeAdSlotState.Ready.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.avinya.ads.nativead/NativeAdSlotState.Ready.toString|toString(){}[0]
+    }
+
+    final class Retained : dev.avinya.ads.nativead/NativeAdSlotState { // dev.avinya.ads.nativead/NativeAdSlotState.Retained|null[0]
+        constructor <init>(dev.avinya.ads.nativead/NativeMediaInfo?) // dev.avinya.ads.nativead/NativeAdSlotState.Retained.<init>|<init>(dev.avinya.ads.nativead.NativeMediaInfo?){}[0]
+
+        final val mediaInfo // dev.avinya.ads.nativead/NativeAdSlotState.Retained.mediaInfo|{}mediaInfo[0]
+            final fun <get-mediaInfo>(): dev.avinya.ads.nativead/NativeMediaInfo? // dev.avinya.ads.nativead/NativeAdSlotState.Retained.mediaInfo.<get-mediaInfo>|<get-mediaInfo>(){}[0]
+
+        final fun component1(): dev.avinya.ads.nativead/NativeMediaInfo? // dev.avinya.ads.nativead/NativeAdSlotState.Retained.component1|component1(){}[0]
+        final fun copy(dev.avinya.ads.nativead/NativeMediaInfo? = ...): dev.avinya.ads.nativead/NativeAdSlotState.Retained // dev.avinya.ads.nativead/NativeAdSlotState.Retained.copy|copy(dev.avinya.ads.nativead.NativeMediaInfo?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.avinya.ads.nativead/NativeAdSlotState.Retained.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.avinya.ads.nativead/NativeAdSlotState.Retained.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.avinya.ads.nativead/NativeAdSlotState.Retained.toString|toString(){}[0]
+    }
+
+    final object Empty : dev.avinya.ads.nativead/NativeAdSlotState { // dev.avinya.ads.nativead/NativeAdSlotState.Empty|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.avinya.ads.nativead/NativeAdSlotState.Empty.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.avinya.ads.nativead/NativeAdSlotState.Empty.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.avinya.ads.nativead/NativeAdSlotState.Empty.toString|toString(){}[0]
+    }
+
+    final object Loading : dev.avinya.ads.nativead/NativeAdSlotState { // dev.avinya.ads.nativead/NativeAdSlotState.Loading|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.avinya.ads.nativead/NativeAdSlotState.Loading.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.avinya.ads.nativead/NativeAdSlotState.Loading.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.avinya.ads.nativead/NativeAdSlotState.Loading.toString|toString(){}[0]
+    }
 }
 
 sealed interface dev.avinya.ads/AdEvent { // dev.avinya.ads/AdEvent|null[0]
@@ -458,21 +551,26 @@ sealed interface dev.avinya.ads/AdEvent { // dev.avinya.ads/AdEvent|null[0]
     }
 
     final class VideoEnded : dev.avinya.ads/AdEvent { // dev.avinya.ads/AdEvent.VideoEnded|null[0]
-        constructor <init>(kotlin/String) // dev.avinya.ads/AdEvent.VideoEnded.<init>|<init>(kotlin.String){}[0]
+        constructor <init>(kotlin/String, kotlin/String? = ...) // dev.avinya.ads/AdEvent.VideoEnded.<init>|<init>(kotlin.String;kotlin.String?){}[0]
 
+        final val adInstanceId // dev.avinya.ads/AdEvent.VideoEnded.adInstanceId|{}adInstanceId[0]
+            final fun <get-adInstanceId>(): kotlin/String? // dev.avinya.ads/AdEvent.VideoEnded.adInstanceId.<get-adInstanceId>|<get-adInstanceId>(){}[0]
         final val placementId // dev.avinya.ads/AdEvent.VideoEnded.placementId|{}placementId[0]
             final fun <get-placementId>(): kotlin/String // dev.avinya.ads/AdEvent.VideoEnded.placementId.<get-placementId>|<get-placementId>(){}[0]
 
         final fun component1(): kotlin/String // dev.avinya.ads/AdEvent.VideoEnded.component1|component1(){}[0]
-        final fun copy(kotlin/String = ...): dev.avinya.ads/AdEvent.VideoEnded // dev.avinya.ads/AdEvent.VideoEnded.copy|copy(kotlin.String){}[0]
+        final fun component2(): kotlin/String? // dev.avinya.ads/AdEvent.VideoEnded.component2|component2(){}[0]
+        final fun copy(kotlin/String = ..., kotlin/String? = ...): dev.avinya.ads/AdEvent.VideoEnded // dev.avinya.ads/AdEvent.VideoEnded.copy|copy(kotlin.String;kotlin.String?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // dev.avinya.ads/AdEvent.VideoEnded.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // dev.avinya.ads/AdEvent.VideoEnded.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // dev.avinya.ads/AdEvent.VideoEnded.toString|toString(){}[0]
     }
 
     final class VideoMuted : dev.avinya.ads/AdEvent { // dev.avinya.ads/AdEvent.VideoMuted|null[0]
-        constructor <init>(kotlin/String, kotlin/Boolean) // dev.avinya.ads/AdEvent.VideoMuted.<init>|<init>(kotlin.String;kotlin.Boolean){}[0]
+        constructor <init>(kotlin/String, kotlin/Boolean, kotlin/String? = ...) // dev.avinya.ads/AdEvent.VideoMuted.<init>|<init>(kotlin.String;kotlin.Boolean;kotlin.String?){}[0]
 
+        final val adInstanceId // dev.avinya.ads/AdEvent.VideoMuted.adInstanceId|{}adInstanceId[0]
+            final fun <get-adInstanceId>(): kotlin/String? // dev.avinya.ads/AdEvent.VideoMuted.adInstanceId.<get-adInstanceId>|<get-adInstanceId>(){}[0]
         final val muted // dev.avinya.ads/AdEvent.VideoMuted.muted|{}muted[0]
             final fun <get-muted>(): kotlin/Boolean // dev.avinya.ads/AdEvent.VideoMuted.muted.<get-muted>|<get-muted>(){}[0]
         final val placementId // dev.avinya.ads/AdEvent.VideoMuted.placementId|{}placementId[0]
@@ -480,46 +578,56 @@ sealed interface dev.avinya.ads/AdEvent { // dev.avinya.ads/AdEvent|null[0]
 
         final fun component1(): kotlin/String // dev.avinya.ads/AdEvent.VideoMuted.component1|component1(){}[0]
         final fun component2(): kotlin/Boolean // dev.avinya.ads/AdEvent.VideoMuted.component2|component2(){}[0]
-        final fun copy(kotlin/String = ..., kotlin/Boolean = ...): dev.avinya.ads/AdEvent.VideoMuted // dev.avinya.ads/AdEvent.VideoMuted.copy|copy(kotlin.String;kotlin.Boolean){}[0]
+        final fun component3(): kotlin/String? // dev.avinya.ads/AdEvent.VideoMuted.component3|component3(){}[0]
+        final fun copy(kotlin/String = ..., kotlin/Boolean = ..., kotlin/String? = ...): dev.avinya.ads/AdEvent.VideoMuted // dev.avinya.ads/AdEvent.VideoMuted.copy|copy(kotlin.String;kotlin.Boolean;kotlin.String?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // dev.avinya.ads/AdEvent.VideoMuted.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // dev.avinya.ads/AdEvent.VideoMuted.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // dev.avinya.ads/AdEvent.VideoMuted.toString|toString(){}[0]
     }
 
     final class VideoPaused : dev.avinya.ads/AdEvent { // dev.avinya.ads/AdEvent.VideoPaused|null[0]
-        constructor <init>(kotlin/String) // dev.avinya.ads/AdEvent.VideoPaused.<init>|<init>(kotlin.String){}[0]
+        constructor <init>(kotlin/String, kotlin/String? = ...) // dev.avinya.ads/AdEvent.VideoPaused.<init>|<init>(kotlin.String;kotlin.String?){}[0]
 
+        final val adInstanceId // dev.avinya.ads/AdEvent.VideoPaused.adInstanceId|{}adInstanceId[0]
+            final fun <get-adInstanceId>(): kotlin/String? // dev.avinya.ads/AdEvent.VideoPaused.adInstanceId.<get-adInstanceId>|<get-adInstanceId>(){}[0]
         final val placementId // dev.avinya.ads/AdEvent.VideoPaused.placementId|{}placementId[0]
             final fun <get-placementId>(): kotlin/String // dev.avinya.ads/AdEvent.VideoPaused.placementId.<get-placementId>|<get-placementId>(){}[0]
 
         final fun component1(): kotlin/String // dev.avinya.ads/AdEvent.VideoPaused.component1|component1(){}[0]
-        final fun copy(kotlin/String = ...): dev.avinya.ads/AdEvent.VideoPaused // dev.avinya.ads/AdEvent.VideoPaused.copy|copy(kotlin.String){}[0]
+        final fun component2(): kotlin/String? // dev.avinya.ads/AdEvent.VideoPaused.component2|component2(){}[0]
+        final fun copy(kotlin/String = ..., kotlin/String? = ...): dev.avinya.ads/AdEvent.VideoPaused // dev.avinya.ads/AdEvent.VideoPaused.copy|copy(kotlin.String;kotlin.String?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // dev.avinya.ads/AdEvent.VideoPaused.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // dev.avinya.ads/AdEvent.VideoPaused.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // dev.avinya.ads/AdEvent.VideoPaused.toString|toString(){}[0]
     }
 
     final class VideoPlayed : dev.avinya.ads/AdEvent { // dev.avinya.ads/AdEvent.VideoPlayed|null[0]
-        constructor <init>(kotlin/String) // dev.avinya.ads/AdEvent.VideoPlayed.<init>|<init>(kotlin.String){}[0]
+        constructor <init>(kotlin/String, kotlin/String? = ...) // dev.avinya.ads/AdEvent.VideoPlayed.<init>|<init>(kotlin.String;kotlin.String?){}[0]
 
+        final val adInstanceId // dev.avinya.ads/AdEvent.VideoPlayed.adInstanceId|{}adInstanceId[0]
+            final fun <get-adInstanceId>(): kotlin/String? // dev.avinya.ads/AdEvent.VideoPlayed.adInstanceId.<get-adInstanceId>|<get-adInstanceId>(){}[0]
         final val placementId // dev.avinya.ads/AdEvent.VideoPlayed.placementId|{}placementId[0]
             final fun <get-placementId>(): kotlin/String // dev.avinya.ads/AdEvent.VideoPlayed.placementId.<get-placementId>|<get-placementId>(){}[0]
 
         final fun component1(): kotlin/String // dev.avinya.ads/AdEvent.VideoPlayed.component1|component1(){}[0]
-        final fun copy(kotlin/String = ...): dev.avinya.ads/AdEvent.VideoPlayed // dev.avinya.ads/AdEvent.VideoPlayed.copy|copy(kotlin.String){}[0]
+        final fun component2(): kotlin/String? // dev.avinya.ads/AdEvent.VideoPlayed.component2|component2(){}[0]
+        final fun copy(kotlin/String = ..., kotlin/String? = ...): dev.avinya.ads/AdEvent.VideoPlayed // dev.avinya.ads/AdEvent.VideoPlayed.copy|copy(kotlin.String;kotlin.String?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // dev.avinya.ads/AdEvent.VideoPlayed.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // dev.avinya.ads/AdEvent.VideoPlayed.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // dev.avinya.ads/AdEvent.VideoPlayed.toString|toString(){}[0]
     }
 
     final class VideoStarted : dev.avinya.ads/AdEvent { // dev.avinya.ads/AdEvent.VideoStarted|null[0]
-        constructor <init>(kotlin/String) // dev.avinya.ads/AdEvent.VideoStarted.<init>|<init>(kotlin.String){}[0]
+        constructor <init>(kotlin/String, kotlin/String? = ...) // dev.avinya.ads/AdEvent.VideoStarted.<init>|<init>(kotlin.String;kotlin.String?){}[0]
 
+        final val adInstanceId // dev.avinya.ads/AdEvent.VideoStarted.adInstanceId|{}adInstanceId[0]
+            final fun <get-adInstanceId>(): kotlin/String? // dev.avinya.ads/AdEvent.VideoStarted.adInstanceId.<get-adInstanceId>|<get-adInstanceId>(){}[0]
         final val placementId // dev.avinya.ads/AdEvent.VideoStarted.placementId|{}placementId[0]
             final fun <get-placementId>(): kotlin/String // dev.avinya.ads/AdEvent.VideoStarted.placementId.<get-placementId>|<get-placementId>(){}[0]
 
         final fun component1(): kotlin/String // dev.avinya.ads/AdEvent.VideoStarted.component1|component1(){}[0]
-        final fun copy(kotlin/String = ...): dev.avinya.ads/AdEvent.VideoStarted // dev.avinya.ads/AdEvent.VideoStarted.copy|copy(kotlin.String){}[0]
+        final fun component2(): kotlin/String? // dev.avinya.ads/AdEvent.VideoStarted.component2|component2(){}[0]
+        final fun copy(kotlin/String = ..., kotlin/String? = ...): dev.avinya.ads/AdEvent.VideoStarted // dev.avinya.ads/AdEvent.VideoStarted.copy|copy(kotlin.String;kotlin.String?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // dev.avinya.ads/AdEvent.VideoStarted.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // dev.avinya.ads/AdEvent.VideoStarted.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // dev.avinya.ads/AdEvent.VideoStarted.toString|toString(){}[0]
@@ -806,11 +914,66 @@ final class dev.avinya.ads.internal/FullScreenStateLock { // dev.avinya.ads.inte
     final fun <#A1: kotlin/Any?> withLock(kotlin/Function0<#A1>): #A1 // dev.avinya.ads.internal/FullScreenStateLock.withLock|withLock(kotlin.Function0<0:0>){0§<kotlin.Any?>}[0]
 }
 
+final class dev.avinya.ads.nativead/NativeAdManagerState { // dev.avinya.ads.nativead/NativeAdManagerState|null[0]
+    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Int, kotlin/Int, kotlin/Int) // dev.avinya.ads.nativead/NativeAdManagerState.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
+
+    final val activeSessions // dev.avinya.ads.nativead/NativeAdManagerState.activeSessions|{}activeSessions[0]
+        final fun <get-activeSessions>(): kotlin/Int // dev.avinya.ads.nativead/NativeAdManagerState.activeSessions.<get-activeSessions>|<get-activeSessions>(){}[0]
+    final val hardLimit // dev.avinya.ads.nativead/NativeAdManagerState.hardLimit|{}hardLimit[0]
+        final fun <get-hardLimit>(): kotlin/Int // dev.avinya.ads.nativead/NativeAdManagerState.hardLimit.<get-hardLimit>|<get-hardLimit>(){}[0]
+    final val inactiveSessions // dev.avinya.ads.nativead/NativeAdManagerState.inactiveSessions|{}inactiveSessions[0]
+        final fun <get-inactiveSessions>(): kotlin/Int // dev.avinya.ads.nativead/NativeAdManagerState.inactiveSessions.<get-inactiveSessions>|<get-inactiveSessions>(){}[0]
+    final val loadedAds // dev.avinya.ads.nativead/NativeAdManagerState.loadedAds|{}loadedAds[0]
+        final fun <get-loadedAds>(): kotlin/Int // dev.avinya.ads.nativead/NativeAdManagerState.loadedAds.<get-loadedAds>|<get-loadedAds>(){}[0]
+    final val reservedLoads // dev.avinya.ads.nativead/NativeAdManagerState.reservedLoads|{}reservedLoads[0]
+        final fun <get-reservedLoads>(): kotlin/Int // dev.avinya.ads.nativead/NativeAdManagerState.reservedLoads.<get-reservedLoads>|<get-reservedLoads>(){}[0]
+
+    final fun component1(): kotlin/Int // dev.avinya.ads.nativead/NativeAdManagerState.component1|component1(){}[0]
+    final fun component2(): kotlin/Int // dev.avinya.ads.nativead/NativeAdManagerState.component2|component2(){}[0]
+    final fun component3(): kotlin/Int // dev.avinya.ads.nativead/NativeAdManagerState.component3|component3(){}[0]
+    final fun component4(): kotlin/Int // dev.avinya.ads.nativead/NativeAdManagerState.component4|component4(){}[0]
+    final fun component5(): kotlin/Int // dev.avinya.ads.nativead/NativeAdManagerState.component5|component5(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ...): dev.avinya.ads.nativead/NativeAdManagerState // dev.avinya.ads.nativead/NativeAdManagerState.copy|copy(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.avinya.ads.nativead/NativeAdManagerState.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.avinya.ads.nativead/NativeAdManagerState.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.avinya.ads.nativead/NativeAdManagerState.toString|toString(){}[0]
+}
+
+final class dev.avinya.ads.nativead/NativeAdMemoryPolicy { // dev.avinya.ads.nativead/NativeAdMemoryPolicy|null[0]
+    constructor <init>(kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin.time/Duration = ...) // dev.avinya.ads.nativead/NativeAdMemoryPolicy.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.time.Duration){}[0]
+
+    final val hardLimit // dev.avinya.ads.nativead/NativeAdMemoryPolicy.hardLimit|{}hardLimit[0]
+        final fun <get-hardLimit>(): kotlin/Int // dev.avinya.ads.nativead/NativeAdMemoryPolicy.hardLimit.<get-hardLimit>|<get-hardLimit>(){}[0]
+    final val inactiveSessionLimit // dev.avinya.ads.nativead/NativeAdMemoryPolicy.inactiveSessionLimit|{}inactiveSessionLimit[0]
+        final fun <get-inactiveSessionLimit>(): kotlin/Int // dev.avinya.ads.nativead/NativeAdMemoryPolicy.inactiveSessionLimit.<get-inactiveSessionLimit>|<get-inactiveSessionLimit>(){}[0]
+    final val inactiveSessionTtl // dev.avinya.ads.nativead/NativeAdMemoryPolicy.inactiveSessionTtl|{}inactiveSessionTtl[0]
+        final fun <get-inactiveSessionTtl>(): kotlin.time/Duration // dev.avinya.ads.nativead/NativeAdMemoryPolicy.inactiveSessionTtl.<get-inactiveSessionTtl>|<get-inactiveSessionTtl>(){}[0]
+    final val maxInactiveSessions // dev.avinya.ads.nativead/NativeAdMemoryPolicy.maxInactiveSessions|{}maxInactiveSessions[0]
+        final fun <get-maxInactiveSessions>(): kotlin/Int // dev.avinya.ads.nativead/NativeAdMemoryPolicy.maxInactiveSessions.<get-maxInactiveSessions>|<get-maxInactiveSessions>(){}[0]
+    final val maxSessionRecords // dev.avinya.ads.nativead/NativeAdMemoryPolicy.maxSessionRecords|{}maxSessionRecords[0]
+        final fun <get-maxSessionRecords>(): kotlin/Int // dev.avinya.ads.nativead/NativeAdMemoryPolicy.maxSessionRecords.<get-maxSessionRecords>|<get-maxSessionRecords>(){}[0]
+    final val softLimit // dev.avinya.ads.nativead/NativeAdMemoryPolicy.softLimit|{}softLimit[0]
+        final fun <get-softLimit>(): kotlin/Int // dev.avinya.ads.nativead/NativeAdMemoryPolicy.softLimit.<get-softLimit>|<get-softLimit>(){}[0]
+
+    final fun component1(): kotlin/Int // dev.avinya.ads.nativead/NativeAdMemoryPolicy.component1|component1(){}[0]
+    final fun component2(): kotlin/Int // dev.avinya.ads.nativead/NativeAdMemoryPolicy.component2|component2(){}[0]
+    final fun component3(): kotlin/Int // dev.avinya.ads.nativead/NativeAdMemoryPolicy.component3|component3(){}[0]
+    final fun component4(): kotlin/Int // dev.avinya.ads.nativead/NativeAdMemoryPolicy.component4|component4(){}[0]
+    final fun component5(): kotlin/Int // dev.avinya.ads.nativead/NativeAdMemoryPolicy.component5|component5(){}[0]
+    final fun component6(): kotlin.time/Duration // dev.avinya.ads.nativead/NativeAdMemoryPolicy.component6|component6(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin.time/Duration = ...): dev.avinya.ads.nativead/NativeAdMemoryPolicy // dev.avinya.ads.nativead/NativeAdMemoryPolicy.copy|copy(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int;kotlin.time.Duration){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.avinya.ads.nativead/NativeAdMemoryPolicy.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.avinya.ads.nativead/NativeAdMemoryPolicy.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.avinya.ads.nativead/NativeAdMemoryPolicy.toString|toString(){}[0]
+}
+
 final class dev.avinya.ads.nativead/NativeAdOptions { // dev.avinya.ads.nativead/NativeAdOptions|null[0]
-    constructor <init>(dev.avinya.ads.nativead/NativeMediaAspectRatio = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., dev.avinya.ads.nativead/AdChoicesPlacement = ..., dev.avinya.ads.nativead/NativeVideoOptions = ..., dev.avinya.ads.nativead/NativeCustomClickGesture? = ...) // dev.avinya.ads.nativead/NativeAdOptions.<init>|<init>(dev.avinya.ads.nativead.NativeMediaAspectRatio;kotlin.Boolean;kotlin.Boolean;dev.avinya.ads.nativead.AdChoicesPlacement;dev.avinya.ads.nativead.NativeVideoOptions;dev.avinya.ads.nativead.NativeCustomClickGesture?){}[0]
+    constructor <init>(dev.avinya.ads.nativead/NativeMediaAspectRatio = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., dev.avinya.ads.nativead/AdChoicesPlacement = ..., dev.avinya.ads.nativead/NativeVideoOptions = ..., dev.avinya.ads.nativead/NativeCustomClickGesture? = ..., dev.avinya.ads.nativead/NativeAdBatching = ...) // dev.avinya.ads.nativead/NativeAdOptions.<init>|<init>(dev.avinya.ads.nativead.NativeMediaAspectRatio;kotlin.Boolean;kotlin.Boolean;dev.avinya.ads.nativead.AdChoicesPlacement;dev.avinya.ads.nativead.NativeVideoOptions;dev.avinya.ads.nativead.NativeCustomClickGesture?;dev.avinya.ads.nativead.NativeAdBatching){}[0]
 
     final val adChoicesPlacement // dev.avinya.ads.nativead/NativeAdOptions.adChoicesPlacement|{}adChoicesPlacement[0]
         final fun <get-adChoicesPlacement>(): dev.avinya.ads.nativead/AdChoicesPlacement // dev.avinya.ads.nativead/NativeAdOptions.adChoicesPlacement.<get-adChoicesPlacement>|<get-adChoicesPlacement>(){}[0]
+    final val batching // dev.avinya.ads.nativead/NativeAdOptions.batching|{}batching[0]
+        final fun <get-batching>(): dev.avinya.ads.nativead/NativeAdBatching // dev.avinya.ads.nativead/NativeAdOptions.batching.<get-batching>|<get-batching>(){}[0]
     final val customClickGesture // dev.avinya.ads.nativead/NativeAdOptions.customClickGesture|{}customClickGesture[0]
         final fun <get-customClickGesture>(): dev.avinya.ads.nativead/NativeCustomClickGesture? // dev.avinya.ads.nativead/NativeAdOptions.customClickGesture.<get-customClickGesture>|<get-customClickGesture>(){}[0]
     final val disableImageLoading // dev.avinya.ads.nativead/NativeAdOptions.disableImageLoading|{}disableImageLoading[0]
@@ -828,26 +991,81 @@ final class dev.avinya.ads.nativead/NativeAdOptions { // dev.avinya.ads.nativead
     final fun component4(): dev.avinya.ads.nativead/AdChoicesPlacement // dev.avinya.ads.nativead/NativeAdOptions.component4|component4(){}[0]
     final fun component5(): dev.avinya.ads.nativead/NativeVideoOptions // dev.avinya.ads.nativead/NativeAdOptions.component5|component5(){}[0]
     final fun component6(): dev.avinya.ads.nativead/NativeCustomClickGesture? // dev.avinya.ads.nativead/NativeAdOptions.component6|component6(){}[0]
-    final fun copy(dev.avinya.ads.nativead/NativeMediaAspectRatio = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., dev.avinya.ads.nativead/AdChoicesPlacement = ..., dev.avinya.ads.nativead/NativeVideoOptions = ..., dev.avinya.ads.nativead/NativeCustomClickGesture? = ...): dev.avinya.ads.nativead/NativeAdOptions // dev.avinya.ads.nativead/NativeAdOptions.copy|copy(dev.avinya.ads.nativead.NativeMediaAspectRatio;kotlin.Boolean;kotlin.Boolean;dev.avinya.ads.nativead.AdChoicesPlacement;dev.avinya.ads.nativead.NativeVideoOptions;dev.avinya.ads.nativead.NativeCustomClickGesture?){}[0]
+    final fun component7(): dev.avinya.ads.nativead/NativeAdBatching // dev.avinya.ads.nativead/NativeAdOptions.component7|component7(){}[0]
+    final fun copy(dev.avinya.ads.nativead/NativeMediaAspectRatio = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., dev.avinya.ads.nativead/AdChoicesPlacement = ..., dev.avinya.ads.nativead/NativeVideoOptions = ..., dev.avinya.ads.nativead/NativeCustomClickGesture? = ..., dev.avinya.ads.nativead/NativeAdBatching = ...): dev.avinya.ads.nativead/NativeAdOptions // dev.avinya.ads.nativead/NativeAdOptions.copy|copy(dev.avinya.ads.nativead.NativeMediaAspectRatio;kotlin.Boolean;kotlin.Boolean;dev.avinya.ads.nativead.AdChoicesPlacement;dev.avinya.ads.nativead.NativeVideoOptions;dev.avinya.ads.nativead.NativeCustomClickGesture?;dev.avinya.ads.nativead.NativeAdBatching){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // dev.avinya.ads.nativead/NativeAdOptions.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // dev.avinya.ads.nativead/NativeAdOptions.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // dev.avinya.ads.nativead/NativeAdOptions.toString|toString(){}[0]
 }
 
-final class dev.avinya.ads.nativead/NativeAdToken { // dev.avinya.ads.nativead/NativeAdToken|null[0]
-    constructor <init>(kotlin/String, kotlin/String) // dev.avinya.ads.nativead/NativeAdToken.<init>|<init>(kotlin.String;kotlin.String){}[0]
+final class dev.avinya.ads.nativead/NativeAdSessionPolicy { // dev.avinya.ads.nativead/NativeAdSessionPolicy|null[0]
+    constructor <init>(kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ...) // dev.avinya.ads.nativead/NativeAdSessionPolicy.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Int){}[0]
 
-    final val placementId // dev.avinya.ads.nativead/NativeAdToken.placementId|{}placementId[0]
-        final fun <get-placementId>(): kotlin/String // dev.avinya.ads.nativead/NativeAdToken.placementId.<get-placementId>|<get-placementId>(){}[0]
-    final val tokenId // dev.avinya.ads.nativead/NativeAdToken.tokenId|{}tokenId[0]
-        final fun <get-tokenId>(): kotlin/String // dev.avinya.ads.nativead/NativeAdToken.tokenId.<get-tokenId>|<get-tokenId>(){}[0]
+    final val maxRetainedAds // dev.avinya.ads.nativead/NativeAdSessionPolicy.maxRetainedAds|{}maxRetainedAds[0]
+        final fun <get-maxRetainedAds>(): kotlin/Int // dev.avinya.ads.nativead/NativeAdSessionPolicy.maxRetainedAds.<get-maxRetainedAds>|<get-maxRetainedAds>(){}[0]
+    final val prefetchAhead // dev.avinya.ads.nativead/NativeAdSessionPolicy.prefetchAhead|{}prefetchAhead[0]
+        final fun <get-prefetchAhead>(): kotlin/Int // dev.avinya.ads.nativead/NativeAdSessionPolicy.prefetchAhead.<get-prefetchAhead>|<get-prefetchAhead>(){}[0]
+    final val retainBehind // dev.avinya.ads.nativead/NativeAdSessionPolicy.retainBehind|{}retainBehind[0]
+        final fun <get-retainBehind>(): kotlin/Int // dev.avinya.ads.nativead/NativeAdSessionPolicy.retainBehind.<get-retainBehind>|<get-retainBehind>(){}[0]
 
-    final fun component1(): kotlin/String // dev.avinya.ads.nativead/NativeAdToken.component1|component1(){}[0]
-    final fun component2(): kotlin/String // dev.avinya.ads.nativead/NativeAdToken.component2|component2(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/String = ...): dev.avinya.ads.nativead/NativeAdToken // dev.avinya.ads.nativead/NativeAdToken.copy|copy(kotlin.String;kotlin.String){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // dev.avinya.ads.nativead/NativeAdToken.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // dev.avinya.ads.nativead/NativeAdToken.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // dev.avinya.ads.nativead/NativeAdToken.toString|toString(){}[0]
+    final fun component1(): kotlin/Int // dev.avinya.ads.nativead/NativeAdSessionPolicy.component1|component1(){}[0]
+    final fun component2(): kotlin/Int // dev.avinya.ads.nativead/NativeAdSessionPolicy.component2|component2(){}[0]
+    final fun component3(): kotlin/Int // dev.avinya.ads.nativead/NativeAdSessionPolicy.component3|component3(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ...): dev.avinya.ads.nativead/NativeAdSessionPolicy // dev.avinya.ads.nativead/NativeAdSessionPolicy.copy|copy(kotlin.Int;kotlin.Int;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.avinya.ads.nativead/NativeAdSessionPolicy.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.avinya.ads.nativead/NativeAdSessionPolicy.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.avinya.ads.nativead/NativeAdSessionPolicy.toString|toString(){}[0]
+}
+
+final class dev.avinya.ads.nativead/NativeAdSessionState { // dev.avinya.ads.nativead/NativeAdSessionState|null[0]
+    constructor <init>(kotlin/Boolean, kotlin.collections/Map<kotlin/String, dev.avinya.ads.nativead/NativeAdSlotState>) // dev.avinya.ads.nativead/NativeAdSessionState.<init>|<init>(kotlin.Boolean;kotlin.collections.Map<kotlin.String,dev.avinya.ads.nativead.NativeAdSlotState>){}[0]
+
+    final val active // dev.avinya.ads.nativead/NativeAdSessionState.active|{}active[0]
+        final fun <get-active>(): kotlin/Boolean // dev.avinya.ads.nativead/NativeAdSessionState.active.<get-active>|<get-active>(){}[0]
+    final val slots // dev.avinya.ads.nativead/NativeAdSessionState.slots|{}slots[0]
+        final fun <get-slots>(): kotlin.collections/Map<kotlin/String, dev.avinya.ads.nativead/NativeAdSlotState> // dev.avinya.ads.nativead/NativeAdSessionState.slots.<get-slots>|<get-slots>(){}[0]
+
+    final fun component1(): kotlin/Boolean // dev.avinya.ads.nativead/NativeAdSessionState.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/Map<kotlin/String, dev.avinya.ads.nativead/NativeAdSlotState> // dev.avinya.ads.nativead/NativeAdSessionState.component2|component2(){}[0]
+    final fun copy(kotlin/Boolean = ..., kotlin.collections/Map<kotlin/String, dev.avinya.ads.nativead/NativeAdSlotState> = ...): dev.avinya.ads.nativead/NativeAdSessionState // dev.avinya.ads.nativead/NativeAdSessionState.copy|copy(kotlin.Boolean;kotlin.collections.Map<kotlin.String,dev.avinya.ads.nativead.NativeAdSlotState>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.avinya.ads.nativead/NativeAdSessionState.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.avinya.ads.nativead/NativeAdSessionState.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.avinya.ads.nativead/NativeAdSessionState.toString|toString(){}[0]
+}
+
+final class dev.avinya.ads.nativead/NativeAdSlot { // dev.avinya.ads.nativead/NativeAdSlot|null[0]
+    constructor <init>(kotlin/String, dev.avinya.ads/AdPlacement) // dev.avinya.ads.nativead/NativeAdSlot.<init>|<init>(kotlin.String;dev.avinya.ads.AdPlacement){}[0]
+
+    final val key // dev.avinya.ads.nativead/NativeAdSlot.key|{}key[0]
+        final fun <get-key>(): kotlin/String // dev.avinya.ads.nativead/NativeAdSlot.key.<get-key>|<get-key>(){}[0]
+    final val placement // dev.avinya.ads.nativead/NativeAdSlot.placement|{}placement[0]
+        final fun <get-placement>(): dev.avinya.ads/AdPlacement // dev.avinya.ads.nativead/NativeAdSlot.placement.<get-placement>|<get-placement>(){}[0]
+
+    final fun component1(): kotlin/String // dev.avinya.ads.nativead/NativeAdSlot.component1|component1(){}[0]
+    final fun component2(): dev.avinya.ads/AdPlacement // dev.avinya.ads.nativead/NativeAdSlot.component2|component2(){}[0]
+    final fun copy(kotlin/String = ..., dev.avinya.ads/AdPlacement = ...): dev.avinya.ads.nativead/NativeAdSlot // dev.avinya.ads.nativead/NativeAdSlot.copy|copy(kotlin.String;dev.avinya.ads.AdPlacement){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.avinya.ads.nativead/NativeAdSlot.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.avinya.ads.nativead/NativeAdSlot.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.avinya.ads.nativead/NativeAdSlot.toString|toString(){}[0]
+}
+
+final class dev.avinya.ads.nativead/NativeAdWindow { // dev.avinya.ads.nativead/NativeAdWindow|null[0]
+    constructor <init>(kotlin.collections/List<dev.avinya.ads.nativead/NativeAdSlot>, kotlin.collections/List<dev.avinya.ads.nativead/NativeAdSlot> = ..., kotlin.collections/List<dev.avinya.ads.nativead/NativeAdSlot> = ...) // dev.avinya.ads.nativead/NativeAdWindow.<init>|<init>(kotlin.collections.List<dev.avinya.ads.nativead.NativeAdSlot>;kotlin.collections.List<dev.avinya.ads.nativead.NativeAdSlot>;kotlin.collections.List<dev.avinya.ads.nativead.NativeAdSlot>){}[0]
+
+    final val prefetchAhead // dev.avinya.ads.nativead/NativeAdWindow.prefetchAhead|{}prefetchAhead[0]
+        final fun <get-prefetchAhead>(): kotlin.collections/List<dev.avinya.ads.nativead/NativeAdSlot> // dev.avinya.ads.nativead/NativeAdWindow.prefetchAhead.<get-prefetchAhead>|<get-prefetchAhead>(){}[0]
+    final val retainBehind // dev.avinya.ads.nativead/NativeAdWindow.retainBehind|{}retainBehind[0]
+        final fun <get-retainBehind>(): kotlin.collections/List<dev.avinya.ads.nativead/NativeAdSlot> // dev.avinya.ads.nativead/NativeAdWindow.retainBehind.<get-retainBehind>|<get-retainBehind>(){}[0]
+    final val visible // dev.avinya.ads.nativead/NativeAdWindow.visible|{}visible[0]
+        final fun <get-visible>(): kotlin.collections/List<dev.avinya.ads.nativead/NativeAdSlot> // dev.avinya.ads.nativead/NativeAdWindow.visible.<get-visible>|<get-visible>(){}[0]
+
+    final fun component1(): kotlin.collections/List<dev.avinya.ads.nativead/NativeAdSlot> // dev.avinya.ads.nativead/NativeAdWindow.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/List<dev.avinya.ads.nativead/NativeAdSlot> // dev.avinya.ads.nativead/NativeAdWindow.component2|component2(){}[0]
+    final fun component3(): kotlin.collections/List<dev.avinya.ads.nativead/NativeAdSlot> // dev.avinya.ads.nativead/NativeAdWindow.component3|component3(){}[0]
+    final fun copy(kotlin.collections/List<dev.avinya.ads.nativead/NativeAdSlot> = ..., kotlin.collections/List<dev.avinya.ads.nativead/NativeAdSlot> = ..., kotlin.collections/List<dev.avinya.ads.nativead/NativeAdSlot> = ...): dev.avinya.ads.nativead/NativeAdWindow // dev.avinya.ads.nativead/NativeAdWindow.copy|copy(kotlin.collections.List<dev.avinya.ads.nativead.NativeAdSlot>;kotlin.collections.List<dev.avinya.ads.nativead.NativeAdSlot>;kotlin.collections.List<dev.avinya.ads.nativead.NativeAdSlot>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.avinya.ads.nativead/NativeAdWindow.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.avinya.ads.nativead/NativeAdWindow.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.avinya.ads.nativead/NativeAdWindow.toString|toString(){}[0]
 }
 
 final class dev.avinya.ads.nativead/NativeCustomClickGesture { // dev.avinya.ads.nativead/NativeCustomClickGesture|null[0]
@@ -959,8 +1177,8 @@ final class dev.avinya.ads/AdCachePolicy { // dev.avinya.ads/AdCachePolicy|null[
 }
 
 final class dev.avinya.ads/AdConfig { // dev.avinya.ads/AdConfig|null[0]
-    constructor <init>(dev.avinya.ads/AdAppIds, dev.avinya.ads/GlobalRequestConfiguration = ..., dev.avinya.ads/AdDebugOptions = ..., kotlin/Boolean = ..., kotlin.collections/List<dev.avinya.ads/AdInitializationHook> = ...) // dev.avinya.ads/AdConfig.<init>|<init>(dev.avinya.ads.AdAppIds;dev.avinya.ads.GlobalRequestConfiguration;dev.avinya.ads.AdDebugOptions;kotlin.Boolean;kotlin.collections.List<dev.avinya.ads.AdInitializationHook>){}[0]
-    constructor <init>(kotlin/String, kotlin/String, kotlin/Boolean = ..., kotlin.collections/List<kotlin/String> = ..., dev.avinya.ads/ConsentDebugGeography = ..., dev.avinya.ads/AgeRestrictedTreatment = ..., kotlin/Boolean = ..., kotlin.collections/List<dev.avinya.ads/AdInitializationHook> = ...) // dev.avinya.ads/AdConfig.<init>|<init>(kotlin.String;kotlin.String;kotlin.Boolean;kotlin.collections.List<kotlin.String>;dev.avinya.ads.ConsentDebugGeography;dev.avinya.ads.AgeRestrictedTreatment;kotlin.Boolean;kotlin.collections.List<dev.avinya.ads.AdInitializationHook>){}[0]
+    constructor <init>(dev.avinya.ads/AdAppIds, dev.avinya.ads/GlobalRequestConfiguration = ..., dev.avinya.ads/AdDebugOptions = ..., kotlin/Boolean = ..., dev.avinya.ads.nativead/NativeAdMemoryPolicy = ..., kotlin.collections/List<dev.avinya.ads/AdInitializationHook> = ...) // dev.avinya.ads/AdConfig.<init>|<init>(dev.avinya.ads.AdAppIds;dev.avinya.ads.GlobalRequestConfiguration;dev.avinya.ads.AdDebugOptions;kotlin.Boolean;dev.avinya.ads.nativead.NativeAdMemoryPolicy;kotlin.collections.List<dev.avinya.ads.AdInitializationHook>){}[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/Boolean = ..., kotlin.collections/List<kotlin/String> = ..., dev.avinya.ads/ConsentDebugGeography = ..., dev.avinya.ads/AgeRestrictedTreatment = ..., kotlin/Boolean = ..., dev.avinya.ads.nativead/NativeAdMemoryPolicy = ..., kotlin.collections/List<dev.avinya.ads/AdInitializationHook> = ...) // dev.avinya.ads/AdConfig.<init>|<init>(kotlin.String;kotlin.String;kotlin.Boolean;kotlin.collections.List<kotlin.String>;dev.avinya.ads.ConsentDebugGeography;dev.avinya.ads.AgeRestrictedTreatment;kotlin.Boolean;dev.avinya.ads.nativead.NativeAdMemoryPolicy;kotlin.collections.List<dev.avinya.ads.AdInitializationHook>){}[0]
 
     final val androidAppId // dev.avinya.ads/AdConfig.androidAppId|{}androidAppId[0]
         final fun <get-androidAppId>(): kotlin/String // dev.avinya.ads/AdConfig.androidAppId.<get-androidAppId>|<get-androidAppId>(){}[0]
@@ -978,6 +1196,8 @@ final class dev.avinya.ads/AdConfig { // dev.avinya.ads/AdConfig|null[0]
         final fun <get-initializationHooks>(): kotlin.collections/List<dev.avinya.ads/AdInitializationHook> // dev.avinya.ads/AdConfig.initializationHooks.<get-initializationHooks>|<get-initializationHooks>(){}[0]
     final val iosAppId // dev.avinya.ads/AdConfig.iosAppId|{}iosAppId[0]
         final fun <get-iosAppId>(): kotlin/String // dev.avinya.ads/AdConfig.iosAppId.<get-iosAppId>|<get-iosAppId>(){}[0]
+    final val nativeAdMemoryPolicy // dev.avinya.ads/AdConfig.nativeAdMemoryPolicy|{}nativeAdMemoryPolicy[0]
+        final fun <get-nativeAdMemoryPolicy>(): dev.avinya.ads.nativead/NativeAdMemoryPolicy // dev.avinya.ads/AdConfig.nativeAdMemoryPolicy.<get-nativeAdMemoryPolicy>|<get-nativeAdMemoryPolicy>(){}[0]
     final val testDeviceIds // dev.avinya.ads/AdConfig.testDeviceIds|{}testDeviceIds[0]
         final fun <get-testDeviceIds>(): kotlin.collections/List<kotlin/String> // dev.avinya.ads/AdConfig.testDeviceIds.<get-testDeviceIds>|<get-testDeviceIds>(){}[0]
     final val testMode // dev.avinya.ads/AdConfig.testMode|{}testMode[0]
@@ -987,8 +1207,9 @@ final class dev.avinya.ads/AdConfig { // dev.avinya.ads/AdConfig|null[0]
     final fun component2(): dev.avinya.ads/GlobalRequestConfiguration // dev.avinya.ads/AdConfig.component2|component2(){}[0]
     final fun component3(): dev.avinya.ads/AdDebugOptions // dev.avinya.ads/AdConfig.component3|component3(){}[0]
     final fun component4(): kotlin/Boolean // dev.avinya.ads/AdConfig.component4|component4(){}[0]
-    final fun component5(): kotlin.collections/List<dev.avinya.ads/AdInitializationHook> // dev.avinya.ads/AdConfig.component5|component5(){}[0]
-    final fun copy(dev.avinya.ads/AdAppIds = ..., dev.avinya.ads/GlobalRequestConfiguration = ..., dev.avinya.ads/AdDebugOptions = ..., kotlin/Boolean = ..., kotlin.collections/List<dev.avinya.ads/AdInitializationHook> = ...): dev.avinya.ads/AdConfig // dev.avinya.ads/AdConfig.copy|copy(dev.avinya.ads.AdAppIds;dev.avinya.ads.GlobalRequestConfiguration;dev.avinya.ads.AdDebugOptions;kotlin.Boolean;kotlin.collections.List<dev.avinya.ads.AdInitializationHook>){}[0]
+    final fun component5(): dev.avinya.ads.nativead/NativeAdMemoryPolicy // dev.avinya.ads/AdConfig.component5|component5(){}[0]
+    final fun component6(): kotlin.collections/List<dev.avinya.ads/AdInitializationHook> // dev.avinya.ads/AdConfig.component6|component6(){}[0]
+    final fun copy(dev.avinya.ads/AdAppIds = ..., dev.avinya.ads/GlobalRequestConfiguration = ..., dev.avinya.ads/AdDebugOptions = ..., kotlin/Boolean = ..., dev.avinya.ads.nativead/NativeAdMemoryPolicy = ..., kotlin.collections/List<dev.avinya.ads/AdInitializationHook> = ...): dev.avinya.ads/AdConfig // dev.avinya.ads/AdConfig.copy|copy(dev.avinya.ads.AdAppIds;dev.avinya.ads.GlobalRequestConfiguration;dev.avinya.ads.AdDebugOptions;kotlin.Boolean;dev.avinya.ads.nativead.NativeAdMemoryPolicy;kotlin.collections.List<dev.avinya.ads.AdInitializationHook>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // dev.avinya.ads/AdConfig.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // dev.avinya.ads/AdConfig.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // dev.avinya.ads/AdConfig.toString|toString(){}[0]
@@ -1452,6 +1673,8 @@ final object dev.avinya.ads/NoOpAdManager : dev.avinya.ads/AdManager { // dev.av
         final fun <get-diagnostics>(): dev.avinya.ads/AdDiagnostics // dev.avinya.ads/NoOpAdManager.diagnostics.<get-diagnostics>|<get-diagnostics>(){}[0]
     final val events // dev.avinya.ads/NoOpAdManager.events|{}events[0]
         final fun <get-events>(): kotlinx.coroutines.flow/SharedFlow<dev.avinya.ads/AdEvent> // dev.avinya.ads/NoOpAdManager.events.<get-events>|<get-events>(){}[0]
+    final val nativeAds // dev.avinya.ads/NoOpAdManager.nativeAds|{}nativeAds[0]
+        final fun <get-nativeAds>(): dev.avinya.ads.nativead/NativeAdManager // dev.avinya.ads/NoOpAdManager.nativeAds.<get-nativeAds>|<get-nativeAds>(){}[0]
     final val status // dev.avinya.ads/NoOpAdManager.status|{}status[0]
         final fun <get-status>(): kotlinx.coroutines.flow/StateFlow<dev.avinya.ads/AdManagerStatus> // dev.avinya.ads/NoOpAdManager.status.<get-status>|<get-status>(){}[0]
     final val tracking // dev.avinya.ads/NoOpAdManager.tracking|{}tracking[0]
@@ -1460,7 +1683,6 @@ final object dev.avinya.ads/NoOpAdManager : dev.avinya.ads/AdManager { // dev.av
     final fun appOpen(dev.avinya.ads/AdPlacement): dev.avinya.ads/AppOpenAdController // dev.avinya.ads/NoOpAdManager.appOpen|appOpen(dev.avinya.ads.AdPlacement){}[0]
     final fun banner(dev.avinya.ads/AdPlacement): dev.avinya.ads/BannerAdController // dev.avinya.ads/NoOpAdManager.banner|banner(dev.avinya.ads.AdPlacement){}[0]
     final fun interstitial(dev.avinya.ads/AdPlacement): dev.avinya.ads/InterstitialAdController // dev.avinya.ads/NoOpAdManager.interstitial|interstitial(dev.avinya.ads.AdPlacement){}[0]
-    final fun nativeAd(dev.avinya.ads/AdPlacement): dev.avinya.ads/NativeAdPool // dev.avinya.ads/NoOpAdManager.nativeAd|nativeAd(dev.avinya.ads.AdPlacement){}[0]
     final fun rewarded(dev.avinya.ads/AdPlacement): dev.avinya.ads/RewardedAdController // dev.avinya.ads/NoOpAdManager.rewarded|rewarded(dev.avinya.ads.AdPlacement){}[0]
     final fun rewardedInterstitial(dev.avinya.ads/AdPlacement): dev.avinya.ads/RewardedInterstitialAdController // dev.avinya.ads/NoOpAdManager.rewardedInterstitial|rewardedInterstitial(dev.avinya.ads.AdPlacement){}[0]
     final suspend fun initialize(dev.avinya.ads/AdConfig, dev.avinya.ads/ConsentMode): dev.avinya.ads/AdManagerStatus // dev.avinya.ads/NoOpAdManager.initialize|initialize(dev.avinya.ads.AdConfig;dev.avinya.ads.ConsentMode){}[0]
@@ -1510,11 +1732,11 @@ final val dev.avinya.ads/debugAdConfig // dev.avinya.ads/debugAdConfig|{}debugAd
 final val dev.avinya.ads/debugAdPlacements // dev.avinya.ads/debugAdPlacements|{}debugAdPlacements[0]
     final fun <get-debugAdPlacements>(): kotlin.collections/List<dev.avinya.ads/AdPlacement> // dev.avinya.ads/debugAdPlacements.<get-debugAdPlacements>|<get-debugAdPlacements>(){}[0]
 
+final fun (dev.avinya.ads.nativead/NativeAdSession).dev.avinya.ads.nativead/acquireIosNativeAdRenderLease(kotlin/String, dev.avinya.ads/AdPlacement, kotlin/String): dev.avinya.ads.nativead/IosNativeAdRenderLease? // dev.avinya.ads.nativead/acquireIosNativeAdRenderLease|acquireIosNativeAdRenderLease@dev.avinya.ads.nativead.NativeAdSession(kotlin.String;dev.avinya.ads.AdPlacement;kotlin.String){}[0]
 final fun (dev.avinya.ads/BannerAdController).dev.avinya.ads/attachIosBanner() // dev.avinya.ads/attachIosBanner|attachIosBanner@dev.avinya.ads.BannerAdController(){}[0]
 final fun (dev.avinya.ads/BannerAdController).dev.avinya.ads/currentIosBannerView(): GoogleMobileAds/GADBannerView? // dev.avinya.ads/currentIosBannerView|currentIosBannerView@dev.avinya.ads.BannerAdController(){}[0]
 final fun (dev.avinya.ads/BannerAdController).dev.avinya.ads/detachIosBanner() // dev.avinya.ads/detachIosBanner|detachIosBanner@dev.avinya.ads.BannerAdController(){}[0]
 final fun (dev.avinya.ads/BannerAdController).dev.avinya.ads/registerIosBannerGeometry(dev.avinya.ads/BannerGeometry, dev.avinya.ads/AdSizePolicy, dev.avinya.ads/AdRequestOptions) // dev.avinya.ads/registerIosBannerGeometry|registerIosBannerGeometry@dev.avinya.ads.BannerAdController(dev.avinya.ads.BannerGeometry;dev.avinya.ads.AdSizePolicy;dev.avinya.ads.AdRequestOptions){}[0]
-final fun (dev.avinya.ads/NativeAdPool).dev.avinya.ads.nativead/peekIosNativeAd(dev.avinya.ads.nativead/NativeAdToken): GoogleMobileAds/GADNativeAd? // dev.avinya.ads.nativead/peekIosNativeAd|peekIosNativeAd@dev.avinya.ads.NativeAdPool(dev.avinya.ads.nativead.NativeAdToken){}[0]
 final fun dev.avinya.ads.appopen/iosAppForegroundState(): kotlinx.coroutines.flow/Flow<kotlin/Boolean> // dev.avinya.ads.appopen/iosAppForegroundState|iosAppForegroundState(){}[0]
 final suspend fun (dev.avinya.ads/AdManager).dev.avinya.ads/gatherConsentAndInitialize(dev.avinya.ads/AdConfig): dev.avinya.ads/AdManagerStatus // dev.avinya.ads/gatherConsentAndInitialize|gatherConsentAndInitialize@dev.avinya.ads.AdManager(dev.avinya.ads.AdConfig){}[0]
 final suspend fun (dev.avinya.ads/AdManager).dev.avinya.ads/showPrivacyOptions(): kotlin/Boolean // dev.avinya.ads/showPrivacyOptions|showPrivacyOptions@dev.avinya.ads.AdManager(){}[0]

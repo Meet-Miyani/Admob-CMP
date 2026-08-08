@@ -3,6 +3,8 @@
 package dev.avinya.ads.internal
 
 import dev.avinya.ads.AdAttemptResult
+import dev.avinya.ads.AdError
+import dev.avinya.ads.AdEvent
 import dev.avinya.ads.AdPlacement
 import dev.avinya.ads.AdResponseInfo
 import dev.avinya.ads.nativead.NativeMediaInfo
@@ -37,12 +39,30 @@ import dev.avinya.ads.nativead.NativeMediaInfo
  *   session's slot state so Compose can render without re-querying
  *   the platform.
  */
+internal data class NativeAdPlatformBatch<A : Any>(
+    val ads: List<A>,
+    val unfilledError: AdError?,
+)
+
+internal data class NativeAdRenderRecord<A : Any>(
+    val recordId: NativeAdRecordId,
+    val adInstanceId: String,
+    val ad: A,
+    val mediaInfo: NativeMediaInfo?,
+)
+
 internal interface NativeAdPlatform<A : Any> {
     suspend fun load(
         placement: AdPlacement,
         count: Int,
         generation: Long,
-    ): AdAttemptResult<List<A>>
+    ): AdAttemptResult<NativeAdPlatformBatch<A>>
+
+    suspend fun bindEvents(
+        ad: A,
+        adInstanceId: String,
+        emit: (AdEvent) -> Unit,
+    )
 
     fun destroy(ad: A)
 

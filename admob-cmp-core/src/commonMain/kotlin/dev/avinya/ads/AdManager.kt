@@ -3,9 +3,12 @@ package dev.avinya.ads
 import dev.avinya.ads.internal.emitOrLogDrop
 import dev.avinya.ads.internal.FullScreenPresentationArbiter
 import dev.avinya.ads.internal.NoOpControllerRegistry
-import dev.avinya.ads.nativead.NativeAdOptions
-import dev.avinya.ads.nativead.NativeAdToken
 import dev.avinya.ads.nativead.NativeMediaInfo
+import dev.avinya.ads.nativead.NativeAdManager
+import dev.avinya.ads.nativead.NativeAdMemoryPolicy
+import dev.avinya.ads.internal.NativeAdManagerImpl
+import dev.avinya.ads.internal.NativeAdPlatform
+import dev.avinya.ads.internal.NativeAdPlatformBatch
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -71,8 +74,8 @@ public interface AdManager {
 
     /** Returns a [BannerAdController] for [placement], cached by id. */
     public fun banner(placement: AdPlacement): BannerAdController
-    /** Returns a [NativeAdPool] for [placement], cached by id. */
-    public fun nativeAd(placement: AdPlacement): NativeAdPool
+    /** Process-wide bounded coordinator for feed-shaped native-ad sessions. */
+    public val nativeAds: NativeAdManager
     /** Returns an [InterstitialAdController] for [placement], cached by id. */
     public fun interstitial(placement: AdPlacement): InterstitialAdController
     /** Returns a [RewardedAdController] for [placement], cached by id. */
@@ -261,55 +264,6 @@ public interface AppOpenAdController : FullScreenAdController {
 }
 
 /**
- * Manages a pool of preloaded native ads for a single placement. Ads are
- * acquired via [acquire] and must be returned via [release]. The composable
- * [NativeAdView] handles acquire/release automatically. Use the pool directly
- * for manual native ad rendering.
- */
-public interface NativeAdPool {
-    /** The placement this pool is bound to. */
-    public val placement: AdPlacement
-    /** Current load state of the pool. */
-    public val loadState: StateFlow<AdLoadState>
-    /** Shared flow of native ad lifecycle events. */
-    public val events: SharedFlow<AdEvent>
-    /**
-     * Number of ads currently available for [acquire], as a live signal.
-     *
-     * Consumers that render one ad per list row should key their acquisition effect on
-     * this so a row that got `null` from [acquire] retries when inventory frees up.
-     * Without it, `acquire()` returning null was terminal for that composition: with
-     * `cachePolicy.maxSize = 1` and one row holding the ad, every other row rendered
-     * blank forever.
-     *
-     * Note this counts only *available* ads. [AdCachePolicy.maxSize] budgets
-     * available + in-use, so releasing a lease frees a slot without incrementing this
-     * value — the next [preload] is what refills it.
-     */
-    public val availableAds: StateFlow<Int>
-    /** Preloads [count] native ads. */
-    public suspend fun preload(
-        count: Int = placement.cachePolicy.maxSize,
-        requestOptions: AdRequestOptions = placement.requestOptions,
-        nativeOptions: NativeAdOptions = placement.nativeOptions
-    ): AdLoadState
-    /** Acquires a [NativeAdToken] from the pool, or null if none available. Every acquire must be paired with a [release]. */
-    public fun acquire(): NativeAdToken?
-    /**
-     * Releases a previously acquired [NativeAdToken]. The underlying native ad is
-     * destroyed/discarded (native ads are single-use and not returned to the pool).
-     * Call when the rendering view is disposed.
-     */
-    public fun release(token: NativeAdToken)
-    /** Returns the number of cached ads currently available for acquire. */
-    public fun availableCount(): Int
-    /** Returns media info (aspect ratio, video duration) for the ad identified by [token]. */
-    public fun mediaInfo(token: NativeAdToken): NativeMediaInfo?
-    /** Clears all cached ads and resets the pool. */
-    public fun clear()
-}
-
-/**
  * Default no-op manager used when ads aren't configured. All loads fail
  * with [AdError.sdkNotReady] and the status is always
  * [AdManagerStatus.Disabled].
@@ -328,7 +282,10 @@ public object NoOpAdManager : AdManager {
 
     override suspend fun initialize(config: AdConfig, consentMode: ConsentMode): AdManagerStatus = status.value
     override fun banner(placement: AdPlacement): BannerAdController = controllers.banner(placement)
-    override fun nativeAd(placement: AdPlacement): NativeAdPool = controllers.nativeAd(placement)
+    override val nativeAds: NativeAdManager = NativeAdManagerImpl(
+        NativeAdMemoryPolicy(),
+        NoOpNativePlatform,
+    )
     override fun interstitial(placement: AdPlacement): InterstitialAdController = controllers.interstitial(placement)
     override fun rewarded(placement: AdPlacement): RewardedAdController = controllers.rewarded(placement)
     override fun rewardedInterstitial(placement: AdPlacement): RewardedInterstitialAdController = controllers.rewardedInterstitial(placement)
@@ -415,24 +372,13 @@ internal class NoOpRewardedInterstitialAdController(placement: AdPlacement) : No
 
 internal class NoOpAppOpenAdController(placement: AdPlacement) : NoOpFullScreenAdController(placement), AppOpenAdController
 
-internal class NoOpNativeAdPool(override val placement: AdPlacement) : NativeAdPool {
-    private val _loadState = MutableStateFlow<AdLoadState>(AdLoadState.Idle)
-    private val _events = MutableSharedFlow<AdEvent>(extraBufferCapacity = 8)
-    override val loadState: StateFlow<AdLoadState> = _loadState
-    override val events: SharedFlow<AdEvent> = _events
-    override val availableAds: StateFlow<Int> = MutableStateFlow(0)
-    override suspend fun preload(count: Int, requestOptions: AdRequestOptions, nativeOptions: NativeAdOptions): AdLoadState {
-        val error = AdError.sdkNotReady()
-        return AdLoadState.Failed(error).also {
-            _loadState.value = it
-            _events.emitOrLogDrop(AdEvent.LoadFailed(placement.id, error), "NoOp(${placement.id})")
-        }
-    }
-    override fun acquire(): NativeAdToken? = null
-    override fun release(token: NativeAdToken) = Unit
-    override fun availableCount(): Int = 0
-    override fun mediaInfo(token: NativeAdToken): NativeMediaInfo? = null
-    override fun clear() = Unit
+private object NoOpNativePlatform : NativeAdPlatform<Any> {
+    override suspend fun load(placement: AdPlacement, count: Int, generation: Long): AdAttemptResult<NativeAdPlatformBatch<Any>> =
+        AdAttemptResult.Failure(AdError.sdkNotReady())
+    override suspend fun bindEvents(ad: Any, adInstanceId: String, emit: (AdEvent) -> Unit) = Unit
+    override fun destroy(ad: Any) = Unit
+    override fun responseInfo(ad: Any): AdResponseInfo? = null
+    override fun mediaInfo(ad: Any): NativeMediaInfo? = null
 }
 
 /**

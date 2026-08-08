@@ -203,13 +203,6 @@ public interface NativeAdSession {
     public fun deactivate()
 
     /**
-     * Per-slot state flow. The session creates the flow on first request
-     * and keeps it live until the slot is removed from the window and
-     * fully retired. Compose keys its renderer off this flow.
-     */
-    public fun slotState(slotKey: String): StateFlow<NativeAdSlotState>
-
-    /**
      * Retires every record the session owns and removes it from the
      * manager's registry. Idempotent — calling [close] on an already-closed
      * session is a no-op. After [close] the session must not be reused.

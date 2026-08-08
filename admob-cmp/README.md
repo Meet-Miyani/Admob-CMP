@@ -108,6 +108,19 @@ Full documentation: <https://ads.avinya.dev>
 Integrating with an AI coding agent? Point it at [AGENTS.md](AGENTS.md) and
 <https://ads.avinya.dev/llms.txt>.
 
+## Native feed sessions
+
+Native ads are coordinator-owned, bounded sessions rather than consumer-managed platform
+objects. Create one stable `NativeAdSession` for each logical feed owner with
+`adManager.nativeAds.session(sessionKey)`, report stable model-owned `NativeAdSlot`s through a
+viewport window (or use `rememberNativeAdFeedSession` in Compose), and render with
+`NativeAdView(session, slotKey, placement)`. A temporary tab exit deactivates the session and
+retains its bounded anchor; a permanently discarded destination closes it. The default process
+policy is soft 4 / hard 6 loaded-plus-reserved ads, with three active records, one inactive
+anchor, one-hour per-placement native TTL, and 30-minute inactive-session metadata TTL. See the
+[native guide](https://ads.avinya.dev/formats/native/) for feed, inline-article, batching, and
+migration examples.
+
 ## Requirements
 
 | Platform | Minimum |

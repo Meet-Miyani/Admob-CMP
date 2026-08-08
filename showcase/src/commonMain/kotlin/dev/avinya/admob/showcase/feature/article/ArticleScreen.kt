@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -63,8 +64,10 @@ import dev.avinya.admob.showcase.ui.inspector.InspectorSheet
 import dev.avinya.admob.showcase.ui.inspector.LocalInspectorPlacements
 import dev.avinya.admob.showcase.ui.theme.EmeraldPrimary
 import dev.avinya.ads.LocalAdManager
+import dev.avinya.ads.nativead.NativeAdSlot
 import dev.avinya.ads.ui.BannerAdView
 import dev.avinya.ads.ui.NativeAdView
+import dev.avinya.ads.ui.rememberNativeAdFeedSession
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 
@@ -152,6 +155,16 @@ private fun ArticleBody(
     val showInlineAd = adsEnabled && sdkReady
     val showAdRow = adIndex != null && showInlineAd
     val effectiveAdIndex = adIndex?.takeIf { showInlineAd } ?: Int.MAX_VALUE
+    val inlineSlot = remember(article.id) {
+        NativeAdSlot("inline-after-paragraph-3:${article.id}", ShowcasePlacements.articleNative)
+    }
+    val nativeSession = rememberNativeAdFeedSession(
+        sessionKey = "showcase-article:${article.id}",
+        listState = listState,
+        // LazyColumn has a header before its paragraph/ad rows.
+        itemCount = 1 + paragraphs.size + if (showAdRow) 1 else 0,
+        slotAt = { index -> inlineSlot.takeIf { showAdRow && index == effectiveAdIndex + 1 } },
+    )
 
     val fraction by remember(listState, paragraphs.size) {
         derivedStateOf {
@@ -256,12 +269,15 @@ private fun ArticleBody(
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
                         ) {
                             NativeAdView(
+                                session = nativeSession,
+                                slotKey = inlineSlot.key,
                                 placement = ShowcasePlacements.articleNative,
-                                itemKey = "article_native_${article.id}",
                                 layout = inlineNativeAdLayout,
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .heightIn(min = 164.dp)
                                     .padding(16.dp),
+                                loading = { Box(Modifier.fillMaxWidth().heightIn(min = 164.dp)) },
                             )
                         }
                     }

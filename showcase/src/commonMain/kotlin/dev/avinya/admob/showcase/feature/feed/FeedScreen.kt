@@ -10,9 +10,11 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -54,6 +56,7 @@ import dev.avinya.admob.showcase.ui.theme.EmeraldPrimary
 import dev.avinya.ads.LocalAdManager
 import dev.avinya.ads.ui.BannerAdView
 import dev.avinya.ads.ui.NativeAdView
+import dev.avinya.ads.ui.rememberNativeAdFeedSession
 import kotlinx.coroutines.launch
 
 @Composable
@@ -64,6 +67,16 @@ fun FeedScreen(onArticleClick: (String) -> Unit) {
         FeedViewModel(graph.articles, graph.settings, adManager)
     }
     val items = viewModel.feed.collectAsLazyPagingItems()
+    val listState = rememberLazyListState()
+    val nativeSession = rememberNativeAdFeedSession(
+        sessionKey = "showcase-feed",
+        listState = listState,
+        itemCount = items.itemCount,
+        slotAt = { index ->
+            (items[index] as? FeedItem.NativeAdSlot)
+                ?.sessionSlot(ShowcasePlacements.feedNative)
+        },
+    )
 
     val inspectorEnabled by graph.settings.inspectorEnabled.collectAsState(initial = true)
     var showInspector by remember { mutableStateOf(false) }
@@ -115,6 +128,7 @@ fun FeedScreen(onArticleClick: (String) -> Unit) {
 
             LazyColumn(
                 modifier = Modifier.weight(1f),
+                state = listState,
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -139,7 +153,7 @@ fun FeedScreen(onArticleClick: (String) -> Unit) {
                             }
                         }
                         is FeedItem.NativeAdSlot -> {
-                            NativeAdCard(slotKey = item.slotKey)
+                            NativeAdCard(session = nativeSession, slotKey = item.slotKey)
                         }
                         null -> Unit
                     }
@@ -336,6 +350,7 @@ private fun ArticleCard(
 
 @Composable
 private fun NativeAdCard(
+    session: dev.avinya.ads.nativead.NativeAdSession,
     slotKey: String,
     modifier: Modifier = Modifier,
 ) {
@@ -346,10 +361,12 @@ private fun NativeAdCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         NativeAdView(
+            session = session,
+            slotKey = slotKey,
             placement = ShowcasePlacements.feedNative,
-            itemKey = slotKey,
             layout = feedNativeAdLayout,
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 250.dp).padding(16.dp),
+            loading = { Box(Modifier.fillMaxWidth().heightIn(min = 250.dp)) },
         )
     }
 }

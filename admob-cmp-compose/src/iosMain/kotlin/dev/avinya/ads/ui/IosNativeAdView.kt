@@ -1,8 +1,9 @@
-@file:OptIn(InternalAdMobCmpApi::class)
+@file:OptIn(dev.avinya.ads.InternalAdMobCmpApi::class, kotlinx.cinterop.ExperimentalForeignApi::class)
+
 package dev.avinya.ads.ui
 
-import dev.avinya.ads.InternalAdMobCmpApi
 import GoogleMobileAds.GADNativeAdView
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -12,187 +13,131 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.layout.height
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.UIKitInteropProperties
 import androidx.compose.ui.viewinterop.UIKitViewController
+import dev.avinya.ads.AdError
 import dev.avinya.ads.AdEvent
 import dev.avinya.ads.AdFormat
-import dev.avinya.ads.AdLogger
-import dev.avinya.ads.AdManagerStatus
 import dev.avinya.ads.AdPlacement
-import dev.avinya.ads.IosAdMob
 import dev.avinya.ads.LocalAdManager
-import dev.avinya.ads.nativead.NativeAdToken
+import dev.avinya.ads.nativead.IosNativeAdRenderLease
+import dev.avinya.ads.nativead.NativeAdSession
+import dev.avinya.ads.nativead.NativeAdSlotState
+import dev.avinya.ads.nativead.acquireIosNativeAdRenderLease
 import dev.avinya.ads.nativead.layout.AdLayout
-import dev.avinya.ads.nativead.peekIosNativeAd
 import dev.avinya.ads.nativead.rendering.IosNativeAdRenderer
-import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.useContents
-import kotlinx.coroutines.flow.filter
 import platform.CoreGraphics.CGSizeMake
 import platform.UIKit.NSLayoutConstraint
 import platform.UIKit.UILayoutPriorityFittingSizeLevel
 import platform.UIKit.UILayoutPriorityRequired
 import platform.UIKit.UIView
 import platform.UIKit.UIViewController
-import kotlin.math.abs
 
-// See KDoc on the expect declaration in commonMain (ui/NativeAdView.kt).
-@OptIn(ExperimentalForeignApi::class)
 @Composable
 public actual fun NativeAdView(
+    session: NativeAdSession,
+    slotKey: String,
     placement: AdPlacement,
-    itemKey: String,
     layout: AdLayout,
     modifier: Modifier,
-    onEvent: (AdEvent) -> Unit
+    loading: @Composable () -> Unit,
+    failure: @Composable (AdError) -> Unit,
+    onEvent: (AdEvent) -> Unit,
 ) {
-    if (!placement.enabled || placement.format != AdFormat.Native) {
-        AdLogger.w("iOS NativeAdView skipped. placement=${placement.id} enabled=${placement.enabled} format=${placement.format}")
+    if (!placement.enabled || placement.format != AdFormat.Native || layout.validation.errors.isNotEmpty()) {
+        loading()
         return
     }
 
-    layout.validation.errors.forEach { issue ->
-        AdLogger.e("Native layout validation error [${issue.code}] at ${issue.nodePath}: ${issue.message}")
-    }
-    layout.validation.warnings.forEach { issue ->
-        AdLogger.w("Native layout validation warning [${issue.code}] at ${issue.nodePath}: ${issue.message}")
-    }
-    // P1-17: errors were logged and then rendering continued anyway, so a layout missing
-    // every renderable asset still ran preload/acquire and registered an empty view tree with
-    // the SDK — consuming inventory while violating the validator's own "errors prevent
-    // rendering" contract. Warnings still render; only errors stop here.
-    if (layout.validation.errors.isNotEmpty()) {
-        AdLogger.e(
-            "iOS NativeAdView refusing to render a layout with ${layout.validation.errors.size} " +
-                "validation error(s). placement=${placement.id} itemKey=$itemKey"
-        )
-        return
-    }
+    val slotState = session.state.collectAsState().value.slots[slotKey]
+    val rendererId = remember(session, slotKey) { "ios-native-renderer-${nextIosRendererId++}" }
+    var lease by remember(session, slotKey, placement, rendererId) { mutableStateOf<IosNativeAdRenderLease?>(null) }
+    val manager = LocalAdManager.current
+    val currentLease by rememberUpdatedState(lease)
+    val currentOnEvent by rememberUpdatedState(onEvent)
 
-    val sdk = LocalAdManager.current
-    if (sdk !== IosAdMob.manager) {
-        AdLogger.w("iOS NativeAdView skipped because LocalAdManager is not IosAdMob.manager. placement=${placement.id}")
-        return
-    }
-
-    val status by sdk.status.collectAsState()
-    val pool = remember(sdk, placement) { sdk.nativeAd(placement) }
-    var token by remember(placement.id, itemKey, layout.identity) { mutableStateOf<NativeAdToken?>(null) }
-    var nativeContentHeight by remember(placement.id, itemKey, layout.identity) {
-        mutableDoubleStateOf(1.0)
-    }
-
-    val currentOnEvent = rememberCurrentEventCallback(onEvent)
-
-    LaunchedEffect(pool) {
-        // collect, not collectLatest: collectLatest cancels the in-flight onEvent when a
-        // new event arrives, so a rapid Impression -> Click silently dropped the impression.
-        // onEvent is a plain callback with nothing to cancel.
-        //
-        // P1-8: every row on a shared native placement collects the SAME pool-wide events
-        // flow. Impression/Clicked/Paid now carry the ad-instance id they belong to (see
-        // AdEvent.Impression.adInstanceId), so filter out ones that aren't for THIS row's
-        // currently-leased ad. token is read fresh on every emission (not captured once),
-        // so this stays correct as the row acquires/loses its lease over its lifetime.
-        // An event with a null adInstanceId (Loaded/LoadFailed — pool-wide, not
-        // per-instance) is never filtered.
-        pool.events
-            .filter { event ->
-                val instanceId = when (event) {
-                    is AdEvent.Impression -> event.adInstanceId
-                    is AdEvent.Clicked -> event.adInstanceId
-                    is AdEvent.Paid -> event.adInstanceId
-                    else -> null
-                }
-                instanceId == null || instanceId == token?.tokenId
+    LaunchedEffect(manager, placement.id) {
+        manager.events.collect { event ->
+            if (isNativeEventForLease(placement.id, currentLease?.adInstanceId, event)) {
+                currentOnEvent(event)
             }
-            .collect(currentOnEvent)
-    }
-
-    val availableAds by pool.availableAds.collectAsState()
-
-    // Keyed on availableAds so a row that lost the race — or was blocked because maxSize was
-    // fully leased — retries when inventory frees up, instead of rendering blank forever.
-    // maxSize counts available + in-use, so release() frees a SLOT without incrementing
-    // availableAds; re-running preload, not just acquire, is what refills it.
-    //
-    // Every mounted row re-runs this on each availability change, so with N rows and one ad,
-    // N-1 will preload (a no-op via the core's cache check) and acquire (null). preload is
-    // serialized by the core's loadMutex, so that is a thundering herd on a mutex, not on the
-    // network. Judged acceptable: the alternative is a suspending lease queue, which the
-    // resolved design decision excludes. If it ever shows up in a profile, the mitigation is a
-    // small random stagger before acquire, not a redesign.
-    LaunchedEffect(pool, itemKey, layout.identity, status, availableAds) {
-        AdLogger.d("iOS NativeAdView effect. placement=${placement.id} itemKey=$itemKey status=$status token=${token?.tokenId} layout=${layout.identity}")
-        if (status != AdManagerStatus.Ready) {
-            AdLogger.w("iOS NativeAdView waiting for SDK Ready. placement=${placement.id} status=$status")
-            return@LaunchedEffect
-        }
-        if (token == null) {
-            val state = pool.preload(placement.cachePolicy.maxSize, placement.requestOptions, placement.nativeOptions)
-            AdLogger.i("iOS NativeAdView preload finished. placement=${placement.id} state=$state")
-            token = pool.acquire()
-            AdLogger.i("iOS NativeAdView acquired. placement=${placement.id} token=${token?.tokenId}")
         }
     }
 
-    val currentToken = token
-    if (currentToken != null) {
-        key(currentToken.tokenId, layout.identity) {
-            UIKitViewController(
-                factory = {
-                    AdLogger.d("iOS NativeAdView factory render. placement=${placement.id} itemKey=$itemKey token=${currentToken.tokenId} layout=${layout.identity}")
-                    val nativeAd = pool.peekIosNativeAd(currentToken)
-                        ?: return@UIKitViewController UIViewController()
-                    val nativeView = GADNativeAdView()
-                    nativeView.translatesAutoresizingMaskIntoConstraints = false
-                    val renderer = IosNativeAdRenderer(nativeAd, nativeView)
-                    val content = renderer.render(layout.root)
-                    nativeView.addSubview(content)
-                    content.leadingAnchor.constraintEqualToAnchor(nativeView.leadingAnchor).active = true
-                    content.trailingAnchor.constraintEqualToAnchor(nativeView.trailingAnchor).active = true
-                    content.topAnchor.constraintEqualToAnchor(nativeView.topAnchor).active = true
-                    IosNativeAdHostController(
-                        nativeView = nativeView,
-                        content = content,
-                        registerNativeAd = { nativeView.nativeAd = nativeAd },
-                        onPreferredHeightChanged = { measuredHeight ->
-                            nativeContentHeight = measuredHeight
+    LaunchedEffect(session, slotKey, placement, rendererId, slotState) {
+        if (slotState.canRenderNativeAd()) {
+            if (lease == null) lease = session.acquireIosNativeAdRenderLease(slotKey, placement, rendererId)
+        } else {
+            lease = null
+        }
+    }
+
+    DisposableEffect(lease) {
+        val leaseToRelease = lease
+        onDispose { leaseToRelease?.release() }
+    }
+
+    when (slotState) {
+        is NativeAdSlotState.Failed -> failure(slotState.error)
+        is NativeAdSlotState.Ready, is NativeAdSlotState.Retained, is NativeAdSlotState.Mounted -> {
+            val mountedLease = lease
+            if (mountedLease == null) {
+                loading()
+            } else {
+                var preferredHeight by remember(mountedLease.adInstanceId, layout.identity) { mutableDoubleStateOf(1.0) }
+                key(mountedLease.adInstanceId, layout.identity) {
+                    UIKitViewController(
+                        factory = {
+                            val nativeView = GADNativeAdView()
+                            nativeView.translatesAutoresizingMaskIntoConstraints = false
+                            val content = IosNativeAdRenderer(mountedLease.ad, nativeView).render(layout.root)
+                            nativeView.addSubview(content)
+                            content.leadingAnchor.constraintEqualToAnchor(nativeView.leadingAnchor).active = true
+                            content.trailingAnchor.constraintEqualToAnchor(nativeView.trailingAnchor).active = true
+                            content.topAnchor.constraintEqualToAnchor(nativeView.topAnchor).active = true
+                            IosNativeAdHostController(nativeView, content, mountedLease.ad) { preferredHeight = it }
                         },
+                        onRelease = { it.releaseHost() },
+                        modifier = modifier.then(Modifier.height(preferredHeight.dp)),
+                        properties = UIKitInteropProperties(isInteractive = true, isNativeAccessibilityEnabled = true),
                     )
-                },
-                modifier = modifier.then(Modifier.height(nativeContentHeight.dp)),
-                properties = UIKitInteropProperties(
-                    isInteractive = true,
-                    isNativeAccessibilityEnabled = true
-                )
-            )
+                }
+            }
         }
-    }
-
-    DisposableEffect(pool, currentToken?.tokenId) {
-        val tokenToRelease = currentToken
-        onDispose {
-            AdLogger.d("iOS NativeAdView dispose. placement=${placement.id} itemKey=$itemKey token=${tokenToRelease?.tokenId}")
-            tokenToRelease?.let(pool::release)
-        }
+        else -> loading()
     }
 }
 
-@OptIn(ExperimentalForeignApi::class)
 private class IosNativeAdHostController(
     private val nativeView: GADNativeAdView,
     private val content: UIView,
-    private val registerNativeAd: () -> Unit,
+    private val nativeAd: GoogleMobileAds.GADNativeAd,
     private val onPreferredHeightChanged: (Double) -> Unit,
 ) : UIViewController(nibName = null, bundle = null) {
-    private var nativeAdRegistered: Boolean = false
-    private val containmentConstraint: NSLayoutConstraint =
-        content.bottomAnchor.constraintLessThanOrEqualToAnchor(nativeView.bottomAnchor)
+    private var nativeAdRegistered = false
+    private val containmentConstraint: NSLayoutConstraint = content.bottomAnchor.constraintLessThanOrEqualToAnchor(nativeView.bottomAnchor)
+    private val hostRelease = IosNativeHostRelease(
+        detachNativeAd = { nativeView.nativeAd = null },
+        clearAssets = {
+            nativeView.headlineView = null
+            nativeView.bodyView = null
+            nativeView.callToActionView = null
+            nativeView.iconView = null
+            nativeView.mediaView = null
+            nativeView.advertiserView = null
+            nativeView.priceView = null
+            nativeView.storeView = null
+            nativeView.starRatingView = null
+            nativeView.adChoicesView = null
+            nativeView.subviews.forEach { (it as? UIView)?.removeFromSuperview() }
+        },
+        releaseController = { view.removeFromSuperview() },
+    )
 
     init {
         nativeView.clipsToBounds = true
@@ -206,47 +151,27 @@ private class IosNativeAdHostController(
     override fun viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         if (nativeAdRegistered) return
-
-        val currentSize = view.bounds.useContents { size.width to size.height }
-        val width = currentSize.first
+        val (width, currentHeight) = view.bounds.useContents { size.width to size.height }
         if (!width.isFinite() || width <= 0.0) return
-
         val measuredHeight = content.systemLayoutSizeFittingSize(
             targetSize = CGSizeMake(width, 0.0),
             withHorizontalFittingPriority = UILayoutPriorityRequired,
             verticalFittingPriority = UILayoutPriorityFittingSizeLevel,
         ).useContents { height }
-        val sizing = resolveNativeAdLayoutSizing(
-            currentHeight = currentSize.second,
-            measuredHeight = measuredHeight,
-        )
+        val sizing = resolveNativeAdLayoutSizing(currentHeight, measuredHeight)
         if (sizing.shouldUpdateHeight) {
-            AdLogger.d(
-                "iOS native host sizing. currentHeight=${currentSize.second} " +
-                    "measuredHeight=$measuredHeight"
-            )
             onPreferredHeightChanged(measuredHeight)
-            return
-        }
-        if (sizing.shouldRegisterNativeAd) {
+        } else if (sizing.shouldRegisterNativeAd) {
             containmentConstraint.active = true
             view.layoutIfNeeded()
             nativeView.layoutIfNeeded()
-            val containmentIssues = registeredAssetContainmentIssues()
-            if (containmentIssues.isNotEmpty()) {
-                AdLogger.e(
-                    "iOS native ad registration blocked because asset bounds escape " +
-                        "GADNativeAdView: ${containmentIssues.joinToString()}"
-                )
-                return
-            }
-            registerNativeAd()
+            if (registeredAssetContainmentIssues().isNotEmpty()) return
+            nativeView.nativeAd = nativeAd
             nativeAdRegistered = true
-            AdLogger.d(
-                "iOS native ad registered after containment. height=${currentSize.second}"
-            )
         }
     }
+
+    fun releaseHost() = hostRelease.release()
 
     private fun registeredAssetContainmentIssues(): List<String> {
         val root = nativeView.bounds.toRectSnapshot()
@@ -263,58 +188,74 @@ private class IosNativeAdHostController(
             nativeView.adChoicesView?.let { "adChoices" to it },
         )
         return assets.mapNotNull { (name, asset) ->
-            val converted = nativeView.convertRect(asset.bounds, fromView = asset).toRectSnapshot()
-            "$name=$converted root=$root".takeUnless { root.contains(converted) }
+            val bounds = nativeView.convertRect(asset.bounds, fromView = asset).toRectSnapshot()
+            "$name=$bounds root=$root".takeUnless { root.contains(bounds) }
         }
     }
 }
 
-@OptIn(ExperimentalForeignApi::class)
-private data class RectSnapshot(
-    val x: Double,
-    val y: Double,
-    val width: Double,
-    val height: Double,
-) {
-    fun contains(other: RectSnapshot, tolerance: Double = 0.5): Boolean =
-        other.x >= x - tolerance &&
-            other.y >= y - tolerance &&
+private data class IosNativeRect(val x: Double, val y: Double, val width: Double, val height: Double) {
+    fun contains(other: IosNativeRect, tolerance: Double = 0.5): Boolean =
+        other.x >= x - tolerance && other.y >= y - tolerance &&
             other.x + other.width <= x + width + tolerance &&
             other.y + other.height <= y + height + tolerance
 }
 
-@OptIn(ExperimentalForeignApi::class)
-private fun kotlinx.cinterop.CValue<platform.CoreGraphics.CGRect>.toRectSnapshot(): RectSnapshot =
-    useContents {
-        RectSnapshot(
-            x = origin.x,
-            y = origin.y,
-            width = size.width,
-            height = size.height,
-        )
+private fun kotlinx.cinterop.CValue<platform.CoreGraphics.CGRect>.toRectSnapshot(): IosNativeRect = useContents {
+    IosNativeRect(origin.x, origin.y, size.width, size.height)
+}
+
+/** Clears only Compose's iOS host; the coordinator retains delegates and destroys GADNativeAd. */
+internal class IosNativeHostRelease(
+    private val detachNativeAd: () -> Unit,
+    private val clearAssets: () -> Unit,
+    private val releaseController: () -> Unit,
+) {
+    private var released = false
+    fun release() {
+        if (released) return
+        released = true
+        detachNativeAd()
+        clearAssets()
+        releaseController()
     }
+}
 
 internal data class IosNativeAdLayoutSizing(
     val shouldUpdateHeight: Boolean,
     val shouldRegisterNativeAd: Boolean,
 )
 
-internal fun resolveNativeAdLayoutSizing(
-    currentHeight: Double,
-    measuredHeight: Double,
-    tolerance: Double = 0.5,
-): IosNativeAdLayoutSizing {
-    if (!measuredHeight.isFinite() || measuredHeight <= 0.0) {
-        return IosNativeAdLayoutSizing(
-            shouldUpdateHeight = false,
-            shouldRegisterNativeAd = false,
-        )
+internal fun resolveNativeAdLayoutSizing(currentHeight: Double, measuredHeight: Double): IosNativeAdLayoutSizing {
+    if (!measuredHeight.isFinite() || measuredHeight <= 0.0 || !currentHeight.isFinite() || currentHeight <= 0.0) {
+        return IosNativeAdLayoutSizing(false, false)
     }
-    val heightMatches = currentHeight.isFinite() &&
-        currentHeight > 0.0 &&
-        abs(currentHeight - measuredHeight) <= tolerance
-    return IosNativeAdLayoutSizing(
-        shouldUpdateHeight = !heightMatches,
-        shouldRegisterNativeAd = heightMatches,
-    )
+    return if (kotlin.math.abs(currentHeight - measuredHeight) > 0.5) {
+        IosNativeAdLayoutSizing(true, false)
+    } else {
+        IosNativeAdLayoutSizing(false, true)
+    }
 }
+
+internal fun isNativeEventForLease(
+    placementId: String,
+    adInstanceId: String?,
+    event: AdEvent,
+): Boolean = adInstanceId != null && event.placementId == placementId && event.nativeAdInstanceIdOrNull() == adInstanceId
+
+private fun AdEvent.nativeAdInstanceIdOrNull(): String? = when (this) {
+    is AdEvent.Impression -> adInstanceId
+    is AdEvent.Clicked -> adInstanceId
+    is AdEvent.Paid -> adInstanceId
+    is AdEvent.VideoStarted -> adInstanceId
+    is AdEvent.VideoPlayed -> adInstanceId
+    is AdEvent.VideoPaused -> adInstanceId
+    is AdEvent.VideoEnded -> adInstanceId
+    is AdEvent.VideoMuted -> adInstanceId
+    else -> null
+}
+
+private fun NativeAdSlotState?.canRenderNativeAd(): Boolean =
+    this is NativeAdSlotState.Ready || this is NativeAdSlotState.Retained || this is NativeAdSlotState.Mounted
+
+private var nextIosRendererId: Long = 0
