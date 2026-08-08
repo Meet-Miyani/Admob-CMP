@@ -1,0 +1,35 @@
+package dev.avinya.ads.nativead
+
+import dev.avinya.ads.AdError
+import dev.avinya.ads.AdAttemptResult
+import dev.avinya.ads.AdFormat
+import dev.avinya.ads.AdPlacement
+import dev.avinya.ads.AdUnitIds
+import dev.avinya.ads.internal.NativeMemoryPressure
+import kotlinx.coroutines.test.runTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
+
+class IosNativeAdPlatformTest {
+    private fun placement(batching: NativeAdBatching) = AdPlacement("ios-$batching", AdFormat.Native, AdUnitIds("a", "i"), nativeOptions = NativeAdOptions(batching = batching))
+    @Test fun `sequential count three creates three loaders without multiple ads option`() = runTest { val f=Fake<String>(); val d=IosNativeLoadMachine(f).load(placement(NativeAdBatching.Sequential),3,1); repeat(3){f.ad("$it");f.finish()}; assertEquals(listOf(false,false,false),f.multiple); assertEquals(3,d.await().ads.size) }
+    @Test fun `sequential partial success retains prior ads and terminal error`() = runTest { val f=Fake<String>();val d=IosNativeLoadMachine(f).load(placement(NativeAdBatching.Sequential),2,1);f.ad("a");f.finish();f.error(AdError.message("x"));f.finish();assertEquals(listOf("a"),d.await().ads);assertEquals("x",d.await().unfilledError?.message) }
+    @Test fun `google only accepts exact counts one through five and rejects larger before GMA`() = runTest { (1..5).forEach{n->val f=Fake<String>();val d=IosNativeLoadMachine(f).load(placement(NativeAdBatching.GoogleOnly),n,1);assertEquals(listOf(true),f.multiple);f.finish();d.await()};val f=Fake<String>();assertFailsWith<IllegalArgumentException>{IosNativeLoadMachine(f).load(placement(NativeAdBatching.GoogleOnly),6,1)};assertEquals(emptyList(),f.multiple) }
+    @Test fun `active registry strongly retains loader and delegate until finish callback`() = runTest { val f=Fake<String>();val m=IosNativeLoadMachine(f);val d=m.load(placement(NativeAdBatching.GoogleOnly),1,1);assertEquals(1,m.activeLoadCount);f.finish();d.await();assertEquals(0,m.activeLoadCount) }
+    @Test fun `cancellation settles coroutine but retains invalidated delegate until finish`() = runTest { val f=Fake<String>();val m=IosNativeLoadMachine(f);val d=m.load(placement(NativeAdBatching.GoogleOnly),1,1);d.cancel();assertEquals(1,m.activeLoadCount);f.finish();assertEquals(0,m.activeLoadCount) }
+    @Test fun `late invalidated delegate tears down every arriving ad`() = runTest { val f=Fake<String>();val d=IosNativeLoadMachine(f).load(placement(NativeAdBatching.GoogleOnly),1,1);d.cancel();f.ad("late");assertEquals(listOf("late"),f.destroyed);f.finish() }
+    @Test fun `finish and cancellation race resumes continuation once`() = runTest { val f=Fake<String>();val d=IosNativeLoadMachine(f).load(placement(NativeAdBatching.GoogleOnly),1,1);f.finish();d.cancel();d.await();assertEquals(1,f.finishes) }
+    @Test fun `metadata is snapshotted on Main before callback completion`() = runTest { val f=Fake<String>();val d=IosNativeLoadMachine(f).load(placement(NativeAdBatching.GoogleOnly),1,1);f.ad("main-snapshot");f.finish();assertEquals("main-snapshot",d.await().ads.single()) }
+    @Test fun `load machine delegates teardown to the platform facade`() = runTest { val f=Fake<String>();val m=IosNativeLoadMachine(f);val d=m.load(placement(NativeAdBatching.GoogleOnly),1,1);f.ad("a");f.finish();d.await();m.destroy("a");assertEquals(listOf("a"),f.destroyed) }
+    @Test fun `zero ad result is failure while partial result remains success`() {
+        assertIs<AdAttemptResult.Failure>(IosNativeLoadResult<String>(emptyList(), AdError.message("empty")).toAttemptResult())
+        val partial = assertIs<AdAttemptResult.Success<*>>(IosNativeLoadResult(listOf("a"), AdError.message("partial")).toAttemptResult())
+        assertEquals(1, (partial.value as dev.avinya.ads.internal.NativeAdPlatformBatch<*>).ads.size)
+    }
+    @Test fun `destroy gate runs teardown once without retaining an ad registry`() { val gate=IosNativeDestroyGate();var calls=0;gate.destroyOnce{calls++};gate.destroyOnce{calls++};assertEquals(1,calls) }
+    @Test fun `memory warning emits critical and observer removal is idempotent`() { val f=Warnings();val got=mutableListOf<NativeMemoryPressure>();val s=IosNativeMemorySignal(f){got+=it};f.fire();s.close();s.close();assertEquals(listOf(NativeMemoryPressure.Critical),got);assertEquals(1,f.removed) }
+}
+private class Fake<A:Any>:IosNativeAdLoaderFacade<A>{data class C<A:Any>(val ad:(A)->Unit,val err:(AdError)->Unit,val end:()->Unit);val calls=mutableListOf<C<A>>();val multiple=mutableListOf<Boolean>();val destroyed=mutableListOf<A>();var finishes=0;override fun start(p:AdPlacement,count:Int,multiple:Boolean,onAd:(A)->Unit,onError:(AdError)->Unit,onFinish:()->Unit){this.multiple+=multiple;calls+=C(onAd,onError,onFinish)};fun ad(a:A){calls.last().ad(a)};fun error(e:AdError){calls.last().err(e)};fun finish(){finishes++;calls.removeLast().end()};override fun destroy(ad:A){destroyed+=ad}}
+private class Warnings:IosMemoryWarnings{var c:(()->Unit)?=null;var removed=0;override fun add(callback:()->Unit):Any{c=callback;return this};override fun remove(token:Any){removed++;c=null};fun fire(){c?.invoke()}}

@@ -76,9 +76,9 @@ because the caller's intent was "fill the cache", and the cache
 is partially full. A call that returns zero ads is `Failed` with
 a no-fill error, not `Loaded` with an empty cache.
 
-A native-pool cross-reference in one sentence: for native
-placements the same `maxSize` budgets **available + in-use** ads
-together — see the [native ads guide](/formats/native/).
+Native placements use session/window retention and the process-wide
+native memory policy rather than `maxSize` capacity — see the
+[native ads guide](/formats/native/).
 
 ## Retry policies and backoff behaviour
 

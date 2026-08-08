@@ -6,10 +6,10 @@
     "invariants": [1, 7],
     "prose": [
       "dev.avinya.ads:admob-cmp is an umbrella artefact. It holds essentially no code of its own; it exists so that a consumer adds one dependency and gets both underlying modules, which it re-exports with Gradle api scope: admob-cmp-core and admob-cmp-compose.",
-      "admob-cmp-core has no Compose dependency. Its commonMain source set holds the public API — AdManager, the per-format controllers, AdPlacement, AdConfig, AdEvent, AdError, consent and diagnostics — plus the internal shared state machines in dev.avinya.ads.internal: FullScreenSlotCore, BannerCore, NativePoolCore and AdRetry. The package dev.avinya.ads.appopen holds AppOpenAdCoordinator, while dev.avinya.ads.nativead holds the native pool contract, options and media information.",
+      "admob-cmp-core has no Compose dependency. Its commonMain source set holds the public API — AdManager, the per-format controllers, AdPlacement, AdConfig, AdEvent, AdError, consent and diagnostics — plus the internal shared state machines FullScreenSlotCore, BannerCore, NativeAdCoordinatorCore, NativeAdSessionCore and AdRetry. The package dev.avinya.ads.appopen holds AppOpenAdCoordinator, while dev.avinya.ads.nativead holds the bounded native-session contract, policies, options and media information.",
       "admob-cmp-compose holds everything that requires Compose Multiplatform: the dev.avinya.ads.ui composables BannerAdView and NativeAdView, the adLayout {} DSL with its validator and templates in dev.avinya.ads.nativead.layout, and the debug screen in dev.avinya.ads.debug.",
-      "androidMain supplies AndroidGoogleAdManager and the Android slots, pool and banner backed by the GMA Next-Gen SDK on API level 26 and above, the AdMob.manager(context) singleton, and a ProcessLifecycleOwner foreground signal. iosMain supplies IosGoogleAdManager and the iOS slots, pool, banner and consent over Kotlin/Native cinterop bindings against GMA 13.x on iOS 15 and above, a UIKit native-ad renderer, and an NSNotificationCenter foreground signal.",
-      "Platform classes implement only low-level operations — loadAd, presentAd, destroyAd, canPresent and getResponseInfo for full-screen formats, alongside BannerPlatform and NativePoolPlatform for banners and native ads. High-level ad loading, presentation flow, caching, retry routines and consent-gating logic execute entirely within the shared core. Low-level platform adapters directly manage native batch-assembly locking, iOS delegate lifecycles, and in-flight request registries."
+      "androidMain supplies AndroidGoogleAdManager and Android native-session platform adapters backed by the GMA Next-Gen SDK on API level 26 and above, the AdMob.manager(context) singleton, and a ProcessLifecycleOwner foreground signal. iosMain supplies IosGoogleAdManager, iOS native-session adapters, banner and consent over Kotlin/Native cinterop bindings against GMA 13.x on iOS 15 and above, a UIKit native-ad renderer, and an NSNotificationCenter foreground signal.",
+      "Platform classes implement low-level operations only. The native coordinator owns platform ads, global reservations, exact retirement and session generations; platform adapters retain delegates and perform SDK calls on Main. No platform call occurs while coordinator or governor locks are held."
     ]
   },
   "init-sequence": {
@@ -40,19 +40,16 @@
       "All suspending operations enforce configured execution bounds. Ad loading operates within withTimeoutOrNull using placement.timeoutPolicy.loadTimeout, bounding the complete attempt sequence including backoff delays. Timeouts apply to the pre-hand-off window; once the underlying SDK assumes presentation control, presentation is not forcefully terminated."
     ]
   },
-  "native-pool-lifecycle": {
-    "id": "native-pool-lifecycle",
-    "title": "Native ad pool lifecycle and maxSize accounting",
-    "desc": "preload, acquire, render and release for the native ad pool, and how maxSize budgets available plus in-use ads.",
+  "native-session-lifecycle": {
+    "id": "native-session-lifecycle",
+    "title": "Native session lifecycle and bounded admission",
+    "desc": "Viewport demand becomes a reservation, platform load, retained record and one renderer lease; detachment retains and retirement destroys exactly once.",
     "invariants": [3, 4, 8],
     "prose": [
-      "The native pool manages ad inventory for feeds and list items using a shared placement identifier. Calling pool.preload(count) requests a batch load from the platform adapter, adding loaded ads to available inventory. Calling pool.acquire() leases an ad and returns an acquisition token for rendering in NativeAdView, while pool.release(token) returns the leased slot.",
-      "AdCachePolicy.maxSize defines the total capacity budget for available and leased ads combined. When maxSize is 1 and an ad is currently leased, subsequent calls to preload() return early and acquire() returns null until capacity is freed.",
-      "The property pool.availableAds is a `StateFlow<Int>` representing remaining available inventory capacity. Composables observe availableAds to trigger acquisition attempts when new capacity becomes available.",
-      "Because native ad handles are single-use, calling release(token) destroys the native ad object and frees a slot in maxSize capacity without automatically incrementing availableAds. Applications or composables must invoke preload() to request a replacement ad into the newly freed capacity slot. Built-in NativeAdView composables manage this cycle automatically.",
-      "Calling clear() purges and destroys unleased available inventory. Currently leased ads remain valid until release(token) is called so active views complete rendering smoothly. Clearing a pool where all capacity is leased releases no slots until active views dispose and invoke release().",
-      "An internal generation counter tracks batch loading operations across clear() calls. Batch loading requests initiated prior to a clear() invocation are discarded upon completion, preventing stale ads from populating the pool.",
-      "Platform adapters handle concurrency and delegate management locally. Native ad batch assembly coordinates main-thread SDK callbacks with multi-threaded cancellation signals using thread-safe locking within the platform layer. On iOS, platform handles retain strong references to native delegates to prevent premature garbage collection."
+      "A named native session receives a bounded window of stable, model-owned slots from a measured viewport. It ranks visible slots before ahead and behind bands, and requests capacity from the process-wide governor before a platform load begins.",
+      "The default governor permits four speculative loaded-or-reserved ads and never permits more than six total. Visible demand can use hard-limit headroom; mounted records cannot be evicted. Session state publishes empty, loading, ready, mounted, retained and failed slots rather than exposing platform handles.",
+      "A successful load is a coordinator-owned retained record. NativeAdView may obtain one internal renderer lease for an exact slot generation. A row or tab detachment releases that renderer binding while the bounded record can remain available for reattachment.",
+      "TTL expiry, memory pressure, consent invalidation, clear and permanent close retire the record exactly once. Reservations are generation-bound, so a late callback or stale renderer release cannot modify a replacement record. Android synchronizes batch callback handoff; iOS retains strong delegate references alongside the record."
     ]
   },
   "banner-geometry": {

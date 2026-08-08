@@ -45,11 +45,10 @@ class NoOpAdManagerTest {
     }
 
     @Test
-    fun `native pool returns null acquire`() {
-        val pool = NoOpAdManager.nativeAd(placement.copy(id = "native-test", format = AdFormat.Native))
-        assertIs<NoOpNativeAdPool>(pool)
-        assertNull(pool.acquire())
-        assertEquals(0, pool.availableCount())
+    fun `native sessions remain bounded`() {
+        val session = NoOpAdManager.nativeAds.session("native-test")
+        session.updateWindow(dev.avinya.ads.nativead.NativeAdWindow(listOf(dev.avinya.ads.nativead.NativeAdSlot("slot", placement.copy(id = "native", format = AdFormat.Native)))))
+        assertEquals(0, NoOpAdManager.nativeAds.state.value.loadedAds)
     }
 
     @Test

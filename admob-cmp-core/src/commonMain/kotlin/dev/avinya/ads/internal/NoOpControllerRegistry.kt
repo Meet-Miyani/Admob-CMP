@@ -8,7 +8,6 @@ internal class NoOpControllerRegistry {
     private val lock = FullScreenStateLock()
     private val placements = mutableMapOf<String, AdPlacement>()
     private val banners = mutableMapOf<String, BannerAdController>()
-    private val nativePools = mutableMapOf<String, NativeAdPool>()
     private val fullScreen = mutableMapOf<Pair<String, AdFormat>, FullScreenAdController>()
 
     private fun owned(placement: AdPlacement, expected: AdFormat): AdPlacement {
@@ -28,10 +27,6 @@ internal class NoOpControllerRegistry {
         banners.getOrPut(value.id) { NoOpBannerAdController(value) }
     }
 
-    internal fun nativeAd(placement: AdPlacement): NativeAdPool = lock.withLock {
-        val value = owned(placement, AdFormat.Native)
-        nativePools.getOrPut(value.id) { NoOpNativeAdPool(value) }
-    }
 
     internal fun interstitial(placement: AdPlacement): InterstitialAdController = lock.withLock {
         val value = owned(placement, AdFormat.Interstitial)

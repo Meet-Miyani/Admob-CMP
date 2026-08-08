@@ -35,16 +35,16 @@ The library supports six distinct ad format configurations across five core ad t
 | Rewarded | `adManager.rewarded(placement)` | — | [Rewarded ads](/formats/rewarded/) |
 | Rewarded Interstitial | `adManager.rewardedInterstitial(placement)` | — | [Rewarded ads](/formats/rewarded/) |
 | App-Open | `adManager.appOpen(placement)` | — | [App-open ads](/formats/app-open/) |
-| Native | `adManager.nativeAd(placement)` | `NativeAdView` | [Native ads](/formats/native/) |
+| Native | `adManager.nativeAds.session(key, policy)` | `NativeAdView(session, slotKey, placement)` | [Native ads](/formats/native/) |
 
-Controllers are placement-keyed singletons retained across screen recompositions, ensuring load state continuity and preventing redundant ad requests.
+Full-screen and banner controllers are placement-keyed. Native ads use named, viewport-aware sessions with stable model-owned slots, globally bounded capacity, and a coordinator that owns the platform ad objects.
 
 ## Core capabilities
 
 AdMob CMP addresses common ad-integration challenges in shared Kotlin code:
 
 1. **Placement-Keyed Controller Management**: Maintains static, placement-specific controllers across UI recompositions.
-2. **Automated Ad Caching & Retry**: Implements TTL-based eviction, backoff retry policies, and customizable caching parameters (`AdCachePolicy`, `AdExpirationPolicy`, `AdRetryPolicy`).
+2. **Bounded native sessions and retry**: Native sessions use stable windows, TTL-based retirement and globally bounded loaded-plus-reserved capacity; other formats use their documented cache policy and retry controls.
 3. **Consent-Gated Requests**: Automatically checks `canRequestAds` before making network requests, preventing policy violations from premature loading.
 4. **Unified Reactive Event Stream**: Exposes a single `AdEvent` `StateFlow` covering `Loaded`, `LoadFailed`, `Impression`, `Clicked`, `Paid`, and `RewardEarned`.
 

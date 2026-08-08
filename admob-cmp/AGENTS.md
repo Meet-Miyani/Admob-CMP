@@ -34,7 +34,7 @@ or `ConsentMode.SkipConsent`.
 | `Rewarded` | `rewarded(placement)` | — | `ANDROID_REWARDED` / `IOS_REWARDED` |
 | `RewardedInterstitial` | `rewardedInterstitial(placement)` | — | `ANDROID_REWARDED_INTERSTITIAL` / `IOS_REWARDED_INTERSTITIAL` |
 | `AppOpen` | `appOpen(placement)` + `AppOpenAdCoordinator` | — | `ANDROID_APP_OPEN` / `IOS_APP_OPEN` |
-| `Native` | `nativeAd(placement)` (pool) | `NativeAdView(placement, itemKey, layout)` | `ANDROID_NATIVE` / `IOS_NATIVE` |
+| `Native` | `nativeAds.session(key, policy)` | `NativeAdView(session, slotKey, placement, layout)` | `ANDROID_NATIVE` / `IOS_NATIVE` |
 
 `TestAdIds` constants are flat (`TestAdIds.ANDROID_BANNER`) — there is no
 `TestAdIds.Android.*` nesting.
@@ -109,37 +109,31 @@ val layout = adLayout {
         callToAction(modifier = AdModifier.fillMaxWidth())
     }
 }
-NativeAdView(placement = placement, itemKey = "feed_3", layout = layout)
+// Own this above individual rows; keys come from the feed model, never indexes.
+val session = rememberNativeAdFeedSession(
+    sessionKey = "home-feed",
+    listState = listState,
+    itemCount = items.size,
+    slotAt = { index -> (items[index] as? FeedItem.NativeSlot)?.slot },
+)
+NativeAdView(session = session, slotKey = "feed_3", placement = placement, layout = layout)
 ```
 
 DSL nodes are functions with named args (`headline(maxLines = 2)`), NOT
 property-assignment blocks. `adBadge()` is policy-required (validator warns).
-Manual pooling: `pool.preload(count)`, `pool.acquire()` → render → `pool.release(token)`;
-`pool.mediaInfo(token)` gives aspect ratio / video info.
+The manager owns native platform objects; applications report stable `NativeAdSlot`s through
+`NativeAdSession.updateWindow`, while `NativeAdView` obtains the single internal renderer
+lease. Do not preload, acquire, release, or retain platform objects yourself. A default session
+retains three active records (previous/current/next), one inactive anchor, with a process-wide
+soft limit of four and hard limit of six loaded-plus-reserved ads. `cachePolicy.expirationPolicy
+.nativeTtl` remains the per-placement TTL (one hour by default); native `maxSize` and
+`reloadAfterShow` are ignored.
 
-### Availability (`pool.availableAds`)
-
-`AdCachePolicy.maxSize` budgets **available + in-use** ads. So with `maxSize = 1` and one
-row holding the ad, `preload()` returns early and `acquire()` returns `null` for every other
-row — deterministically, not as a race. `acquire()` returning null used to be silent and
-terminal for that composition, leaving those rows blank forever.
-
-`pool.availableAds: StateFlow<Int>` is the signal that lets a view recover. Key your
-acquisition effect on it:
-
-```kotlin
-val availableAds by pool.availableAds.collectAsState()
-LaunchedEffect(pool, itemKey, availableAds) { … pool.preload(…); pool.acquire() … }
-```
-
-Re-run `preload`, not just `acquire`: `release()` destroys the ad (native ads are
-single-use) so it frees a `maxSize` **slot** without incrementing `availableAds`. The
-`NativeAdView` composables already do this.
-
-`clear()` drains available inventory only. Ads currently leased stay alive until their
-`release()`, because a live view is still rendering them — so `peek(token)` keeps resolving
-after a `clear()`. A consequence: clearing a fully-leased pool frees no capacity until those
-views dispose.
+Leaving a tab calls `deactivate()` and keeps the bounded inactive anchor. Call `close()` only
+when the logical destination is permanently discarded. Session metadata is reaped after 30
+minutes inactive. `NativeAdSession.state` supplies `Empty`, `Loading`, `Ready`, `Mounted`,
+`Retained`, and `Failed` slot states; preserve row geometry for loading and failure rather than
+removing an ad row.
 
 > **Platform gap — native video events on Android.** iOS emits five video events
 > (`VideoStarted`, `VideoPlayed`, `VideoPaused`, `VideoEnded`, `VideoMuted`) via
@@ -172,12 +166,13 @@ then call `adManager.consent.showPrivacyOptions()`. Do NOT gate on
 ## Hard rules
 
 1. Wrap controller lookups in `remember { adManager.x(placement) }` — never per-recomposition work in composition.
-2. Every `pool.acquire()` needs a matching `release()` (the composables do it for you).
+2. Own one named native session above its rows; use stable model-owned slot keys, never indexes
+   or serialised platform objects. The SDK alone owns render leases and platform ads.
 3. Call `show()` from a UI-scoped coroutine, never `GlobalScope`; it suspends for the ad's full lifetime.
 4. Android-only options that iOS silently ignores: `immersiveMode`, `customClickGesture`, `publisherProvidedId`, `categoryExclusions`, `skipUninitializedAdapters`. (`customTargeting` and `placementId` ARE mapped on both platforms.)
 5. Video `AdEvent`s are iOS-only until the Android Next-Gen SDK exposes video callbacks.
 6. Don't construct `AdManager` implementations; only `rememberAdManager()` / `AdMob.manager(context)`.
-7. Use static, finite `AdPlacement.id`s. Controllers are cached per id for the manager's lifetime and not auto-evicted — never generate per-item ids like `"feed_item_$index"`. For feeds/lists reuse one placement id; the native pool serves per-item ads.
+7. Use static, finite `AdPlacement.id`s. Controllers are cached per id for the manager's lifetime and not auto-evicted — never generate per-item ids like `"feed_item_$index"`. For feeds/lists reuse one placement id and report stable model-owned native slot keys to one session.
 
 ## Config flags: `testMode` and `strictTestMode`
 
@@ -265,7 +260,7 @@ Android has no ATT; `adManager.tracking` is a no-op there, always reporting
   and nothing will ever call `destroyAd` to release that delegate.
 - `AdAttemptResult.Success/Failure` is the internal load-callback bridge.
 - iOS: every ObjC delegate is weak — keep strong Kotlin refs alongside the ad
-  (pool `NativeEntry.delegates`, slot `FullScreenDelegateStore`, keyed by ad
+  (native coordinator record delegates, slot `FullScreenDelegateStore`, keyed by ad
   identity so destroying one ad can't sever a different ad's live delegate).
   Paid-event handlers capture ads via `WeakReference` (ARC cycles).
 - `AndroidGoogleAdManager`/`IosGoogleAdManager.initialize()`: concurrent

@@ -95,9 +95,9 @@ internal class BannerCore<V : Any, S : Any>(
     // Recovery paths (failOrRestore/onCancelled) must be able to republish Loaded without
     // calling back into the platform. Reading it lazily instead was wrong twice over: it
     // touched a GMA object while holding the state lock — which on iOS is also taken from GMA
-    // callback threads, the exact thing NativePoolCore.mediaInfo documents as forbidden — and
+    // callback threads, which are not safe for synchronous SDK reads — and
     // it could read from a banner that clear() had already retired and destroyed. Mirrors
-    // NativePoolCore.lastResponseInfo.
+    // cached response metadata follows the same rule.
     private var bannerResponseInfo: AdResponseInfo? = null
 
     // The single record refresh() replays. Its fields have two DIFFERENT owners with
@@ -201,7 +201,7 @@ internal class BannerCore<V : Any, S : Any>(
         requestOptions: AdRequestOptions
     ) {
         // resolveSize is a platform call and stays outside the state lock: on iOS that lock is
-        // also taken from GMA callback threads (the rule NativePoolCore documents).
+        // also taken from GMA callback threads (the same callback-thread rule).
         val resolvedSize = platform.resolveSize(sizePolicy, geometry.widthDp)
         platform.withStateLock {
             val existing = replayRequest
@@ -363,7 +363,7 @@ internal class BannerCore<V : Any, S : Any>(
      * cancellation comment two lines up — the previous banner really does stay displayed, but
      * `BannerAdView` reads Idle as "cleared/destroyed, drop the reference" and blanked the
      * slot. A restarted `LaunchedEffect`, a resize or an explicit cancel would wipe a perfectly
-     * live ad. This is the same inventory-blindness [NativePoolCore.onCancelled] fixed for the
+     * live ad. This is the same inventory-blindness fixed for native-ad loads in the
      * pool (P1-3); the banner never got the matching fix.
      */
     private fun onCancelled(requiredGeneration: Long) {
@@ -401,7 +401,7 @@ internal class BannerCore<V : Any, S : Any>(
      * Teardown that cannot itself derail an in-flight failure path. Used where the core is
      * discarding a banner it has decided not to own; a throwing `destroy` there would replace
      * the original failure with a confusing secondary one. Mirrors
-     * `FullScreenSlotCore.safelyDestroyAd` and `NativePoolCore.safelyDestroy`.
+     * `FullScreenSlotCore.safelyDestroyAd` and the native coordinator's destruction path.
      */
     private fun safelyDestroy(banner: V) {
         try {

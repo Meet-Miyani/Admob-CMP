@@ -61,7 +61,7 @@ describe('build-time static SVG only', () => {
     // One representative string per hand-authored diagram.
     for (const needle of [
       'FullScreenSlotCore',
-      'maxSize = available + in-use',
+      'soft 4 / hard 6',
       'UIScreen.mainScreen',
       'NETWORK_ERROR',
       'upstream SDK gap',

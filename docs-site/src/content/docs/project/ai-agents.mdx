@@ -26,8 +26,8 @@ entry points (`rememberAdManager()` for Compose,
 shared placement lists), the canonical initialisation snippet,
 a format-to-API table mapping each `AdFormat` to its controller,
 composable and test ad IDs, the full-screen load/show pattern,
-the banner and native sections including geometry and pool
-accounting, the app-open coordinator, the consent and
+the banner and native sections including geometry and session
+ownership, the app-open coordinator, the consent and
 privacy-options rule, `testMode` versus
 `strictTestMode` distinctions, executable iOS setup steps, and a
 symptom-to-fix troubleshooting table. The file lives at
@@ -68,11 +68,11 @@ Diagram components ship with prose equivalents that are included in the `llms.tx
 Key rules and constraints for AI coding tools when integrating AdMob CMP:
 
 - Use `rememberAdManager()` in Compose or `AdMob.manager(context)` on Android rather than constructing `AdManager` implementations directly.
-- Do not generate per-item placement IDs such as `"feed_item_$index"`. Controllers are cached per ID and never auto-evicted; reuse placement IDs and allow the native pool to handle per-item ads.
+- Do not generate per-item placement IDs such as `"feed_item_$index"`. Reuse a static placement and give native sessions stable model-owned slot keys; never use list indexes or serialise a session/platform ad.
 - Invoke `show()` from a UI-scoped coroutine rather than `GlobalScope`, as it suspends for the ad's full on-screen lifetime.
 - Use flat test ID constants: `TestAdIds.ANDROID_BANNER`.
 - Format `adLayout` DSL nodes as functions with named arguments: `headline(maxLines = 2)`.
 - Note that `testMode = true` configures UMP consent debugging only; it does not serve test ads.
 - Gate privacy-settings buttons on `PrivacyOptionsRequirementStatus.Required` rather than `ConsentStatus.Obtained`.
-- `pool.peek(...)` is internal and not part of the public API.
+- Native sessions own platform objects and renderer leases. Report windows with the Compose helpers; do not add manual preload, acquire, release, token, or platform lookup code.
 - Native video events fire on iOS (`GADVideoControllerDelegate`); Android does not emit native video events.

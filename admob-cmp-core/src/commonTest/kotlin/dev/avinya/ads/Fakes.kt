@@ -18,6 +18,11 @@ import kotlin.time.Instant
  *  callback resolves the presentation. */
 private suspend fun suspendForeverUntilCancelled(): Nothing = awaitCancellation()
 
+internal class FakeAd(val id: Int) {
+    override fun equals(other: Any?): Boolean = other is FakeAd && other.id == id
+    override fun hashCode(): Int = id
+}
+
 internal open class FakeFullScreenSlot(
     placement: AdPlacement,
     globalEvents: MutableSharedFlow<AdEvent>,
@@ -192,7 +197,7 @@ internal class FakeAdManager : AdManager, FullScreenPresenceAware {
 
     override suspend fun initialize(config: AdConfig, consentMode: ConsentMode): AdManagerStatus = status.value
     override fun banner(placement: AdPlacement): BannerAdController = NoOpBannerAdController(placement)
-    override fun nativeAd(placement: AdPlacement): NativeAdPool = NoOpNativeAdPool(placement)
+    override val nativeAds: dev.avinya.ads.nativead.NativeAdManager get() = NoOpAdManager.nativeAds
     override fun interstitial(placement: AdPlacement): InterstitialAdController = NoOpInterstitialAdController(placement)
     override fun rewarded(placement: AdPlacement): RewardedAdController = NoOpRewardedAdController(placement)
     override fun rewardedInterstitial(placement: AdPlacement): RewardedInterstitialAdController = NoOpRewardedInterstitialAdController(placement)

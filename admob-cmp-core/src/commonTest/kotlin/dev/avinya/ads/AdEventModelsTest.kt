@@ -94,6 +94,15 @@ class AdEventModelsTest {
     }
 
     @Test
+    fun `AdEvent video lifecycle events carry their native instance identity`() {
+        assertEquals("first", AdEvent.VideoStarted("native", adInstanceId = "first").adInstanceId)
+        assertEquals("second", AdEvent.VideoPlayed("native", adInstanceId = "second").adInstanceId)
+        assertEquals("third", AdEvent.VideoPaused("native", adInstanceId = "third").adInstanceId)
+        assertEquals("fourth", AdEvent.VideoEnded("native", adInstanceId = "fourth").adInstanceId)
+        assertEquals("fifth", AdEvent.VideoMuted("native", muted = true, adInstanceId = "fifth").adInstanceId)
+    }
+
+    @Test
     fun `AdShowResult subclasses work correctly`() {
         assertEquals(AdShowResult.Shown::class, AdShowResult.Shown::class)
         assertEquals(AdShowResult.NotReady::class, AdShowResult.NotReady::class)

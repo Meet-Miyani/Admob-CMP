@@ -41,7 +41,7 @@ All six formats, on both platforms, from one `commonMain` API.
 | Rewarded | `AdFormat.Rewarded` | `rewarded(placement)` | — | `ANDROID_REWARDED` / `IOS_REWARDED` |
 | Rewarded interstitial | `AdFormat.RewardedInterstitial` | `rewardedInterstitial(placement)` | — | `ANDROID_REWARDED_INTERSTITIAL` / `IOS_REWARDED_INTERSTITIAL` |
 | App-open | `AdFormat.AppOpen` | `appOpen(placement)` + `AppOpenAdCoordinator` | — | `ANDROID_APP_OPEN` / `IOS_APP_OPEN` |
-| Native | `AdFormat.Native` | `nativeAd(placement)` (a pool) | `NativeAdView(placement, itemKey, layout)` | `ANDROID_NATIVE` / `IOS_NATIVE` |
+| Native | `AdFormat.Native` | `nativeAds.session(key, policy)` | `NativeAdView(session, slotKey, placement, layout)` | `ANDROID_NATIVE` / `IOS_NATIVE` |
 
 ## 30-second quickstart
 
@@ -99,7 +99,7 @@ BannerAdView(
 )
 ```
 
-Native ads are laid out with a declarative DSL and served from a pool, so a feed reuses one placement id across every row and the pool serves a distinct ad per `itemKey`:
+Native ads are laid out with a declarative DSL and served by a bounded session. A feed reuses one placement id, keeps stable model-owned slot keys, and lets the session own native platform objects:
 
 ```kotlin
 val nativePlacement = remember {
@@ -108,7 +108,6 @@ val nativePlacement = remember {
         format = AdFormat.Native,
         androidAdUnitId = TestAdIds.ANDROID_NATIVE,
         iosAdUnitId = TestAdIds.IOS_NATIVE,
-        maxCacheSize = 3
     )
 }
 
@@ -124,14 +123,20 @@ val layout = remember {
     }
 }
 
-NativeAdView(placement = nativePlacement, itemKey = "feed_3", layout = layout)
+val session = rememberNativeAdFeedSession(
+    sessionKey = "feed",
+    listState = listState,
+    itemCount = feed.size,
+    slotAt = { index -> (feed[index] as? FeedItem.NativeSlot)?.let { NativeAdSlot(it.key, nativePlacement) } },
+)
+NativeAdView(session = session, slotKey = "after-article-3", placement = nativePlacement, layout = layout)
 ```
 
-Use a static, finite placement id. Never generate one per row (`"feed_item_$index"`) — controllers are cached per id for the manager's lifetime.
+Use a static, finite placement id and stable model-owned slot keys. Never generate either from a row index. The default active session retains three records; the process-wide governor bounds loaded plus reserved ads at soft 4 / hard 6. A temporary tab exit deactivates the session and retains one anchor; permanently discarded destinations close it. Per-placement native TTL remains one hour by default.
 
 ## Why AdMob CMP
 
-- **Six formats, not four.** Native ads and app-open ads are supported on both platforms, with a layout DSL and a real pool.
+- **Six formats, not four.** Native ads and app-open ads are supported on both platforms, with a layout DSL and bounded, viewport-aware sessions.
 - **Consent is part of initialization.** UMP modes, the privacy options form, and `canRequestAds` are first-class, and the iOS consent → ATT → initialize ordering is enforced rather than documented and hoped for.
 - **The iOS test link actually works.** The `dev.avinya.ads.admob-cmp` Gradle plugin links Google Mobile Ads and UMP into Kotlin/Native test executables, which is the difference between `:iosSimulatorArm64Test` passing and failing with `Undefined symbols … _OBJC_CLASS_$_GAD*`.
 - **Revenue and mediation are exposed.** Paid events carry `AdValue` and `ResponseInfo`; mediation adapters get initialization hooks.
@@ -189,7 +194,7 @@ This repository is the SDK plus a Kotlin Multiplatform demo that exercises it.
 | Module | What it is |
 |---|---|
 | `admob-cmp/` | The published facade artifact — depends on core and compose |
-| `admob-cmp-core/` | Compose-free Kotlin Multiplatform core: `AdManager`, consent, full-screen orchestration, banner and native pools, iOS cinterop bindings |
+| `admob-cmp-core/` | Compose-free Kotlin Multiplatform core: `AdManager`, consent, full-screen orchestration, banner and native-session coordination, iOS cinterop bindings |
 | `admob-cmp-compose/` | Compose Multiplatform UI: `BannerAdView`, `NativeAdView`, the native-ad layout DSL, the debug console, `rememberAdManager` |
 | `admob-cmp-gradle-plugin/` | Links Google Mobile Ads and UMP into Kotlin/Native test executables |
 | `shared/`, `androidApp/`, `iosApp/`, `desktopApp/`, `webApp/` | The demo application. Ads render on the Android and iOS targets; desktop and web build without the ad surface. |
@@ -248,6 +253,121 @@ is the contributor's responsibility:
    before the artifacts are publicly available — this is deliberate, because
    Maven Central coordinates are immutable, and it is the last point at which
    a bad release can be stopped.
+
+## Showcase app
+
+`showcase/` is a production-grade Compose Multiplatform reference app that
+exercises every ad format the SDK supports in realistic placements — a
+reading app with a paged feed, article detail, a coin economy and a
+per-screen ad Inspector.
+
+It is a **consumer** of `admob-cmp`; reusable ad lifecycle behavior belongs
+in the SDK rather than in sample-only workarounds. The approved next work is
+defined by the [native-ad session architecture](docs/superpowers/plans/2026-08-07-native-ad-session-architecture.md)
+and the dependent [Fieldnotes Showcase redesign](docs/superpowers/plans/2026-08-07-showcase-fieldnotes-redesign.md).
+
+### Screens
+
+- **Onboarding** — first-run only. The canonical UMP consent → ATT → GMA
+  initialisation order from the SDK, including the
+  `AdInitializationPhase.BeforeMobileAdsInitialize` hook that fires the ATT
+  request. Renders `Starting`, `ConsentRequired`, `Ready` and `Failed`
+  states.
+- **Feed** — a Paging3-backed list of articles. A native ad slot is
+  interleaved after every sixth article using `insertSeparators`; the slot
+  slot key is derived from the preceding article's id, so refreshing or
+  prepending pages does not discard a stable native session record. An anchored adaptive banner
+  pins above the bottom bar.
+- **Article** — the detail screen. An inline native ad is inserted after the
+  third paragraph using a different `AdLayout` than the feed's, proving the
+  layout DSL composes. A collapsible banner sits at the bottom. On close,
+  `AdPolicy.decideInterstitial` decides whether the next article is
+  interrupted, and every decision — Show or Suppress — is recorded in the
+  Inspector with its reason.
+- **Store** — a coin economy. "Watch an ad → +50 coins" runs the full
+  `RewardedAdController` lifecycle; the credit comes from the
+  `onRewardEarned` callback, not from `show()`'s return value, and a
+  per-presentation idempotency key in `reward_grants` prevents a replayed
+  callback from double-crediting. A rewarded-interstitial is offered as a
+  "today's offer" dialog on entering the premium section. Unlocking a
+  premium article spends coins and runs inside `AppOpenSuppressor` so an
+  app-open ad cannot appear mid-transaction.
+- **Library** — bookmarks, in-progress articles, and unlocked premium
+  articles. **Zero ads, by design** — restraint is part of a good
+  integration, and Settings explains the reasoning.
+- **Settings** — consent status and privacy options, ATT status and
+  `requestAuthorization()`, `resetConsentForDebug()` and a
+  `ConsentDebugGeography` picker, SDK version and adapter statuses, the
+  Google ad Inspector, the SDK debug menu, and a theme toggle.
+
+### Inspector
+
+Every screen has an **Inspect** button in its top bar, shown only when
+`settings.inspectorEnabled` is on. It opens a modal bottom sheet with three
+tabs that read the showcase's telemetry tables, so the history survives
+navigation:
+
+- **Placements** — for the current screen: the `AdPlacement` config as
+  rendered fields (id, format, ad unit per platform, size, refresh and cache
+  policy), native session slot states, and global loaded/reserved capacity.
+- **Events** — the rolling `ad_events` log interleaved with
+  `policy_decisions`, newest first. Suppression reasons are rendered
+  verbatim, so the tab answers "why did no ad appear", not just "what
+  happened".
+- **Revenue** — per-placement aggregates (`AdValuePrecision` is preserved)
+  and the raw `paid_events` list. Mixed currencies are not summed.
+
+On Android, the Events tab explicitly labels the native video events
+(`VideoStarted`, `VideoPlayed`, `VideoPaused`, `VideoEnded`, `VideoMuted`)
+as unavailable — the GMA Next-Gen SDK does not yet expose the equivalent
+of iOS's `GADVideoControllerDelegate`, and the SDK's own `AdEvent` KDoc
+records this as an upstream limitation. The empty section is labelled
+rather than left blank, so it reads as documented, not broken.
+
+### App-open ads
+
+A process-wide `AppOpenAdCoordinator` is started at the app root. It shows
+an ad on foreground after a minimum 4-second background and a 4-hour
+cooldown between shows. An `AppOpenSuppressor` lets flows opt out for
+their lifetime; the Store uses it for coin-unlock transactions and
+onboarding enters the suppressor for its whole screen, so an app-open ad
+cannot appear over a consent flow or a purchase.
+
+### Format coverage
+
+| Format | Where | What it proves |
+|---|---|---|
+| Banner | Feed, anchored adaptive | sizing, `SdkManaged` refresh |
+| Banner | Article, collapsible | `CollapsiblePlacement`, `AdServerManaged` |
+| Native | Feed, paged | bounded session, stable slot keys, viewport retention |
+| Native | Article, inline | layout DSL reuse in a different shape |
+| Interstitial | Article close | frequency capping, cache, suppression reasons |
+| Rewarded | Store | reward-callback correctness, persisted consequence |
+| RewardedInterstitial | Store premium entry | offer-wall pattern |
+| AppOpen | app-wide | `AppOpenAdCoordinator`, `isBlocked` during transactions |
+
+### Run it
+
+```bash
+./gradlew :androidApp:installDebug          # Android
+open iosApp/iosApp.xcodeproj                # iOS — build and run in Xcode
+```
+
+All placements use Google's test ad units with `strictTestMode` on. The app
+targets Android and iOS only; `desktopApp` and `webApp` keep rendering the
+unsupported-platform screen.
+
+Compile check across all four consumer apps and the iOS arm64 target:
+
+```bash
+./gradlew :androidApp:assembleDebug :desktopApp:compileKotlin :webApp:compileKotlinJs :showcase:compileKotlinIosSimulatorArm64 --no-configuration-cache
+```
+
+Tests:
+
+```bash
+./gradlew :showcase:testAndroidHostTest :showcase:iosSimulatorArm64Test
+```
 
 ## License
 

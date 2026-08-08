@@ -1,0 +1,17 @@
+---
+import DiagramFrame from './DiagramFrame.astro';
+---
+
+<DiagramFrame id="native-session-lifecycle" width={1120} height={440}>
+    <rect class="dg-panel" x="24" y="42" width="180" height="86" rx="12" /><text class="dg-title" x="114" y="78" text-anchor="middle">Viewport demand</text><text class="dg-sub" x="114" y="102" text-anchor="middle">stable slots + window</text>
+    <rect class="dg-panel" x="254" y="42" width="180" height="86" rx="12" /><text class="dg-title" x="344" y="78" text-anchor="middle">Reservation</text><text class="dg-sub" x="344" y="102" text-anchor="middle">soft 4 / hard 6</text>
+    <rect class="dg-panel" x="484" y="42" width="180" height="86" rx="12" /><text class="dg-title" x="574" y="78" text-anchor="middle">Platform load</text><text class="dg-sub" x="574" y="102" text-anchor="middle">main-thread SDK work</text>
+    <rect class="dg-panel" x="714" y="42" width="180" height="86" rx="12" /><text class="dg-title" x="804" y="78" text-anchor="middle">Retained record</text><text class="dg-sub" x="804" y="102" text-anchor="middle">session-owned native ad</text>
+    <rect class="dg-panel" x="914" y="42" width="180" height="86" rx="12" /><text class="dg-title" x="1004" y="78" text-anchor="middle">Render lease</text><text class="dg-sub" x="1004" y="102" text-anchor="middle">one live renderer</text>
+    <path class="dg-edge" d="M204 85H254 M434 85H484 M664 85H714 M894 85H914" marker-end="url(#native-session-lifecycle-arrow)" />
+    <rect class="dg-note" x="714" y="188" width="180" height="78" rx="12" /><text class="dg-title" x="804" y="220" text-anchor="middle">Detachment</text><text class="dg-sub" x="804" y="244" text-anchor="middle">retain for tab/row return</text>
+    <rect class="dg-alert" x="914" y="188" width="180" height="78" rx="12" /><text class="dg-title" x="1004" y="220" text-anchor="middle">Retirement</text><text class="dg-sub" x="1004" y="244" text-anchor="middle">TTL, eviction, clear, close</text>
+    <path class="dg-edge" d="M1004 128V188 M1004 128V158H804V188 M804 266V306H1004V266" marker-end="url(#native-session-lifecycle-arrow)" />
+    <text class="dg-sub" x="24" y="350">No platform call runs under the coordinator/governor locks. Reservations map to generations; stale callbacks and leases cannot replace or retire a newer record.</text>
+    <text class="dg-sub" x="24" y="384">Mounted records are never eviction candidates. Loading/failure state remains in the stable row so the feed geometry does not jump.</text>
+</DiagramFrame>

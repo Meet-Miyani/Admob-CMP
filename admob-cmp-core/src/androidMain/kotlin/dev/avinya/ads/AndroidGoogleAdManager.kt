@@ -8,7 +8,10 @@ import dev.avinya.ads.internal.FullScreenPresentationArbiter
 import dev.avinya.ads.internal.deriveAdmission
 import dev.avinya.ads.internal.ConsentSessionState
 import dev.avinya.ads.internal.ownedSnapshot
-import dev.avinya.ads.nativead.AndroidNativeAdPool
+import dev.avinya.ads.internal.NativeAdManagerImpl
+import dev.avinya.ads.nativead.AndroidNativeAdPlatform
+import dev.avinya.ads.nativead.NativeAdManager
+import dev.avinya.ads.nativead.NativeAdMemoryPolicy
 import com.google.android.libraries.ads.mobile.sdk.MobileAds
 import com.google.android.libraries.ads.mobile.sdk.common.OnAdInspectorClosedListener
 import com.google.android.libraries.ads.mobile.sdk.initialization.AdapterStatus
@@ -96,7 +99,18 @@ internal class AndroidGoogleAdManager(
 
     private val banners = mutableMapOf<String, BannerAdController>()
     private val slots = mutableMapOf<AdSlotKey, FullScreenAdController>()
-    private val nativePools = mutableMapOf<String, NativeAdPool>()
+    private val nativeManager = NativeAdManagerImpl(
+        policy = null,
+        platform = AndroidNativeAdPlatform(),
+        canRequestAds = { adRequestBlockedError() == null },
+        eventSink = { _events.tryEmit(it) },
+    )
+    override val nativeAds: NativeAdManager = nativeManager
+
+    /** Binds the deferred native facade only after this config has initialized GMA. */
+    internal fun configureNativeAdsAfterAcceptedInitialization(config: AdConfig) {
+        nativeManager.configure(config.nativeAdMemoryPolicy)
+    }
     private data class InitializationAttempt(
         val identity: AdInitializationConfigIdentity,
         val consentMode: ConsentMode,
@@ -171,7 +185,7 @@ internal class AndroidGoogleAdManager(
                     nativeInitialization?.completion
                 }
                 if (nativeCompletion != null) return@withLock null
-                appliedOutcome(requestedIdentity)?.let { return it }
+                appliedOutcome(requestedIdentity, ownedConfig.nativeAdMemoryPolicy)?.let { return it }
                 InitializationAttempt(
                     identity = requestedIdentity,
                     consentMode = consentMode,
@@ -205,7 +219,7 @@ internal class AndroidGoogleAdManager(
             }
             if (equivalentAttempt) return result
             if (result == AdManagerStatus.Ready) {
-                appliedOutcome(requestedIdentity)?.let { return it }
+                appliedOutcome(requestedIdentity, config.nativeAdMemoryPolicy)?.let { return it }
             }
             // A distinct request waited for the process-wide slot but the leader
             // did not initialize GMA. Register a new attempt for its own semantics.
@@ -226,12 +240,12 @@ internal class AndroidGoogleAdManager(
         return try {
             when (awaitAbandonedNativeInitialization()) {
                 NativeInitializationResult.Applied -> {
-                    val result = appliedOutcome(attempt.identity) ?: _status.value
+                    val result = appliedOutcome(attempt.identity, config.nativeAdMemoryPolicy) ?: _status.value
                     completeAttempt(attempt, result)
                     return result
                 }
                 is NativeInitializationResult.Failed -> {
-                    appliedOutcome(attempt.identity)?.let { result ->
+                    appliedOutcome(attempt.identity, config.nativeAdMemoryPolicy)?.let { result ->
                         completeAttempt(attempt, result)
                         return result
                     }
@@ -297,11 +311,16 @@ internal class AndroidGoogleAdManager(
     }
 
     private suspend fun appliedOutcome(
-        requestedIdentity: AdInitializationConfigIdentity
+        requestedIdentity: AdInitializationConfigIdentity,
+        requestedNativeAdMemoryPolicy: NativeAdMemoryPolicy,
     ): AdManagerStatus? = mobileAdsInitializationMutex.withLock {
         val appliedIdentity = appliedConfigIdentity ?: return@withLock null
         if (appliedIdentity != requestedIdentity) {
             AdLogger.w("Android MobileAds already has a different effective configuration; ignoring this request.")
+            return@withLock publishAppliedTerminalLocked(appliedTerminalStatus ?: _status.value)
+        }
+        nativeManager.configuredPolicyOrNull()?.takeIf { it != requestedNativeAdMemoryPolicy }?.let {
+            AdLogger.w("Android native ad memory policy is already configured; ignoring this request.")
             return@withLock publishAppliedTerminalLocked(appliedTerminalStatus ?: _status.value)
         }
         appliedTerminalStatus?.let(::publishAppliedTerminalLocked)
@@ -317,7 +336,7 @@ internal class AndroidGoogleAdManager(
 
     private suspend fun initializeMobileAds(config: AdConfig): AdManagerStatus {
         val requestedIdentity = config.initializationIdentity(config.androidAppId)
-        appliedOutcome(requestedIdentity)?.let { return it }
+        appliedOutcome(requestedIdentity, config.nativeAdMemoryPolicy)?.let { return it }
 
         var operation = mobileAdsInitializationMutex.withLock { nativeInitialization }
         if (operation == null) {
@@ -391,6 +410,7 @@ internal class AndroidGoogleAdManager(
                 androidDiagnostics.captureSnapshotOnMain()
                 config.dispatchInitializationHooks(AdInitializationPhase.AfterMobileAdsInitialize)
                 mobileAdsInitializationMutex.withLock {
+                    configureNativeAdsAfterAcceptedInitialization(config)
                     appliedConfigIdentity = requestedIdentity
                     appliedTerminalStatus = AdManagerStatus.Ready
                 }
@@ -480,15 +500,15 @@ internal class AndroidGoogleAdManager(
      * (sub-project D) and is not addressed here.
      */
     private fun purgeOnRevocation() {
-        val (bannersSnapshot, slotsSnapshot, poolsSnapshot) = synchronized(registryLock) {
-            Triple(banners.values.toList(), slots.values.toList(), nativePools.values.toList())
+        val (bannersSnapshot, slotsSnapshot) = synchronized(registryLock) {
+            Pair(banners.values.toList(), slots.values.toList())
         }
         bannersSnapshot.forEach { it.clear() }
         slotsSnapshot.forEach { it.clear() }
-        poolsSnapshot.forEach { it.clear() }
+        nativeManager.onConsentRevoked()
         AdLogger.i(
             "Android revocation purge complete. banners=${bannersSnapshot.size} " +
-                "fullScreen=${slotsSnapshot.size} nativePools=${poolsSnapshot.size}"
+                "fullScreen=${slotsSnapshot.size} nativeSessions=${nativeAds.state.value.activeSessions}"
         )
     }
 
@@ -502,19 +522,6 @@ internal class AndroidGoogleAdManager(
         banners.getOrPut(ownedPlacement.id) {
             AdLogger.d("Android banner controller created. placement=${ownedPlacement.id}")
             AndroidBannerAdController(ownedPlacement, _events, ::adRequestBlockedError, activityProvider)
-        }
-    }
-
-    override fun nativeAd(placement: AdPlacement): NativeAdPool = synchronized(registryLock) {
-        val ownedPlacement = placement.ownedSnapshot()
-        require(ownedPlacement.format == AdFormat.Native) {
-            "AdPlacement '${ownedPlacement.id}' has format ${ownedPlacement.format} but was passed to a Native factory. " +
-                "The factory function and placement.format must agree."
-        }
-        checkPlacementCollision(ownedPlacement)
-        nativePools.getOrPut(ownedPlacement.id) {
-            AdLogger.d("Android native pool created. placement=${ownedPlacement.id} androidAdUnit=${ownedPlacement.androidAdUnitId} maxCache=${ownedPlacement.cachePolicy.maxSize}")
-            AndroidNativeAdPool(ownedPlacement, _events, ::adRequestBlockedError)
         }
     }
 

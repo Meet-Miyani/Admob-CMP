@@ -1,7 +1,7 @@
-@file:OptIn(InternalAdMobCmpApi::class)
+@file:OptIn(dev.avinya.ads.InternalAdMobCmpApi::class)
+
 package dev.avinya.ads.ui
 
-import dev.avinya.ads.InternalAdMobCmpApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -10,142 +10,141 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
+import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdView
+import dev.avinya.ads.AdError
 import dev.avinya.ads.AdEvent
 import dev.avinya.ads.AdFormat
-import dev.avinya.ads.AdLogger
-import dev.avinya.ads.AdManagerStatus
 import dev.avinya.ads.AdPlacement
 import dev.avinya.ads.LocalAdManager
-import dev.avinya.ads.nativead.NativeAdToken
-import dev.avinya.ads.nativead.peekAndroidNativeAd
+import dev.avinya.ads.nativead.AndroidNativeAdRenderLease
+import dev.avinya.ads.nativead.NativeAdSession
+import dev.avinya.ads.nativead.NativeAdSlotState
+import dev.avinya.ads.nativead.acquireAndroidRenderLease
 import dev.avinya.ads.nativead.layout.AdLayout
 import dev.avinya.ads.nativead.rendering.AndroidNativeAdLayoutRenderer
-import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAd
-import kotlinx.coroutines.flow.filter
 
-// See KDoc on the expect declaration in commonMain (ui/NativeAdView.kt).
 @Composable
 public actual fun NativeAdView(
+    session: NativeAdSession,
+    slotKey: String,
     placement: AdPlacement,
-    itemKey: String,
     layout: AdLayout,
     modifier: Modifier,
-    onEvent: (AdEvent) -> Unit
+    loading: @Composable () -> Unit,
+    failure: @Composable (AdError) -> Unit,
+    onEvent: (AdEvent) -> Unit,
 ) {
-    if (!placement.enabled || placement.format != AdFormat.Native) {
-        AdLogger.w("Android NativeAdView skipped. placement=${placement.id} enabled=${placement.enabled} format=${placement.format}")
+    if (!placement.enabled || placement.format != AdFormat.Native || layout.validation.errors.isNotEmpty()) {
+        loading()
         return
     }
 
-    layout.validation.errors.forEach { issue ->
-        AdLogger.e("Native layout validation error [${issue.code}] at ${issue.nodePath}: ${issue.message}")
-    }
-    layout.validation.warnings.forEach { issue ->
-        AdLogger.w("Native layout validation warning [${issue.code}] at ${issue.nodePath}: ${issue.message}")
-    }
-    // P1-17: errors were logged and then rendering continued anyway, so a layout missing
-    // every renderable asset still ran preload/acquire and registered an empty view tree with
-    // the SDK — consuming inventory while violating the validator's own "errors prevent
-    // rendering" contract. Warnings still render; only errors stop here.
-    if (layout.validation.errors.isNotEmpty()) {
-        AdLogger.e(
-            "Android NativeAdView refusing to render a layout with ${layout.validation.errors.size} " +
-                "validation error(s). placement=${placement.id} itemKey=$itemKey"
-        )
-        return
-    }
+    val slotState = session.state.collectAsState().value.slots[slotKey]
+    val rendererId = remember(session, slotKey) { "android-native-renderer-${nextAndroidRendererId++}" }
+    var lease by remember(session, slotKey, placement, rendererId) { mutableStateOf<AndroidNativeAdRenderLease?>(null) }
+    val manager = LocalAdManager.current
+    val currentLease by rememberUpdatedState(lease)
+    val currentOnEvent by rememberUpdatedState(onEvent)
 
-    val sdk = LocalAdManager.current
-    val status by sdk.status.collectAsState()
-    val pool = remember(sdk, placement) { sdk.nativeAd(placement) }
-    var token by remember(placement.id, itemKey, layout.identity) { mutableStateOf<NativeAdToken?>(null) }
-    var nativeAd by remember(placement.id, itemKey, layout.identity) { mutableStateOf<NativeAd?>(null) }
-
-    val currentOnEvent = rememberCurrentEventCallback(onEvent)
-
-    LaunchedEffect(pool) {
-        // collect, not collectLatest: collectLatest cancels the in-flight onEvent when a
-        // new event arrives, so a rapid Impression -> Click silently dropped the impression.
-        // onEvent is a plain callback with nothing to cancel.
-        //
-        // P1-8: every row on a shared native placement collects the SAME pool-wide events
-        // flow. Impression/Clicked/Paid now carry the ad-instance id they belong to (see
-        // AdEvent.Impression.adInstanceId), so filter out ones that aren't for THIS row's
-        // currently-leased ad. token is read fresh on every emission (not captured once),
-        // so this stays correct as the row acquires/loses its lease over its lifetime.
-        // An event with a null adInstanceId (Loaded/LoadFailed — pool-wide, not
-        // per-instance) is never filtered.
-        pool.events
-            .filter { event ->
-                val instanceId = when (event) {
-                    is AdEvent.Impression -> event.adInstanceId
-                    is AdEvent.Clicked -> event.adInstanceId
-                    is AdEvent.Paid -> event.adInstanceId
-                    else -> null
-                }
-                instanceId == null || instanceId == token?.tokenId
+    LaunchedEffect(manager, placement.id) {
+        manager.events.collect { event ->
+            if (isNativeEventForLease(placement.id, currentLease?.adInstanceId, event)) {
+                currentOnEvent(event)
             }
-            .collect(currentOnEvent)
-    }
-
-    val availableAds by pool.availableAds.collectAsState()
-
-    // Keyed on availableAds so a row that lost the race — or was blocked because maxSize was
-    // fully leased — retries when inventory frees up, instead of rendering blank forever.
-    // maxSize counts available + in-use, so release() frees a SLOT without incrementing
-    // availableAds; re-running preload, not just acquire, is what refills it.
-    //
-    // Every mounted row re-runs this on each availability change, so with N rows and one ad,
-    // N-1 will preload (a no-op via the core's cache check) and acquire (null). preload is
-    // serialized by the core's loadMutex, so that is a thundering herd on a mutex, not on the
-    // network. Judged acceptable: the alternative is a suspending lease queue, which the
-    // resolved design decision excludes. If it ever shows up in a profile, the mitigation is a
-    // small random stagger before acquire, not a redesign.
-    LaunchedEffect(pool, itemKey, layout.identity, status, availableAds) {
-        AdLogger.d("Android NativeAdView effect. placement=${placement.id} itemKey=$itemKey status=$status token=${token?.tokenId} layout=${layout.identity}")
-        if (status != AdManagerStatus.Ready) {
-            AdLogger.w("Android NativeAdView waiting for SDK Ready. placement=${placement.id} status=$status")
-            return@LaunchedEffect
-        }
-        if (token == null) {
-            val state = pool.preload(placement.cachePolicy.maxSize, placement.requestOptions, placement.nativeOptions)
-            AdLogger.i("Android NativeAdView preload finished. placement=${placement.id} state=$state")
-            val acquired = pool.acquire()
-            token = acquired
-            nativeAd = acquired?.let(pool::peekAndroidNativeAd)
-            AdLogger.i("Android NativeAdView acquired. placement=${placement.id} token=${acquired?.tokenId} nativeAdFound=${nativeAd != null}")
         }
     }
 
-    val currentToken = token
-    val currentNativeAd = nativeAd
-    if (currentToken != null && currentNativeAd != null) {
-        key(currentToken.tokenId, layout.identity) {
-            AndroidView(
-                factory = { context ->
-                    AdLogger.d("Android NativeAdView factory render. placement=${placement.id} itemKey=$itemKey token=${currentToken.tokenId} layout=${layout.identity}")
-                    AndroidNativeAdLayoutRenderer(context, currentNativeAd).render(layout)
-                },
-                update = {
-                    // Do not rebuild or re-register NativeAdView during normal recomposition.
-                    // The SDK-owned view tree is recreated only when token or layout identity changes.
-                },
-                onRelease = { nativeAdView ->
-                    nativeAdView.destroy()
-                },
-                modifier = modifier
-            )
+    LaunchedEffect(session, slotKey, placement, rendererId, slotState) {
+        if (slotState.canRenderNativeAd()) {
+            if (lease == null) lease = session.acquireAndroidRenderLease(slotKey, placement, rendererId)
+        } else {
+            lease = null
         }
     }
 
-    DisposableEffect(pool, currentToken?.tokenId) {
-        val tokenToRelease = currentToken
-        onDispose {
-            AdLogger.d("Android NativeAdView dispose. placement=${placement.id} itemKey=$itemKey token=${tokenToRelease?.tokenId}")
-            tokenToRelease?.let(pool::release)
+    DisposableEffect(lease) {
+        val leaseToRelease = lease
+        onDispose { leaseToRelease?.release() }
+    }
+
+    when (slotState) {
+        is NativeAdSlotState.Failed -> failure(slotState.error)
+        is NativeAdSlotState.Ready, is NativeAdSlotState.Retained, is NativeAdSlotState.Mounted -> {
+            val mountedLease = lease
+            if (mountedLease == null) {
+                loading()
+            } else {
+                key(mountedLease.adInstanceId, layout.identity) {
+                    AndroidView(
+                        factory = { context ->
+                            AndroidNativeAdLayoutRenderer(context, mountedLease.ad).render(layout)
+                        },
+                        onRelease = ::releaseAndroidNativeAdHost,
+                        modifier = modifier,
+                    )
+                }
+            }
         }
+        else -> loading()
     }
 }
+
+/** Clears Compose-owned Android host state; the coordinator alone destroys NativeAd. */
+internal fun releaseAndroidNativeAdHost(view: NativeAdView) {
+    AndroidNativeHostRelease(
+        clearAssets = {
+            view.headlineView = null
+            view.bodyView = null
+            view.callToActionView = null
+            view.iconView = null
+            view.advertiserView = null
+            view.priceView = null
+            view.storeView = null
+            view.starRatingView = null
+        },
+        clearChildren = view::removeAllViews,
+        destroyHost = view::destroy,
+    ).release()
+}
+
+internal class AndroidNativeHostRelease(
+    private val clearAssets: () -> Unit,
+    private val clearChildren: () -> Unit,
+    private val destroyHost: () -> Unit,
+) {
+    private var released = false
+    fun release() {
+        if (released) return
+        released = true
+        clearAssets()
+        clearChildren()
+        destroyHost()
+    }
+}
+
+internal fun isNativeEventForLease(
+    placementId: String,
+    adInstanceId: String?,
+    event: AdEvent,
+): Boolean = adInstanceId != null && event.placementId == placementId && event.nativeAdInstanceIdOrNull() == adInstanceId
+
+private fun AdEvent.nativeAdInstanceIdOrNull(): String? = when (this) {
+    is AdEvent.Impression -> adInstanceId
+    is AdEvent.Clicked -> adInstanceId
+    is AdEvent.Paid -> adInstanceId
+    is AdEvent.VideoStarted -> adInstanceId
+    is AdEvent.VideoPlayed -> adInstanceId
+    is AdEvent.VideoPaused -> adInstanceId
+    is AdEvent.VideoEnded -> adInstanceId
+    is AdEvent.VideoMuted -> adInstanceId
+    else -> null
+}
+
+private fun NativeAdSlotState?.canRenderNativeAd(): Boolean =
+    this is NativeAdSlotState.Ready || this is NativeAdSlotState.Retained || this is NativeAdSlotState.Mounted
+
+private var nextAndroidRendererId: Long = 0

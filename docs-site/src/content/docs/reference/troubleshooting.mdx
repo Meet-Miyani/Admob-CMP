@@ -118,11 +118,11 @@ If a banner composable or view renders no content, check the following condition
 3. Headless `load()` calls require valid `BannerGeometry` on platforms unable to resolve container width automatically.
 4. Verify that the request did not encounter an ad fill error.
 
-## Native ad pool exhaustion
+## Native ads reload after a tab switch or scroll
 
-`AdCachePolicy.maxSize` limits the total combined count of **available** plus **in-use** ads. If `maxSize` is set to 1 and an ad is currently assigned to a UI component, `preload()` exits early and `acquire()` returns `null`.
+A temporary row recycle or tab exit should detach a renderer, not reload a retained native ad. Keep one stable `NativeAdSession` above the feed rows, use model-owned `NativeAdSlot.key` values, and let the Compose helper call `deactivate()` on temporary composition loss. A reload is expected after TTL expiry (one hour by default), eviction under memory pressure, consent invalidation, clear, or permanent `close()`—not after mere detachment.
 
-To maintain inventory, listen to changes on `pool.availableAds` and trigger `preload()` when capacity becomes available. Calling `release()` destroys the native reference and frees pool capacity.
+If a row is empty or loading, retain its placeholder geometry. Inspect `session.state` and `adManager.nativeAds.state`; do not introduce manual platform-object ownership to force a reload.
 
 ## Controller reentry and initialisation rules
 
@@ -138,7 +138,7 @@ Calling `AdManager.initialize()` multiple times with identical `AdConfig` parame
 
 ## Platform video event support
 
-iOS emits native video lifecycle events via `GADVideoControllerDelegate`. Android GMA Next-Gen SDK does not expose video callbacks on native ads, so Android emits no video events. However, `mediaInfo(token).hasVideoContent` is fully cross-platform and can be used to inspect video capabilities.
+iOS emits native video lifecycle events via `GADVideoControllerDelegate`. Android GMA Next-Gen SDK does not expose video callbacks on native ads, so Android emits no video events. `NativeMediaInfo` is carried by ready, mounted, and retained session state when available and can be used for cross-platform layout decisions.
 
 ## Automated iOS diagnostic tool
 

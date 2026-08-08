@@ -25,7 +25,7 @@ internal data class RecorderState(
  * Fixed-capacity, oldest-first ring buffer over [RecordedAdEvent].
  *
  * [clock] follows the module's per-class injection convention (see `FullScreenSlotCore`,
- * `NativePoolCore`) so timestamps are testable without a real clock.
+ * `NativeAdCoordinatorCore`) so timestamps are testable without a real clock.
  */
 internal class EventRingBuffer(
     private val capacity: Int,

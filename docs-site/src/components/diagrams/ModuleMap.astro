@@ -32,7 +32,7 @@ import DiagramFrame from './DiagramFrame.astro';
   <text class="dg-sub" x="40" y="330">AdConfig, AdEvent, AdError, consent</text>
   <text class="dg-mono" x="40" y="348">core · …ads.internal</text>
   <text class="dg-sub" x="40" y="366">FullScreenSlotCore, BannerCore,</text>
-  <text class="dg-sub" x="40" y="384">NativePoolCore, AdRetry</text>
+  <text class="dg-sub" x="40" y="384">NativeAdCoordinatorCore, NativeAdSessionCore, AdRetry</text>
   <text class="dg-mono" x="40" y="402">core · …appopen / …nativead</text>
   <text class="dg-mono" x="40" y="420">compose · …ads.ui</text>
   <text class="dg-sub" x="40" y="438">BannerAdView, NativeAdView</text>
@@ -44,7 +44,7 @@ import DiagramFrame from './DiagramFrame.astro';
   <text class="dg-title" x="356" y="250">androidMain</text>
   <text class="dg-sub" x="356" y="268">thin adapter</text>
   <text class="dg-mono" x="356" y="294">AndroidGoogleAdManager</text>
-  <text class="dg-sub" x="356" y="312">slots / pool / banner over the</text>
+  <text class="dg-sub" x="356" y="312">slots / native sessions / banner over the</text>
   <text class="dg-sub" x="356" y="330">GMA Next-Gen SDK (API 26+)</text>
   <text class="dg-mono" x="356" y="348">AdMob.manager(context)</text>
   <text class="dg-sub" x="356" y="366">ProcessLifecycleOwner foreground</text>
@@ -59,7 +59,7 @@ import DiagramFrame from './DiagramFrame.astro';
   <text class="dg-title" x="636" y="250">iosMain</text>
   <text class="dg-sub" x="636" y="268">thin adapter</text>
   <text class="dg-mono" x="636" y="294">IosGoogleAdManager</text>
-  <text class="dg-sub" x="636" y="312">slots / pool / banner / consent over</text>
+  <text class="dg-sub" x="636" y="312">slots / native sessions / banner / consent over</text>
   <text class="dg-sub" x="636" y="330">cinterop bindings (GMA 13.x, iOS 15+)</text>
   <text class="dg-sub" x="636" y="348">UIKit native-ad renderer</text>
   <text class="dg-sub" x="636" y="366">NSNotificationCenter foreground signal</text>
@@ -70,7 +70,7 @@ import DiagramFrame from './DiagramFrame.astro';
 
   <text class="dg-note" x="24" y="528">
     Platform classes implement only loadAd / presentAd / destroyAd / canPresent, plus the
-    BannerPlatform and NativePoolPlatform interfaces.
+    BannerPlatform and NativeAdPlatform interfaces.
   </text>
   <text class="dg-note" x="24" y="546">
     Load, show, cache, retry and consent gating all live in the shared core — CLAUDE.md invariants

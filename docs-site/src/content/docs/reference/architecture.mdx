@@ -15,11 +15,11 @@ import ModuleMap from '../../../components/diagrams/ModuleMap.astro';
 | Module / Artifact | Purpose & Contents |
 |---|---|
 | `dev.avinya.ads:admob-cmp` | Umbrella artifact aggregating `admob-cmp-core` and `admob-cmp-compose` for Compose Multiplatform projects. |
-| `dev.avinya.ads:admob-cmp-core` | Core engine: `AdManager`, full-screen controllers, native ad pool, consent state machine, diagnostics, and event streams. |
-| `dev.avinya.ads:admob-cmp-compose` | Compose Multiplatform UI integration: `BannerAdView`, `NativeAdView`, and `rememberAdManager`. |
+| `dev.avinya.ads:admob-cmp-core` | Core engine: `AdManager`, full-screen controllers, bounded native-session coordinator, consent state machine, diagnostics, and event streams. |
+| `dev.avinya.ads:admob-cmp-compose` | Compose Multiplatform UI integration: `BannerAdView`, session-aware `NativeAdView`, viewport bindings, and `rememberAdManager`. |
 | `dev.avinya.ads.admob-cmp` (Gradle Plugin) | Gradle plugin managing version-stamped iOS native test framework dependencies and linker flags for Kotlin/Native test binaries. |
 
-`androidMain` provides `AndroidGoogleAdManager` with slots, native pool, and banner handling over the Android GMA Next-Gen SDK, the `AdMob.manager(context)` singleton, and process lifecycle monitoring (`ProcessLifecycleOwner`).
+`androidMain` provides `AndroidGoogleAdManager` with slots, native-session platform loading and banner handling over the Android GMA Next-Gen SDK, the `AdMob.manager(context)` singleton, and process lifecycle monitoring (`ProcessLifecycleOwner`).
 
 `iosMain` provides `IosGoogleAdManager` over Kotlin/Native cinterop bindings, a Kotlin UIKit native-ad renderer, and application lifecycle event observers via `NSNotificationCenter`.
 
@@ -30,6 +30,8 @@ Separating `admob-cmp-core` from `admob-cmp-compose` allows projects using non-C
 The architecture follows a key principle: **one shared state machine, two thin platform adapters.** Every full-screen slot extends `FullScreenSlotCore`, which owns the load mutex, TTL-based FIFO caching (bounded by `AdCachePolicy.maxSize`), retry policies, consent gating, event emission, and `reloadAfterShow`. Platform classes implement only `loadAd`, `presentAd`, `destroyAd`, and `canPresent`.
 
 Why this matters for applications: interstitial, rewarded, rewarded interstitial, and app-open formats share identical caching, state management, and retry behaviour across Android and iOS. A cache fix or state enhancement in common code takes effect across all full-screen ad formats simultaneously.
+
+Native ads use a companion shared architecture: `NativeAdCoordinatorCore` owns records, global reservations and exact-once retirement; `NativeAdSessionCore` reconciles stable viewport windows. The governor limits loaded plus reserved ads to a process-wide soft 4 / hard 6 by default. Platform loading and destruction occur outside coordinator locks, Android batch callbacks synchronize their handoff, and iOS records strongly retain otherwise weak Objective-C delegates. A record admits one renderer lease; a stale lease cannot unmount its replacement.
 
 Format-specific handling remains encapsulated within platform adapters. A platform's `loadAd` method configures placement identifiers and targeting parameters appropriate for its format, whilst shared common code manages overall lifecycle, status transitions, and ad presentation ownership.
 
@@ -64,7 +66,7 @@ Coroutine cancellation is supported across all suspend APIs. Cancelling a `load(
 ## How do events flow?
 
 ```
-platform SDK callback → slot / pool / controller
+platform SDK callback → slot / native session coordinator / controller
     → controller.events   (per-placement SharedFlow)
     → AdManager.events    (global SharedFlow)
 ```
@@ -81,7 +83,7 @@ Event streams use `SharedFlow<AdEvent>` so multiple collectors (such as UI compo
 | Placement-keyed, long-lived controllers | Centralised caching, retry, and lifecycle management. |
 | Consent integrated into initialisation | Guarantees compliance before ad requests are attempted. |
 | Bindings-only iOS distribution | Ensures mediation compatibility and SPM version flexibility. |
-| Shared core caching | Delivers consistent caching behaviour across platforms independent of platform preloading APIs. |
+| Shared native coordinator | Delivers stable-session admission, retention and exact retirement across platforms without exposing native objects. |
 | No bundled mediation adapters | Allows publishers to select and maintain platform-specific mediation dependencies. |
 | `explicitApi()` and committed ABI dumps | Guarantees public API contract integrity via `checkKotlinAbi`. |
 

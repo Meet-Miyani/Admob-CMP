@@ -49,12 +49,14 @@ AGENTS.md, not this file.
    only on *normal* return, never on cancellation (cancelling mid-show means the
    ad is still on screen). See the `catch (CancellationException)` in
    `FullScreenSlotCore.show()`.
-3. **Native pool `pending` list is touched from two threads** — the SDK
-   callbacks (`Dispatchers.Main.immediate`) and `invokeOnCancellation` (any
-   thread). Every read/write of `pending` and the `cancelled` flag goes through
-   `synchronized(pending)`. Don't reintroduce unsynchronized access.
-4. **iOS ObjC delegates are weak.** Keep a strong Kotlin ref alongside the ad
-   (pool `NativeEntry`, slot `delegate` fields); capture ads in paid-event
+3. **Native coordinator owns native objects.** The governor is the sole capacity authority:
+   loaded records plus reservations never exceed the hard limit. Reservation tokens map to a
+   session generation; every cancellation, stale callback, clear, eviction, or TTL expiry
+   retires exactly once. Use one lock direction (governor before coordinator/session); never
+   call a platform SDK or destroy an ad while holding either lock. Android's batch callback
+   handoff remains synchronized because callbacks and cancellation race.
+4. **iOS ObjC delegates are weak.** Keep a strong Kotlin ref alongside the coordinator-owned ad
+   record and renderer fields; capture ads in paid-event
    handlers via `WeakReference` to avoid ARC cycles.
 5. **All GMA/UMP calls happen on `Dispatchers.Main`** (`.immediate`), **except
    `MobileAds.initialize()` which is `@WorkerThread` in GMA Next-Gen and runs on
@@ -71,19 +73,16 @@ AGENTS.md, not this file.
    **key window**, never `UIScreen.mainScreen`: window bounds are what is correct in
    split view, Slide Over and popovers.
 
-7. **`BannerCore` and `NativePoolCore` are the shared state machines.** Platform
-   classes implement only `BannerPlatform` / `NativePoolPlatform`. Three things stay
-   platform-side by construction and must not migrate into commonMain: native
-   batch-assembly locking (invariant #3), iOS delegate creation/retention/ordering
-   (invariant #4), and iOS's `activeLoad` / `activeLoads` in-flight registries. The
-   platform ad-handle type parameter carries the delegates on iOS
-   (`LoadedNativeAd`, `IosLoadedBanner`), so "the core retains the ad" already
-   implies "the delegate is alive".
+7. **`BannerCore`, `NativeAdCoordinatorCore`, and `NativeAdSessionCore` are shared state
+   machines.** Platform classes implement only their platform interface. Native batching lock
+   handoff, iOS delegate creation/retention/ordering, and iOS in-flight registries remain
+   platform-side. A record may have one renderer lease; a stale release cannot unmount a newer
+   record. The coordinator retains platform delegates until exact retirement.
 
-8. **`maxSize` counts available + in-use.** Do not redefine it. A native pool that
-   cannot serve a row publishes that through `availableAds`; views key their
-   acquisition effect on it and re-run `preload`. `clear()` does not destroy leased
-   ads — a live view owns them until `release()`.
+8. **Native capacity is global and session-driven.** The default process policy is soft 4/hard
+   6 and counts loaded plus reserved work. Visible demand may pass soft capacity; speculative
+   demand may not. Mounted records are never eviction candidates. `AdCachePolicy.maxSize` and
+   `reloadAfterShow` do not control native sessions; per-placement `nativeTtl` still does.
 
 9. **Every suspending ad operation is bounded.** Loads go through
    `withTimeoutOrNull(placement.timeoutPolicy.loadTimeout)` inside the shared core, never
