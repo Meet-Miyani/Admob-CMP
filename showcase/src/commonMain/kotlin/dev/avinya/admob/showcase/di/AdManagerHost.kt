@@ -11,7 +11,9 @@ import dev.avinya.ads.rememberAdManager
  * Uses the SDK's own `LocalAdManager` rather than adding one to [AppGraph]:
  * `rememberAdManager()` already returns a process-wide singleton, so putting
  * it in the hand-rolled graph would duplicate ownership and imply the
- * showcase controls a lifecycle it does not.
+ * showcase controls a lifecycle it does not. The graph does not own the
+ * manager's lifecycle; the controller owns the app's startup policy and
+ * receives the manager once, the same way telemetry does.
  */
 @Composable
 fun ProvideAdManager(content: @Composable () -> Unit) {

@@ -25,8 +25,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import dev.avinya.ads.ConsentDebugGeography
-import dev.avinya.ads.LocalAdManager
 import dev.avinya.admob.showcase.StartupState
 import dev.avinya.admob.showcase.di.LocalAppGraph
 
@@ -39,17 +37,9 @@ import dev.avinya.admob.showcase.di.LocalAppGraph
  */
 @Composable
 fun OnboardingScreen(onFinished: () -> Unit) {
-    val adManager = LocalAdManager.current
     val graph = LocalAppGraph.current
-    val storedGeography by graph.settings.consentDebugGeography.collectAsState(initial = null)
-
-    val debugGeography = remember(storedGeography) {
-        ConsentDebugGeography.entries.firstOrNull { it.name == storedGeography }
-            ?: ConsentDebugGeography.Disabled
-    }
-
-    val viewModel: OnboardingViewModel = viewModel(key = debugGeography.name) {
-        OnboardingViewModel(adManager, graph.settings, debugGeography)
+    val viewModel: OnboardingViewModel = viewModel {
+        OnboardingViewModel(graph.startup, graph.settings)
     }
     val state by viewModel.state.collectAsState()
 

@@ -3,8 +3,10 @@ package dev.avinya.admob.showcase.feature.settings
 import androidx.lifecycle.viewModelScope
 import dev.avinya.ads.AdManager
 import dev.avinya.ads.ConsentDebugGeography
+import dev.avinya.admob.showcase.StartupState
 import dev.avinya.admob.showcase.core.mvi.MviViewModel
 import dev.avinya.admob.showcase.data.prefs.SettingsRepository
+import dev.avinya.admob.showcase.domain.ad.AdStartupController
 import dev.avinya.admob.showcase.ui.theme.ThemeMode
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
@@ -12,17 +14,27 @@ import kotlinx.coroutines.launch
 class SettingsViewModel(
     private val adManager: AdManager,
     private val settings: SettingsRepository,
+    private val startup: AdStartupController,
 ) : MviViewModel<SettingsState, SettingsIntent, SettingsEffect>(SettingsState()) {
 
     init {
         observeSdk()
         observePreferences()
+        observeStartup()
         updateState {
             copy(
                 sdkVersion = adManager.diagnostics.sdkVersion(),
                 adapters = adManager.diagnostics.adapterStatuses().map { it.toString() },
                 tracking = adManager.tracking.status(),
             )
+        }
+    }
+
+    private fun observeStartup() {
+        viewModelScope.launch {
+            startup.state.collect { snapshot ->
+                updateState { copy(startup = snapshot.startup) }
+            }
         }
     }
 
@@ -82,13 +94,21 @@ class SettingsViewModel(
             SettingsIntent.OpenAdInspector -> run("Ad Inspector") {
                 adManager.diagnostics.openAdInspector()
             }
+            SettingsIntent.RetryStartup -> run("Ads re-initialised") {
+                startup.retryAwaiting() is StartupState.Ready
+            }
             SettingsIntent.RequestTracking -> viewModelScope.launch {
                 val result = adManager.tracking.requestAuthorization()
                 updateState { copy(tracking = result) }
             }
             is SettingsIntent.SetDebugGeography -> viewModelScope.launch {
                 settings.setConsentDebugGeography(intent.geography.name)
-                emitEffect(SettingsEffect.Notice("Applies on next launch", success = true))
+                emitEffect(
+                    SettingsEffect.Notice(
+                        "Saved — applies on next launch, or now via Retry if ads are not initialised yet.",
+                        success = true,
+                    ),
+                )
             }
             is SettingsIntent.SetThemeMode -> viewModelScope.launch { settings.setThemeMode(intent.mode) }
             is SettingsIntent.SetInspectorEnabled ->

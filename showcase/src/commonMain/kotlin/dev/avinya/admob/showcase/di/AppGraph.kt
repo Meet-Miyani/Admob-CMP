@@ -17,6 +17,7 @@ import dev.avinya.admob.showcase.data.repo.AdStateRepository
 import dev.avinya.admob.showcase.data.repo.AdTelemetryRepository
 import dev.avinya.admob.showcase.data.repo.ArticleRepository
 import dev.avinya.admob.showcase.data.repo.WalletRepository
+import dev.avinya.admob.showcase.domain.ad.AdStartupController
 import dev.avinya.admob.showcase.domain.ad.ShowcasePlacements
 import dev.avinya.admob.showcase.ui.ad.AppOpenSuppressor
 import kotlinx.coroutines.CoroutineScope
@@ -66,6 +67,8 @@ class AppGraph(storage: PlatformStorage) {
     private val coldStartAt: Long = clock.nowMillis()
 
     val adState: AdStateRepository = AdStateRepository(preferences, clock, coldStartAt)
+
+    val startup: AdStartupController = AdStartupController(settings, appScope)
 
     /**
      * Drained from `adManager.events` by [startTelemetry]. Owns placement-id

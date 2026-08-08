@@ -4,6 +4,7 @@ import dev.avinya.ads.AdTrackingAuthorization
 import dev.avinya.ads.ConsentDebugGeography
 import dev.avinya.ads.ConsentStatus
 import dev.avinya.ads.PrivacyOptionsRequirementStatus
+import dev.avinya.admob.showcase.StartupState
 import dev.avinya.admob.showcase.ui.theme.ThemeMode
 
 /**
@@ -29,6 +30,7 @@ data class SettingsState(
     val inspectorEnabled: Boolean = true,
     val adsEnabled: Boolean = true,
     val busy: Boolean = false,
+    val startup: StartupState = StartupState.Starting,
 )
 
 sealed interface SettingsIntent {
@@ -36,6 +38,7 @@ sealed interface SettingsIntent {
     data object RequestTracking : SettingsIntent
     data object ResetConsent : SettingsIntent
     data object OpenAdInspector : SettingsIntent
+    data object RetryStartup : SettingsIntent
     data class SetDebugGeography(val geography: ConsentDebugGeography) : SettingsIntent
     data class SetThemeMode(val mode: ThemeMode) : SettingsIntent
     data class SetInspectorEnabled(val enabled: Boolean) : SettingsIntent

@@ -61,6 +61,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.avinya.admob.showcase.StartupState
 import dev.avinya.admob.showcase.di.LocalAppGraph
 import dev.avinya.admob.showcase.domain.ad.ShowcasePlacements
 import dev.avinya.admob.showcase.ui.inspector.InspectorEntryPoint
@@ -76,7 +77,9 @@ import dev.avinya.ads.LocalAdManager
 fun SettingsScreen() {
     val adManager = LocalAdManager.current
     val graph = LocalAppGraph.current
-    val viewModel: SettingsViewModel = viewModel { SettingsViewModel(adManager, graph.settings) }
+    val viewModel: SettingsViewModel = viewModel {
+        SettingsViewModel(adManager, graph.settings, graph.startup)
+    }
     val state by viewModel.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -111,6 +114,7 @@ fun SettingsScreen() {
                 item {
                     SdkStatusCard(
                         status = state.sdkStatus,
+                        startup = state.startup,
                         consentStatus = state.consentStatus.toString(),
                         testDeviceId = state.debugGeography.name,
                         version = state.sdkVersion ?: "1.0.0",
@@ -119,6 +123,7 @@ fun SettingsScreen() {
                         showPrivacyButton = shouldShowPrivacyOptionsButton(state.privacyOptions),
                         busy = state.busy,
                         onManageConsent = { viewModel.onIntent(SettingsIntent.ShowPrivacyOptions) },
+                        onRetryStartup = { viewModel.onIntent(SettingsIntent.RetryStartup) },
                     )
                 }
 
@@ -209,6 +214,7 @@ fun SettingsScreen() {
 @Composable
 private fun SdkStatusCard(
     status: String,
+    startup: StartupState,
     consentStatus: String,
     testDeviceId: String,
     version: String,
@@ -217,6 +223,7 @@ private fun SdkStatusCard(
     showPrivacyButton: Boolean,
     busy: Boolean,
     onManageConsent: () -> Unit,
+    onRetryStartup: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -250,11 +257,33 @@ private fun SdkStatusCard(
             }
 
             LabelledValue("SDK Status", status)
+            LabelledValue(
+                "Startup State",
+                when (startup) {
+                    is StartupState.Failed -> "Failed (${startup.message})"
+                    else -> startup.toString()
+                },
+            )
             LabelledValue("SDK Version", version)
             LabelledValue("CMP Consent", consentStatus)
             LabelledValue("Can Request Ads", canRequestAds)
             LabelledValue("Privacy Options", privacyOptions)
             LabelledValue("Test Geography", testDeviceId)
+
+            if (startup !is StartupState.Ready) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Button(
+                    enabled = !busy,
+                    onClick = onRetryStartup,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = EmeraldPrimary,
+                        contentColor = Color.Black,
+                    ),
+                ) {
+                    Text("Retry Initialization")
+                }
+            }
 
             if (showPrivacyButton) {
                 Spacer(modifier = Modifier.height(4.dp))

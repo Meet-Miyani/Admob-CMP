@@ -53,7 +53,10 @@ fun ShowcaseApp() {
     ) {
         ProvideAdManager {
             val adManager = LocalAdManager.current
-            LaunchedEffect(graph, adManager) { graph.startTelemetry(adManager) }
+            LaunchedEffect(graph, adManager) {
+                graph.startTelemetry(adManager)
+                graph.startup.attach(adManager)
+            }
             AppOpenHost(suppressor = suppressor) {
                 ShowcaseTheme(themeMode = themeMode) {
                     // Hold the first screen until the preference resolves, otherwise
